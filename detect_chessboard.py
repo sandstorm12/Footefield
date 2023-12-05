@@ -1,6 +1,5 @@
 import os
 import cv2
-import logging
 import diskcache
 import data_loader
 
