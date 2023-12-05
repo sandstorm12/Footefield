@@ -1,1 +1,3 @@
+tqdm
+diskcache
 opencv-python
