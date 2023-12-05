@@ -15,6 +15,7 @@ def image_name_from_fullpath(fullpath):
     
     return image_name
 
+
 def extract_chessboardcorners(image_paths, cache, display=False):
     print(
         f"Processing --> {os.path.dirname(image_paths[0])}")
