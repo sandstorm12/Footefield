@@ -38,11 +38,14 @@ def extract_chessboardcorners(image_paths, cache, display=False):
         )
         gray = cv2.cvtColor(image_resized, cv2.COLOR_BGR2GRAY)
 
-        chessboard = cv2.findChessboardCorners(gray, (8, 11), None)
+        chessboard = cv2.findChessboardCorners(
+            gray, (CHESSBOARD_COLS, CHESSBOARD_ROWS), None)
 
         images_info[image_name] = {
             "fullpath": image_path,
-            "findchessboardcorners_rgb": chessboard
+            "findchessboardcorners_rgb": chessboard,
+            "width": image.shape[1],
+            "height": image.shape[0],
         }
 
         if display and chessboard[0]:
