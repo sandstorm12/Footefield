@@ -9,6 +9,10 @@ from multiprocessing import Process
 
 cache = diskcache.Cache('storage')
 
+CHESSBOARD_COLS = 8
+CHESSBOARD_ROWS = 11
+CHESSBOARD_SQRS = 60.
+
 
 def image_name_from_fullpath(fullpath):
     image_name = "/".join(fullpath.split("/")[-2:])
