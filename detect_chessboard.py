@@ -1,3 +1,7 @@
+"""
+cache `images_info` key: camera_folder value: findChessboardCorners_output
+"""
+
 import os
 import cv2
 import diskcache
@@ -71,8 +75,11 @@ def extract_chessboardcorners(image_paths, images_info, display=False):
         if chessboard[0]:
             success_count += 1
 
+
     print(f"Found {success_count} chessboards from " +
         f"{len(image_paths)} image for {camera_name}")
+    
+    return images_info
 
 
 if __name__ == "__main__":
@@ -80,15 +87,14 @@ if __name__ == "__main__":
     print(
         f"Images_info available: {cache_available}")
     
-    if not cache_available:
-        cache['images_info'] = {}
+    images_info = {}
 
     processes = []
     for path_calib in data_loader.PATH_CALIBS:
         calibration_images = data_loader.list_calibration_images(path_calib)
         process = Thread(
             target=extract_chessboardcorners,
-            args=(calibration_images['data'][data_loader.TYPE_RGB], cache['images_info'], _DISPLAY))
+            args=(calibration_images['data'][data_loader.TYPE_RGB], images_info, _DISPLAY))
         process.start()
         processes.append(process)
 
@@ -97,6 +103,8 @@ if __name__ == "__main__":
 
     for process in processes:
         process.join()
+
+    cache['images_info'] = images_info
 
     print(f"Grand num of found chessboards: {len(cache['images_info'])}")
     
