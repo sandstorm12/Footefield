@@ -12,12 +12,15 @@ from tqdm import tqdm
 
 
 def load_image_points(cache):
-    images_info = cache.get("images_info", None)
+    images_info = cache['images_info']
 
     criteria = (cv2.TERM_CRITERIA_MAX_ITER | cv2.TERM_CRITERIA_EPS, 30, 0.001)
     
     if not images_info:
         print("'images_info' not found.")
+
+    if len(images_info.keys()) == 0:
+        print("No images in images_info. Please run detect_chessboard first.")
 
     cameras = {}
     for key in images_info.keys():
@@ -56,7 +59,7 @@ def calculate_intrinsics(cameras_info, cache):
         width = cameras_info[key]['width']
         height = cameras_info[key]['height']
 
-        ret, mtx, dist, rvecs, tvecs = \
+        ret, mtx, dist, _, _ = \
             cv2.calibrateCamera(
                 np.tile(obj_points, (len(img_points), 1, 1)),
                 img_points,
