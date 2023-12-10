@@ -1,3 +1,7 @@
+"""
+cache `intrinsics` key: camera_folder value: ret, mtx, and dist of calibrateCamera output
+"""
+
 import cv2
 import diskcache
 import numpy as np
