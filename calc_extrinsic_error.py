@@ -7,6 +7,15 @@ import detect_chessboard
 from tqdm import tqdm
 
 
+ORDER_VALID = (
+    'azure_kinect1_5_calib_snap/azure_kinect1_4_calib_snap',
+    'azure_kinect1_4_calib_snap/azure_kinect3_4_calib_snap',
+    'azure_kinect3_4_calib_snap/azure_kinect3_5_calib_snap',
+    'azure_kinect3_5_calib_snap/azure_kinect2_4_calib_snap',
+    'azure_kinect2_4_calib_snap/azure_kinect1_5_calib_snap',
+)
+
+
 def get_obj_points():
     cols = detect_chessboard.CHESSBOARD_COLS
     rows = detect_chessboard.CHESSBOARD_ROWS
@@ -85,57 +94,58 @@ if __name__ == "__main__":
 
     cameras = list(intrinsics.keys())
     for cam1_idx in range(len(cameras)):
-        for cam2_idx in range(cam1_idx + 1, len(cameras)):
-            print(f"Calibrating... {cameras[cam1_idx]}"
-                  f" vs {cameras[cam2_idx]}")
-
+        for cam2_idx in range(len(cameras)):
             cam_1 = cameras[cam1_idx]
             cam_2 = cameras[cam2_idx]
+
+            if f"{cam_1}/{cam_2}" not in ORDER_VALID:
+                continue
+            
+            print(f"Calibrating... {cameras[cam1_idx]}"
+                  f" vs {cameras[cam2_idx]}")
 
             matching_pairs = find_matching_images(cache['images_info'], cam_1, cam_2)
 
             print(f"Matching pairs: {len(matching_pairs)}")
-            if len(matching_pairs) > 0:
-                img_points_1, width, height = load_image_points(
-                    cache, images=[item['cam_1_img'] for item in matching_pairs.values()])
-                img_points_2, width, height = load_image_points(
-                    cache, images=[item['cam_2_img'] for item in matching_pairs.values()])
 
-                mtx_1 = intrinsics[cam_1]['mtx']
-                dist_1 = intrinsics[cam_1]['dist']
-                rvecs_1 = intrinsics[cam_1]['rvecs']
-                tvecs_1 = intrinsics[cam_1]['tvecs']
+            img_points_1, width, height = load_image_points(
+                cache, images=[item['cam_1_img'] for item in matching_pairs.values()])
+            img_points_2, width, height = load_image_points(
+                cache, images=[item['cam_2_img'] for item in matching_pairs.values()])
 
-                mtx_2 = intrinsics[cam_2]['mtx']
-                dist_2 = intrinsics[cam_2]['dist']
-                rvecs_2 = intrinsics[cam_2]['rvecs']
-                tvecs_2 = intrinsics[cam_2]['tvecs']
+            mtx_1 = intrinsics[cam_1]['mtx']
+            dist_1 = intrinsics[cam_1]['dist']
+            rvecs_1 = intrinsics[cam_1]['rvecs']
+            tvecs_1 = intrinsics[cam_1]['tvecs']
 
-                stereocalibration_criteria = (cv2.TERM_CRITERIA_MAX_ITER + cv2.TERM_CRITERIA_EPS, 100, 1e-5)
-                stereocalibration_flags = 0 | cv2.CALIB_FIX_INTRINSIC
-                
-                # # STERO CALIBRATION
-                ret, mtx1, dist1, mtx2, dist2, R, T, E, F = cv2.stereoCalibrate(
-                    np.tile(obj_points, (len(img_points_1), 1, 1)),
-                    img_points_1, img_points_2,
-                    mtx_1, dist_1, mtx_2, dist_2, (width, height),
-                    criteria=stereocalibration_criteria, flags=stereocalibration_flags)
+            mtx_2 = intrinsics[cam_2]['mtx']
+            dist_2 = intrinsics[cam_2]['dist']
+            rvecs_2 = intrinsics[cam_2]['rvecs']
+            tvecs_2 = intrinsics[cam_2]['tvecs']
 
-                total_error = 0
-                for i in range(len(img_points_1)):
-                    imgpoints1_projected, _ = cv2.projectPoints(obj_points, rvecs_1[i], tvecs_1[i], mtx_1, dist_1)
-                    imgpoints2_projected, _ = cv2.projectPoints(obj_points, rvecs_2[i], tvecs_2[i], mtx_2, dist_2)
+            stereocalibration_criteria = (cv2.TERM_CRITERIA_MAX_ITER + cv2.TERM_CRITERIA_EPS, 100, 1e-5)
+            stereocalibration_flags = 0 | cv2.CALIB_FIX_INTRINSIC
+            
+            # # STERO CALIBRATION
+            ret, mtx_1, dist_1, mtx_2, dist_2, R, T, E, F = cv2.stereoCalibrate(
+                np.tile(obj_points, (len(img_points_1), 1, 1)),
+                img_points_1, img_points_2,
+                mtx_1, dist_1, mtx_2, dist_2, (width, height),
+                criteria=stereocalibration_criteria, flags=stereocalibration_flags)
 
-                    imgpoints1_projected = imgpoints1_projected.reshape(-1, 2)
-                    imgpoints2_projected = imgpoints2_projected.reshape(-1, 2)
+            total_error = 0
+            for i in range(len(img_points_1)):
+                ret, rvec_l, tvec_l = cv2.solvePnP(obj_points, img_points_1[i], mtx_1, dist_1)
+                ret, rvec_r, tvec_r = cv2.solvePnP(obj_points, img_points_2[i], mtx_2, dist_2)
 
-                    error1 = cv2.norm(img_points_1[i], imgpoints1_projected, cv2.NORM_L2) / len(imgpoints1_projected)
-                    error2 = cv2.norm(img_points_2[i], imgpoints2_projected, cv2.NORM_L2) / len(imgpoints2_projected)
-                    print(f"Errors: {error1} {error2}")
-                    total_error += (error1 + error2) / 2
-
-                # Print the average projection error
-                print("Average projection error: ", total_error / len(img_points_1))
+                imgpoints1_projected, _ = cv2.projectPoints(obj_points, rvec_l, tvec_l, mtx_1, dist_1)
+                imgpoints2_projected, _ = cv2.projectPoints(obj_points, rvec_r, tvec_r, mtx_2, dist_2)
 
 
+                error1 = cv2.norm(img_points_1[i], imgpoints1_projected, cv2.NORM_L2) / len(imgpoints1_projected)
+                error2 = cv2.norm(img_points_2[i], imgpoints2_projected, cv2.NORM_L2) / len(imgpoints2_projected)
+                print(f"Errors: cam1 {error1} cam2 {error2}")
+                total_error += (error1 + error2) / 2
 
+            # Print the average projection error
+            print("Average projection error: ", total_error / len(img_points_1))
