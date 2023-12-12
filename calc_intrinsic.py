@@ -59,7 +59,7 @@ def calculate_intrinsics(cameras_info, cache):
         width = cameras_info[key]['width']
         height = cameras_info[key]['height']
 
-        ret, mtx, dist, _, _ = \
+        ret, mtx, dist, rvecs, tvecs = \
             cv2.calibrateCamera(
                 np.tile(obj_points, (len(img_points), 1, 1)),
                 img_points,
@@ -69,6 +69,8 @@ def calculate_intrinsics(cameras_info, cache):
             "ret": ret,
             "mtx": mtx,
             "dist": dist,
+            "rvecs": rvecs,
+            "tvecs": tvecs,
         }
 
     cache['intrinsics'] = intrinsics
