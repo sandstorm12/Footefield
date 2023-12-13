@@ -77,7 +77,7 @@ def calculate_intrinsics(cameras_info, cache):
 
 
 if __name__ == "__main__":
-    cache = diskcache.Cache('storage')
+    cache = diskcache.Cache('cache')
 
     cameras_info = load_image_points(cache)
     calculate_intrinsics(cameras_info, cache)
