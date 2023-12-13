@@ -85,7 +85,7 @@ def find_matching_images(images_info, cam_1, cam_2):
 
 
 if __name__ == "__main__":
-    cache = diskcache.Cache('storage')
+    cache = diskcache.Cache('cache')
 
     print("Cache keys:", get_all_keys(cache))
 
