@@ -14,7 +14,7 @@ IMAGE_DIRS = [
 ]
 
 if __name__ == "__main__":
-    cache = diskcache.Cache('storage')
+    cache = diskcache.Cache('cache')
     intrinsics = cache.get("intrinsics", None)
 
     for image_dir in IMAGE_DIRS:
