@@ -2,16 +2,17 @@
 cache `images_info` key: camera_folder value: findChessboardCorners_output
 """
 
+import sys
+sys.path.append('../')
+
 import os
 import cv2
 import diskcache
-import data_loader
+from utils import data_loader
 
 from tqdm import tqdm
 from threading import Thread
 
-
-cache = diskcache.Cache('storage')
 
 CHESSBOARD_COLS = 8
 CHESSBOARD_ROWS = 11
@@ -83,6 +84,7 @@ def extract_chessboardcorners(image_paths, images_info, display=False):
 
 
 if __name__ == "__main__":
+    cache = diskcache.Cache('cache')
     cache_available = cache.__contains__('images_info')
     print(
         f"Images_info available: {cache_available}")
