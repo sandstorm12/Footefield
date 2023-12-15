@@ -34,12 +34,9 @@ def load_image_points(cache):
         if not ret:
             continue
         
-        image_gray = cv2.imread(images_info[key]['fullpath'], cv2.IMREAD_GRAYSCALE)
-        corners_refined = cv2.cornerSubPix(image_gray, corners, (5, 5), (-1, -1), criteria)
-
-        camera_points['img_points'].append(corners_refined)
-        camera_points['width'] = image_gray.shape[1] # images_info[key]['width']
-        camera_points['height'] = image_gray.shape[0] # ['height']
+        camera_points['img_points'].append(corners)
+        camera_points['width'] = images_info[key]['width'] # images_info[key]['width']
+        camera_points['height'] = images_info[key]['height'] # ['height']
 
     return cameras
 
