@@ -79,6 +79,37 @@ def find_matching_images(images_info, cam_1, cam_2):
     return matching_pairs
 
 
+def visualize_points(img_paths_1, img_paths_2, imgpoints1_projected, imgpoints2_projected):
+    image_1 = cv2.imread(img_paths_1[i])
+    image_2 = cv2.imread(img_paths_2[i])
+    for idx_point, point in enumerate(imgpoints1_projected):
+        x = int(point[0][0])
+        y = int(point[0][1])
+
+        cv2.circle(
+            image_1, (x, y), 10, (0, 0, 0),
+            thickness=-1, lineType=8)
+
+        cv2.putText(
+            image_1, str(idx_point), (x - 5, y + 5),
+            cv2.FONT_HERSHEY_SIMPLEX, .5, (255, 255, 255), thickness=2)
+    
+    for idx_point, point in enumerate(imgpoints2_projected):
+        x = int(point[0][0])
+        y = int(point[0][1])
+
+        cv2.circle(
+            image_2, (x, y), 10, (0, 0, 0),
+            thickness=-1, lineType=8)
+
+        cv2.putText(
+            image_2, str(idx_point), (x - 5, y + 5),
+            cv2.FONT_HERSHEY_SIMPLEX, .5, (255, 255, 255), thickness=2)
+        
+    return image_1, image_2
+
+
+# This is too long
 if __name__ == "__main__":
     cache = diskcache.Cache('cache')
 
@@ -141,38 +172,12 @@ if __name__ == "__main__":
                 print(f"Errors: cam1 {error1} cam2 {error2}")
                 total_error += (error1 + error2) / 2
 
-                # image_1_addr = images_info[matching_pairs[key]['cam_1_img']]['fullpath']
-                print(list(matching_pairs.values())[i]['cam_1_img'])
-                image_1 = cv2.imread(img_paths_1[i])
-                # image_2_addr = images_info[matching_pairs[key]['cam_2_img']]['fullpath']
-                image_2 = cv2.imread(img_paths_2[i])
+                image_l, image_r = visualize_points(
+                    img_paths_1, img_paths_2,
+                    imgpoints1_projected, imgpoints2_projected)
 
-                for idx_point, point in enumerate(imgpoints1_projected):
-                    x = int(point[0][0])
-                    y = int(point[0][1])
-
-                    cv2.circle(
-                        image_1, (x, y), 10, (0, 0, 0),
-                        thickness=-1, lineType=8)
-
-                    cv2.putText(
-                        image_1, str(idx_point), (x, y),
-                        cv2.FONT_HERSHEY_SIMPLEX, .5, (255, 255, 255), thickness=2)
-                
-                for idx_point, point in enumerate(imgpoints2_projected):
-                    x = int(point[0][0])
-                    y = int(point[0][1])
-
-                    cv2.circle(
-                        image_2, (x, y), 10, (0, 0, 0),
-                        thickness=-1, lineType=8)
-
-                    cv2.putText(
-                        image_2, str(idx_point), (x, y),
-                        cv2.FONT_HERSHEY_SIMPLEX, .5, (255, 255, 255), thickness=2)
-
-                cv2.imshow("image1", cv2.resize(image_1, (960, 1080)))
-                cv2.imshow("image2", cv2.resize(image_2, (960, 1080)))
+                cv2.imshow("image1", cv2.resize(image_l, (960, 1080)))
+                cv2.imshow("image2", cv2.resize(image_r, (960, 1080)))
                 key = cv2.waitKey(0)
                 if key == ord('q'):
                     break
