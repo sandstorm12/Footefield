@@ -21,6 +21,8 @@ CHESSBOARD_SQRS = 60.
 _PARALLEL = True
 _DISPLAY = False
 
+criteria = (cv2.TERM_CRITERIA_MAX_ITER | cv2.TERM_CRITERIA_EPS, 30, 0.001)
+
 
 def image_name_from_fullpath(fullpath):
     image_name = "/".join(fullpath.split("/")[-2:])
@@ -45,13 +47,16 @@ def extract_chessboardcorners(image_paths, images_info, display=False):
         )
         gray = cv2.cvtColor(image_resized, cv2.COLOR_BGR2GRAY)
 
-        chessboard = cv2.findChessboardCorners(
+        ret, corners = cv2.findChessboardCorners(
             gray, (CHESSBOARD_COLS, CHESSBOARD_ROWS),
             cv2.CALIB_CB_ADAPTIVE_THRESH + cv2.CALIB_CB_NORMALIZE_IMAGE)
+        
+        if ret:
+            corners = cv2.cornerSubPix(gray, corners, (5, 5), (-1, -1), criteria)
 
         images_info[image_name] = {
             "fullpath": image_path,
-            "findchessboardcorners_rgb": chessboard,
+            "findchessboardcorners_rgb": (ret, corners),
             "width": image.shape[1],
             "height": image.shape[0],
         }
@@ -59,8 +64,8 @@ def extract_chessboardcorners(image_paths, images_info, display=False):
         # print(f"{chessboard[0]} --> {image_path}")
 
         if display:
-            if chessboard[0]:
-                for point in chessboard[1]:
+            if ret:
+                for point in corners:
                     x = int(point[0][0])
                     y = int(point[0][1])
 
@@ -73,7 +78,7 @@ def extract_chessboardcorners(image_paths, images_info, display=False):
             if key == ord('q'):
                 break
 
-        if chessboard[0]:
+        if ret:
             success_count += 1
 
 
