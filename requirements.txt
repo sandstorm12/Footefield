@@ -1,3 +1,6 @@
 tqdm
 diskcache
 opencv-python
+
+mediapipe
+mmpose
