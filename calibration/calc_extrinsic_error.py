@@ -123,8 +123,8 @@ if __name__ == "__main__":
             rvecs_2 = intrinsics[cam_2]['rvecs']
             tvecs_2 = intrinsics[cam_2]['tvecs']
 
-            stereocalibration_criteria = (cv2.TERM_CRITERIA_MAX_ITER + cv2.TERM_CRITERIA_EPS, 100, 1e-5)
-            stereocalibration_flags = 0 | cv2.CALIB_FIX_INTRINSIC
+            stereocalibration_criteria = (cv2.TERM_CRITERIA_MAX_ITER + cv2.TERM_CRITERIA_EPS, 1000, 1e-6)
+            stereocalibration_flags = 0
             
             # # STERO CALIBRATION
             ret, mtx_1, dist_1, mtx_2, dist_2, R, T, E, F = cv2.stereoCalibrate(
@@ -136,11 +136,10 @@ if __name__ == "__main__":
             total_error = 0
             for i in range(len(img_points_1)):
                 ret, rvec_l, tvec_l = cv2.solvePnP(obj_points, img_points_1[i], mtx_1, dist_1)
-                ret, rvec_r, tvec_r = cv2.solvePnP(obj_points, img_points_2[i], mtx_2, dist_2)
+                rvec_r, tvec_r = cv2.composeRT(rvec_l, tvec_l, cv2.Rodrigues(R)[0], T)[:2]
 
                 imgpoints1_projected, _ = cv2.projectPoints(obj_points, rvec_l, tvec_l, mtx_1, dist_1)
                 imgpoints2_projected, _ = cv2.projectPoints(obj_points, rvec_r, tvec_r, mtx_2, dist_2)
-
 
                 error1 = cv2.norm(img_points_1[i], imgpoints1_projected, cv2.NORM_L2) / len(imgpoints1_projected)
                 error2 = cv2.norm(img_points_2[i], imgpoints2_projected, cv2.NORM_L2) / len(imgpoints2_projected)
