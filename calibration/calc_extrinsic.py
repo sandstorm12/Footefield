@@ -51,8 +51,6 @@ def load_image_points(cache, images):
 
     img_points = []
     for key in tqdm(images):
-        camera = key.split("/")[0]
-
         ret, corners = images_info[key]['findchessboardcorners_rgb']
         if not ret:
             continue
@@ -92,7 +90,7 @@ def find_matching_images(images_info, cam_1, cam_2):
     return matching_pairs
 
 
-def calc_reprojection_error(cam_1, cam_2, obj_points, intrinsics, cache):
+def calc_extrinsics(cam_1, cam_2, obj_points, cache):
     print(f"Calibrating... {cam_1} vs {cam_2}")
 
     matching_pairs = find_matching_images(cache['images_info'], cam_1, cam_2)
@@ -104,19 +102,50 @@ def calc_reprojection_error(cam_1, cam_2, obj_points, intrinsics, cache):
     img_points_2, width, height = load_image_points(
         cache, images=[item['cam_2_img'] for item in matching_pairs.values()])
 
-    mtx_1 = intrinsics[cam_1]['mtx']
-    dist_1 = intrinsics[cam_1]['dist']
-
-    mtx_2 = intrinsics[cam_2]['mtx']
-    dist_2 = intrinsics[cam_2]['dist']
-
-    # STERO CALIBRATION
-    _, mtx_1, dist_1, mtx_2, dist_2, R, T, E, F = cv2.stereoCalibrate(
+    _, mtx_1, dist_1, mtx_2, dist_2, R, T, _, _ = cv2.stereoCalibrate(
         np.tile(obj_points, (len(img_points_1), 1, 1)),
         img_points_1, img_points_2,
-        mtx_1, dist_1, mtx_2, dist_2, (width, height),
+        None, None, None, None, (width, height),
         criteria=STEREO_CALIBRATION_CRITERIA, flags=0)
+    
+    if not cache.__contains__('extrinsics'):
+        cache['extrinsics'] = {}
 
+    extrinsics = cache['extrinsics']
+    extrinsics[cam_1] = {
+        'right_cam': cam_2,
+        'mtx_l': mtx_1,
+        'dist_l': dist_1,
+        'mtx_r': mtx_2,
+        'dist_r': dist_2,
+        'rotation': R,
+        'transition': T,
+    }
+    cache['extrinsics'] = extrinsics
+
+
+def calc_reprojection_error(cam_1, cam_2, obj_points, cache):
+    print(f"Calibrating... {cam_1} vs {cam_2}")
+
+    matching_pairs = find_matching_images(cache['images_info'], cam_1, cam_2)
+
+    print(f"Matching pairs: {len(matching_pairs)}")
+
+    img_points_1, _, _ = load_image_points(
+        cache, images=[item['cam_1_img'] for item in matching_pairs.values()])
+    img_points_2, _, _ = load_image_points(
+        cache, images=[item['cam_2_img'] for item in matching_pairs.values()])
+
+    if not cache.__contains__('extrinsics'):
+        raise Exception('Extrinsics not cached.')
+    
+    mtx_1 = cache['extrinsics'][cam_1]['mtx_l']
+    dist_1 = cache['extrinsics'][cam_1]['dist_l']
+    mtx_2 = cache['extrinsics'][cam_1]['mtx_r']
+    dist_2 = cache['extrinsics'][cam_1]['dist_r']
+    R = cache['extrinsics'][cam_1]['rotation']
+    T = cache['extrinsics'][cam_1]['transition']
+    
     total_error = 0
     for i in range(len(img_points_1)):
         _, rvec_l, tvec_l = cv2.solvePnP(obj_points, img_points_1[i], mtx_1, dist_1)
@@ -157,4 +186,5 @@ if __name__ == "__main__":
             if f"{cam_1}/{cam_2}" not in ORDER_VALID:
                 continue
                     
-            calc_reprojection_error(cam_1, cam_2, obj_points, intrinsics, cache)
+            calc_extrinsics(cam_1, cam_2, obj_points, cache)
+            calc_reprojection_error(cam_1, cam_2, obj_points, cache)
