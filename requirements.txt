@@ -1,3 +1,7 @@
 tqdm
 diskcache
 opencv-python
+
+mmpose
+mmcv
+mmdet
