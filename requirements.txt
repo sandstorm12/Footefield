@@ -2,5 +2,6 @@ tqdm
 diskcache
 opencv-python
 
-mediapipe
 mmpose
+mmcv
+mmdet
