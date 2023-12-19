@@ -51,7 +51,11 @@ def list_calibration_images(dir):
 
 
 def image_name_from_fullpath(fullpath):
-    image_name = "/".join(fullpath.split("/")[-2:])
-    image_name = re.sub(PATTERN_NAME, "", image_name)
+    dir, name = fullpath.split("/")[-2:]
+
+    name = name.split(".")[0]
+    name = re.sub(PATTERN_NAME, "", name)
+
+    image_name = f"{dir}/{name}"
     
     return image_name
