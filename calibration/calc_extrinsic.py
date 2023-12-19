@@ -5,8 +5,6 @@ import cv2
 import diskcache
 import numpy as np
 
-import detect_chessboard
-
 from tqdm import tqdm
 from utils import data_loader
 

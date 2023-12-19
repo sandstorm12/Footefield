@@ -86,6 +86,7 @@ def find_matching_images(images_info, cam_1, cam_2):
     return matching_pairs
 
 
+# This is too long. trim this function.
 if __name__ == "__main__":
     cache = diskcache.Cache('cache')
 
