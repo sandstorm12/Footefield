@@ -79,8 +79,6 @@ def extract_chessboardcorners(image_paths, images_info, display=False):
 
     print(f"Found {success_count} chessboards from " +
         f"{len(image_paths)} image for {camera_name}")
-    
-    return images_info
 
 
 def detect_chessboards():
