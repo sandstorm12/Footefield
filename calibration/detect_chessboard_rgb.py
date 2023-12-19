@@ -47,9 +47,10 @@ def extract_chessboardcorners(image_paths, images_info, display=False):
         if images_info.__contains__(image_name):
             images_info[image_name]['findchessboardcorners_rgb'] = \
                 (ret, corners)
+            images_info[image_name]['fullpath_rgb'] = image_path
         else:
             images_info[image_name] = {
-                "fullpath": image_path,
+                "fullpath_rgb": image_path,
                 "findchessboardcorners_rgb": (ret, corners),
                 "width": image.shape[1],
                 "height": image.shape[0],
