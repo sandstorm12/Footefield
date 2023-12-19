@@ -1,4 +1,5 @@
 import os
+import re
 import glob
 
 
@@ -13,6 +14,12 @@ PATH_CALIBS = [
 TYPE_RGB = "TYPE_RGB"
 TYPE_DEPTH = "TYPE_DEPTH"
 TYPE_INFRARED = "TYPE_INFRARED"
+
+CHESSBOARD_COLS = 8
+CHESSBOARD_ROWS = 11
+CHESSBOARD_SQRS = 60.
+
+PATTERN_NAME = r"(color|depth|infrared)"
 
 
 def list_rgb_images(dir):
@@ -41,3 +48,10 @@ def list_calibration_images(dir):
     calibration_images["data"][TYPE_INFRARED] = list_infrared_images(dir)
 
     return calibration_images
+
+
+def image_name_from_fullpath(fullpath):
+    image_name = "/".join(fullpath.split("/")[-2:])
+    image_name = re.sub(PATTERN_NAME, "", image_name)
+    
+    return image_name
