@@ -2,6 +2,9 @@
 cache `intrinsics` key: camera_folder value: ret, mtx, and dist of calibrateCamera output
 """
 
+import sys
+sys.path.append('../')
+
 import cv2
 import diskcache
 import numpy as np
@@ -9,6 +12,7 @@ import numpy as np
 import detect_chessboard
 
 from tqdm import tqdm
+from utils import data_loader
 
 
 def load_image_points(cache):
@@ -42,9 +46,9 @@ def load_image_points(cache):
 
 
 def calculate_intrinsics(cameras_info, cache):
-    cols = detect_chessboard.CHESSBOARD_COLS
-    rows = detect_chessboard.CHESSBOARD_ROWS
-    square_size = detect_chessboard.CHESSBOARD_SQRS
+    cols = data_loader.CHESSBOARD_COLS
+    rows = data_loader.CHESSBOARD_ROWS
+    square_size = data_loader.CHESSBOARD_SQRS
 
     obj_points = np.zeros((cols * rows, 3), np.float32)
     obj_points[:, :2] = np.mgrid[0:cols, 0:rows].T.reshape(-1, 2) * square_size

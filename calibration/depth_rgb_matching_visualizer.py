@@ -17,7 +17,7 @@ for path_calib in data_loader.PATH_CALIBS:
     calibration_images = data_loader.list_calibration_images(path_calib)
 
     paths_rgb_sorted = sorted(calibration_images['data']['TYPE_RGB'])
-    paths_dpt_sorted = sorted(calibration_images['data']['TYPE_DEPTH'])
+    paths_dpt_sorted = sorted(calibration_images['data']['TYPE_INFRARED'])
 
     for idx in range(len(calibration_images['data']['TYPE_RGB'])):
         print(paths_rgb_sorted[idx])

@@ -1,3 +1,6 @@
+import sys
+sys.path.append('../')
+
 import cv2
 import diskcache
 import numpy as np
@@ -5,6 +8,7 @@ import numpy as np
 import detect_chessboard
 
 from tqdm import tqdm
+from utils import data_loader
 
 
 ORDER_VALID = (
@@ -21,9 +25,9 @@ STEREO_CALIBRATION_CRITERIA = (
 
 
 def get_obj_points():
-    cols = detect_chessboard.CHESSBOARD_COLS
-    rows = detect_chessboard.CHESSBOARD_ROWS
-    square_size = detect_chessboard.CHESSBOARD_SQRS
+    cols = data_loader.CHESSBOARD_COLS
+    rows = data_loader.CHESSBOARD_ROWS
+    square_size = data_loader.CHESSBOARD_SQRS
 
     obj_points = np.zeros((cols * rows, 3), np.float32)
     obj_points[:, :2] = np.mgrid[0:cols, 0:rows].T.reshape(-1, 2) * square_size
