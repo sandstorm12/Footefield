@@ -87,7 +87,10 @@ def detect_chessboards():
     print(
         f"Images_info available: {cache_available}")
     
-    images_info = {}
+    if cache_available:
+        images_info = cache['images_info']
+    else:
+        images_info = {}
 
     processes = []
     for path_calib in data_loader.PATH_CALIBS:

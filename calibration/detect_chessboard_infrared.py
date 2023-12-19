@@ -91,11 +91,15 @@ def calculate_total_success_dets(cache):
 
 def detect_chessboards():
     cache = diskcache.Cache('cache')
+    
     cache_available = cache.__contains__('images_info')
     print(
         f"Images_info available: {cache_available}")
     
-    images_info = {}
+    if cache_available:
+        images_info = cache['images_info']
+    else:
+        images_info = {}
 
     processes = []
     for path_calib in data_loader.PATH_CALIBS:
