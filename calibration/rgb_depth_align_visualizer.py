@@ -136,24 +136,27 @@ def calc_reprojection_error(cam_1, obj_points, cache):
     R = cache['depth_matching'][cam_1]['rotation']
     T = cache['depth_matching'][cam_1]['transition']
     
-    R1, R2, P1, P2, Q, roi1, roi2 = cv2.stereoRectify(mtx_1, dist_1, mtx_2, dist_2, (1920, 1080), R, T)
-    map1x, map1y = cv2.initUndistortRectifyMap(mtx_1, dist_1, R1, P1, (1920, 1080), cv2.CV_32FC1)
-    map2x, map2y = cv2.initUndistortRectifyMap(mtx_2, dist_2, R2, P2, (1920, 1080), cv2.CV_32FC1)
+    R1, R2, P1, P2, Q, roi1, roi2 = cv2.stereoRectify(
+        mtx_1, dist_1, mtx_2, dist_2, (1920, 1080),
+        R, T, flags=cv2.CALIB_ZERO_DISPARITY, alpha=-1)
+    
+    map1x, map1y = cv2.initUndistortRectifyMap(mtx_1, dist_1, R1, P1, (1920, 1080), cv2.CV_16SC2)
+    map2x, map2y = cv2.initUndistortRectifyMap(mtx_2, dist_2, R2, P2, (1920, 1080), cv2.CV_16SC2)
 
     for idx in range(len(rgb_depth_pairs['image_points_rgb'])):
         img_rgb = cv2.imread(rgb_depth_pairs['image_paths_rgb'][idx], cv2.IMREAD_GRAYSCALE)
-        img_rgb = cv2.remap(img_rgb, map1x, map1y, cv2.INTER_LINEAR)
+        img_rgb = cv2.remap(img_rgb, map1x, map1y, cv2.INTER_LANCZOS4)
 
         img_inf = cv2.imread(rgb_depth_pairs['image_paths_infrared'][idx], -1)
-        img_inf = np.clip(img_inf.astype(np.float32) * 2., 0, 255).astype('uint8')
+        img_inf = np.clip(img_inf.astype(np.float32) * .8, 0, 255).astype('uint8')
         img_inf = cv2.resize(img_inf, (1920, 1080))
-        img_inf = cv2.remap(img_inf, map2x, map2y, cv2.INTER_LINEAR)
+        img_inf = cv2.remap(img_inf, map2x, map2y, cv2.INTER_LANCZOS4)
 
         img_cmb = (img_rgb * .5 + img_inf * .5).astype(np.uint8)
 
         # cv2.imshow("RGB", img_rgb)
         # cv2.imshow("INF", img_inf)
-        cv2.imshow("INF", img_cmb)
+        cv2.imshow("CMB", img_cmb)
         if cv2.waitKey(0) == ord('q'):
             break
 
