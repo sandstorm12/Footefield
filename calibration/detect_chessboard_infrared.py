@@ -45,12 +45,11 @@ def extract_chessboardcorners(image_paths, images_info, display=False):
                     gray, (data_loader.CHESSBOARD_COLS, data_loader.CHESSBOARD_ROWS))
                 
                 if ret:
-                    # print(thr)
                     break
             
             if ret:
                 corners = cv2.cornerSubPix(
-                    gray, corners, (5, 5), (-1, -1), criteria)
+                    gray, corners, (11, 11), (-1, -1), criteria)
         else:
             ret = False
             corners = None
