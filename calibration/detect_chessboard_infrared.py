@@ -9,6 +9,8 @@ import os
 import re
 import cv2
 import diskcache
+import numpy as np
+import matplotlib.pyplot as plt
 from utils import data_loader
 
 from tqdm import tqdm
@@ -32,15 +34,26 @@ def extract_chessboardcorners(image_paths, images_info, display=False):
     bar.set_description(camera_name)
     for image_path in bar:
         image_name = data_loader.image_name_from_fullpath(image_path)
-        gray = cv2.imread(image_path, cv2.IMREAD_GRAYSCALE)
 
-        ret, corners = cv2.findChessboardCorners(
-            gray, (data_loader.CHESSBOARD_COLS, data_loader.CHESSBOARD_ROWS),
-            cv2.CALIB_CB_ADAPTIVE_THRESH + cv2.CALIB_CB_NORMALIZE_IMAGE)
-        
-        if ret:
-            corners = cv2.cornerSubPix(
-                gray, corners, (5, 5), (-1, -1), criteria)
+        if not images_info.__contains__(image_name) or (images_info.__contains__(image_name) and images_info[image_name]['findchessboardcorners_rgb'][0]): 
+            gray_org = cv2.imread(image_path, -1)
+
+            for thr in [.8, .5, .2, .1]:
+                gray = np.clip(gray_org.astype(np.float32) * thr, 0, 255).astype('uint8')
+                gray = cv2.resize(gray, (1920, 1080))
+                ret, corners = cv2.findChessboardCorners(
+                    gray, (data_loader.CHESSBOARD_COLS, data_loader.CHESSBOARD_ROWS))
+                
+                if ret:
+                    # print(thr)
+                    break
+            
+            if ret:
+                corners = cv2.cornerSubPix(
+                    gray, corners, (5, 5), (-1, -1), criteria)
+        else:
+            ret = False
+            corners = None
 
         if images_info.__contains__(image_name):
             images_info[image_name]['findchessboardcorners_infrared'] = \
@@ -57,6 +70,7 @@ def extract_chessboardcorners(image_paths, images_info, display=False):
         # print(f"{chessboard[0]} --> {image_path}")
 
         if display:
+            print("ret", ret)
             if ret:
                 for point in corners:
                     x = int(point[0][0])
@@ -64,12 +78,12 @@ def extract_chessboardcorners(image_paths, images_info, display=False):
 
                     cv2.circle(
                         gray, (x, y), 10, (123, 105, 34),
-                        thickness=-1, lineType=8) 
+                        thickness=-1, lineType=8)
 
-            cv2.imshow("gray", cv2.equalizeHist(gray))
-            key = cv2.waitKey(0)
-            if key == ord('q'):
-                break
+                cv2.imshow("gray", gray)
+                key = cv2.waitKey(0)
+                if key == ord('q'):
+                    break
 
         if ret:
             success_count += 1
