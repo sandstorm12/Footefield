@@ -13,6 +13,8 @@ STEREO_CALIBRATION_CRITERIA = (
     cv2.TERM_CRITERIA_MAX_ITER + cv2.TERM_CRITERIA_EPS,
     1000, 1e-6)
 
+DISPARITY = -18
+
 
 def get_obj_points():
     cols = data_loader.CHESSBOARD_COLS
@@ -89,36 +91,6 @@ def find_rgb_depth_images(images_info, cam_1):
     return rgb_depth_pairs
 
 
-def calc_depth_rgb_match(cam_1, obj_points, cache):
-    print(f"Calibrating... {cam_1}")
-
-    rgb_depth_pairs = find_rgb_depth_images(cache['images_info'], cam_1)
-
-    print(f"Matching pairs: {len(rgb_depth_pairs['image_points_rgb'])}")
-
-    _, mtx_1, dist_1, mtx_2, dist_2, R, T, _, _ = cv2.stereoCalibrate(
-        np.tile(obj_points, (len(rgb_depth_pairs['image_points_rgb']), 1, 1)),
-        rgb_depth_pairs['image_points_rgb'],
-        rgb_depth_pairs['image_points_infrared'],
-        None, None, None, None,
-        (1920, 1080),
-        criteria=STEREO_CALIBRATION_CRITERIA, flags=0)
-    
-    if not cache.__contains__('extrinsics'):
-        cache['extrinsics'] = {}
-
-    depth_matching = cache.get('depth_matching', {})
-    depth_matching[cam_1] = {
-        'mtx_l': mtx_1,
-        'dist_l': dist_1,
-        'mtx_r': mtx_2,
-        'dist_r': dist_2,
-        'rotation': R,
-        'transition': T,
-    }
-    cache['depth_matching'] = depth_matching
-
-
 def calc_reprojection_error(cam_1, obj_points, cache):
     print(f"Calibrating... {cam_1}")
 
@@ -126,66 +98,38 @@ def calc_reprojection_error(cam_1, obj_points, cache):
 
     print(f"Matching pairs: {len(rgb_depth_pairs['image_points_rgb'])}")
 
-    if not cache.__contains__('extrinsics'):
-        raise Exception('Extrinsics not cached.')
+    if not cache.__contains__('depth_matching'):
+        raise Exception('Depth matching not cached. '
+                        'Run rgb_depth_calibration script.')
     
-    mtx_1 = cache['depth_matching'][cam_1]['mtx_l']
-    dist_1 = cache['depth_matching'][cam_1]['dist_l']
-    mtx_2 = cache['depth_matching'][cam_1]['mtx_r']
-    dist_2 = cache['depth_matching'][cam_1]['dist_r']
-    R = cache['depth_matching'][cam_1]['rotation']
-    T = cache['depth_matching'][cam_1]['transition']
+    map1x = cache['depth_matching'][cam_1]['map_rgb_x']
+    map1y = cache['depth_matching'][cam_1]['map_rgb_y']
+    map2x = cache['depth_matching'][cam_1]['map_infrared_x']
+    map2y = cache['depth_matching'][cam_1]['map_infrared_y']
     
-    R1, R2, P1, P2, Q, roi1, roi2 = cv2.stereoRectify(
-        mtx_1, dist_1, mtx_2, dist_2, (1920, 1080),
-        R, T, flags=cv2.CALIB_ZERO_DISPARITY, alpha=-1)
-    
-    map1x, map1y = cv2.initUndistortRectifyMap(mtx_1, dist_1, R1, P1, (1920, 1080), cv2.CV_16SC2)
-    map2x, map2y = cv2.initUndistortRectifyMap(mtx_2, dist_2, R2, P2, (1920, 1080), cv2.CV_16SC2)
-
     for idx in range(len(rgb_depth_pairs['image_points_rgb'])):
-        img_rgb = cv2.imread(rgb_depth_pairs['image_paths_rgb'][idx], cv2.IMREAD_GRAYSCALE)
+        img_rgb = cv2.imread(rgb_depth_pairs['image_paths_rgb'][idx],
+                             cv2.IMREAD_GRAYSCALE)
         img_rgb = cv2.remap(img_rgb, map1x, map1y, cv2.INTER_LANCZOS4)
 
         img_inf = cv2.imread(rgb_depth_pairs['image_paths_infrared'][idx], -1)
-        img_inf = np.clip(img_inf.astype(np.float32) * .8, 0, 255).astype('uint8')
-        img_inf = cv2.resize(img_inf, (1920, 1080))
+
+        # Remove magic number .8
+        img_inf = np.clip(
+            img_inf.astype(np.float32) * .8, 0, 255).astype('uint8')
+        img_inf = cv2.resize(
+            img_inf,
+            (data_loader.IMAGE_RGB_WIDTH, data_loader.IMAGE_RGB_HEIGHT))
         img_inf = cv2.remap(img_inf, map2x, map2y, cv2.INTER_LANCZOS4)
+
+        # Add the dispartiy between RGB and INFRARED cameras
+        img_inf = np.roll(img_inf, DISPARITY, axis=1)
 
         img_cmb = (img_rgb * .5 + img_inf * .5).astype(np.uint8)
 
-        # cv2.imshow("RGB", img_rgb)
-        # cv2.imshow("INF", img_inf)
         cv2.imshow("CMB", img_cmb)
         if cv2.waitKey(0) == ord('q'):
             break
-
-    total_error = 0
-    for i in range(len(rgb_depth_pairs['image_points_rgb'])):
-        _, rvec_l, tvec_l = cv2.solvePnP(
-            obj_points, rgb_depth_pairs['image_points_rgb'][i], mtx_1, dist_1)
-        rvec_r, tvec_r = cv2.composeRT(
-            rvec_l, tvec_l, cv2.Rodrigues(R)[0], T)[:2]
-
-        imgpoints1_projected, _ = cv2.projectPoints(
-            obj_points, rvec_l, tvec_l, mtx_1, dist_1)
-        imgpoints2_projected, _ = cv2.projectPoints(
-            obj_points, rvec_r, tvec_r, mtx_2, dist_2)
-
-        error1 = cv2.norm(
-            rgb_depth_pairs['image_points_rgb'][i],
-            imgpoints1_projected, cv2.NORM_L2) \
-                / len(imgpoints1_projected)
-        error2 = cv2.norm(
-            rgb_depth_pairs['image_points_infrared'][i],
-            imgpoints2_projected, cv2.NORM_L2) \
-                / len(imgpoints2_projected)
-        print(f"Errors: cam1 {error1} cam2 {error2}")
-        total_error += (error1 + error2) / 2
-
-    # Print the average projection error
-    print("Average projection error: ",
-          total_error / len(rgb_depth_pairs['image_points_rgb']))
 
 
 if __name__ == "__main__":
@@ -198,5 +142,4 @@ if __name__ == "__main__":
     for cam1_idx in range(len(cameras)):
         cam_1 = cameras[cam1_idx]
 
-        calc_depth_rgb_match(cam_1, obj_points, cache)
         calc_reprojection_error(cam_1, obj_points, cache)
