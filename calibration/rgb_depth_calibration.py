@@ -54,7 +54,7 @@ def load_image_points(cache, images):
     return img_points, width, height
 
 
-def find_rgb_depth_images(images_info, cam_1):
+def find_rgb_depth_images(images_info, camera):
     images_info = cache['images_info']
 
     image_points_rgb = []
@@ -62,7 +62,7 @@ def find_rgb_depth_images(images_info, cam_1):
     width = None
     height = None
     for key in images_info.keys():
-        if key.split("/")[0] == cam_1:
+        if key.split("/")[0] == camera:
             points_found_rgb, points_rgb = \
                 images_info[key]['findchessboardcorners_rgb']
             points_found_infrared, points_infrared = \
@@ -83,10 +83,10 @@ def find_rgb_depth_images(images_info, cam_1):
     return rgb_depth_pairs
 
 
-def calc_depth_rgb_match(cam_1, obj_points, cache):
-    print(f"Calibrating... {cam_1}")
+def calc_depth_rgb_match(camera, obj_points, cache):
+    print(f"Calibrating... {camera}")
 
-    rgb_depth_pairs = find_rgb_depth_images(cache['images_info'], cam_1)
+    rgb_depth_pairs = find_rgb_depth_images(cache['images_info'], camera)
 
     print(f"Matching pairs: {len(rgb_depth_pairs['image_points_rgb'])}")
 
@@ -102,7 +102,7 @@ def calc_depth_rgb_match(cam_1, obj_points, cache):
         cache['extrinsics'] = {}
 
     depth_matching = cache.get('depth_matching', {})
-    depth_matching[cam_1] = {
+    depth_matching[camera] = {
         'mtx_l': mtx_1,
         'dist_l': dist_1,
         'mtx_r': mtx_2,
@@ -113,22 +113,56 @@ def calc_depth_rgb_match(cam_1, obj_points, cache):
     cache['depth_matching'] = depth_matching
 
 
-def calc_reprojection_error(cam_1, obj_points, cache):
-    print(f"Calibrating... {cam_1}")
+def calc_rectification_params(camera, cache):
+    mtx_1 = cache['depth_matching'][camera]['mtx_l']
+    dist_1 = cache['depth_matching'][camera]['dist_l']
+    mtx_2 = cache['depth_matching'][camera]['mtx_r']
+    dist_2 = cache['depth_matching'][camera]['dist_r']
+    R = cache['depth_matching'][camera]['rotation']
+    T = cache['depth_matching'][camera]['transition']
+    
+    R1, R2, P1, P2, Q, roi1, roi2 = cv2.stereoRectify(
+        mtx_1, dist_1, mtx_2, dist_2,
+        (data_loader.IMAGE_RGB_WIDTH, data_loader.IMAGE_RGB_HEIGHT),
+        R, T, flags=cv2.CALIB_ZERO_DISPARITY, alpha=-1)
+    
+    map1x, map1y = cv2.initUndistortRectifyMap(
+        mtx_1, dist_1, R1, P1,
+        (data_loader.IMAGE_RGB_WIDTH, data_loader.IMAGE_RGB_HEIGHT),
+        cv2.CV_16SC2)
+    map2x, map2y = cv2.initUndistortRectifyMap(
+        mtx_2, dist_2, R2, P2,
+        (data_loader.IMAGE_RGB_WIDTH, data_loader.IMAGE_RGB_HEIGHT),
+        cv2.CV_16SC2)
 
-    rgb_depth_pairs = find_rgb_depth_images(cache['images_info'], cam_1)
+    depth_matching = cache['depth_matching']
+    depth_matching[camera]['map_rgb_x'] = map1x
+    depth_matching[camera]['map_rgb_y'] = map1y
+    depth_matching[camera]['map_infrared_x'] = map2x
+    depth_matching[camera]['map_infrared_y'] = map2y
+    cache['depth_matching'] = depth_matching
+
+    print('Stored RGB/INFRARED mapping matrices for cam {}.'.format(
+        camera
+    ))
+
+
+def calc_reprojection_error(camera, obj_points, cache):
+    print(f"Calibrating... {camera}")
+
+    rgb_depth_pairs = find_rgb_depth_images(cache['images_info'], camera)
 
     print(f"Matching pairs: {len(rgb_depth_pairs['image_points_rgb'])}")
 
     if not cache.__contains__('extrinsics'):
         raise Exception('Extrinsics not cached.')
     
-    mtx_1 = cache['depth_matching'][cam_1]['mtx_l']
-    dist_1 = cache['depth_matching'][cam_1]['dist_l']
-    mtx_2 = cache['depth_matching'][cam_1]['mtx_r']
-    dist_2 = cache['depth_matching'][cam_1]['dist_r']
-    R = cache['depth_matching'][cam_1]['rotation']
-    T = cache['depth_matching'][cam_1]['transition']
+    mtx_1 = cache['depth_matching'][camera]['mtx_l']
+    dist_1 = cache['depth_matching'][camera]['dist_l']
+    mtx_2 = cache['depth_matching'][camera]['mtx_r']
+    dist_2 = cache['depth_matching'][camera]['dist_r']
+    R = cache['depth_matching'][camera]['rotation']
+    T = cache['depth_matching'][camera]['transition']
     
     total_error = 0
     for i in range(len(rgb_depth_pairs['image_points_rgb'])):
@@ -150,7 +184,7 @@ def calc_reprojection_error(cam_1, obj_points, cache):
             rgb_depth_pairs['image_points_infrared'][i],
             imgpoints2_projected, cv2.NORM_L2) \
                 / len(imgpoints2_projected)
-        print(f"Errors: cam1 {error1} cam2 {error2}")
+        # print(f"Errors: cam1 {error1} cam2 {error2}")
         total_error += (error1 + error2) / 2
 
     # Print the average projection error
@@ -165,8 +199,7 @@ if __name__ == "__main__":
     intrinsics = cache['intrinsics']
 
     cameras = list(intrinsics.keys())
-    for cam1_idx in range(len(cameras)):
-        cam_1 = cameras[cam1_idx]
-
-        calc_depth_rgb_match(cam_1, obj_points, cache)
-        calc_reprojection_error(cam_1, obj_points, cache)
+    for camera in cameras:
+        calc_depth_rgb_match(camera, obj_points, cache)
+        calc_rectification_params(camera, cache)
+        calc_reprojection_error(camera, obj_points, cache)
