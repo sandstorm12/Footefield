@@ -5,12 +5,10 @@ cache `images_info` key: camera_folder value: findChessboardCorners_output
 import sys
 sys.path.append('../')
 
-import os
-import re
 import cv2
 import diskcache
 import numpy as np
-import matplotlib.pyplot as plt
+
 from utils import data_loader
 
 from tqdm import tqdm
@@ -35,14 +33,17 @@ def extract_chessboardcorners(image_paths, images_info, display=False):
     for image_path in bar:
         image_name = data_loader.image_name_from_fullpath(image_path)
 
-        if not images_info.__contains__(image_name) or (images_info.__contains__(image_name) and images_info[image_name]['findchessboardcorners_rgb'][0]): 
+        if not images_info.__contains__(image_name) or \
+            images_info[image_name]['findchessboardcorners_rgb'][0]:
             gray_org = cv2.imread(image_path, -1)
 
             for thr in [.8, .5, .2, .1]:
-                gray = np.clip(gray_org.astype(np.float32) * thr, 0, 255).astype('uint8')
+                gray = np.clip(
+                    gray_org.astype(np.float32) * thr, 0, 255).astype('uint8')
                 gray = cv2.resize(gray, (1920, 1080))
                 ret, corners = cv2.findChessboardCorners(
-                    gray, (data_loader.CHESSBOARD_COLS, data_loader.CHESSBOARD_ROWS))
+                    gray, (data_loader.CHESSBOARD_COLS,
+                           data_loader.CHESSBOARD_ROWS))
                 
                 if ret:
                     break
