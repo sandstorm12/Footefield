@@ -129,11 +129,11 @@ def calc_rectification_params(camera, cache):
     map1x, map1y = cv2.initUndistortRectifyMap(
         mtx_1, dist_1, R1, P1,
         (data_loader.IMAGE_RGB_WIDTH, data_loader.IMAGE_RGB_HEIGHT),
-        cv2.CV_16SC2)
+        cv2.CV_32FC1)
     map2x, map2y = cv2.initUndistortRectifyMap(
         mtx_2, dist_2, R2, P2,
         (data_loader.IMAGE_RGB_WIDTH, data_loader.IMAGE_RGB_HEIGHT),
-        cv2.CV_16SC2)
+        cv2.CV_32FC1)
 
     depth_matching = cache['depth_matching']
     depth_matching[camera]['map_rgb_x'] = map1x
