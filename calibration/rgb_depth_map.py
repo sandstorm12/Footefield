@@ -7,6 +7,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 from utils import data_loader
+from mpl_toolkits.mplot3d import Axes3D
 
 
 DISPARITY = -18
@@ -59,7 +60,7 @@ def _map(x, y, mapx, mapy):
     return next_i, next_j
 
 
-def points_to_depth(keypoints, image_rgb, image_inf, camera, cache):
+def points_to_depth(keypoints, image_depth, camera, cache):
     if not cache.__contains__('depth_matching'):
         raise Exception('Depth matching not cached. '
                         'Run rgb_depth_calibration script.')
@@ -68,53 +69,65 @@ def points_to_depth(keypoints, image_rgb, image_inf, camera, cache):
     map1y = cache['depth_matching'][camera]['map_rgb_y']
     map2x = cache['depth_matching'][camera]['map_infrared_x']
     map2y = cache['depth_matching'][camera]['map_infrared_y']
+
+    image_depth = cv2.remap(image_depth, map2x, map2y, cv2.INTER_LANCZOS4)
+    image_depth = np.roll(image_depth, DISPARITY, axis=1)
     
-    image_rgb = cv2.remap(image_rgb, map1x, map1y, cv2.INTER_LINEAR)
+    keypoints_3d = []
+    for i in range(len(keypoints)):
+        x, y = keypoints[i]
+        x = int(x)
+        y = int(y)
+        x_new, y_new = _map(x, y, map1x, map1y)
+        keypoints_3d.append((x_new, y_new, image_depth[int(y_new), int(x_new)]))
+
+    print(keypoints_3d)
+
+    for idx, point in enumerate(keypoints_3d):
+        x = int(point[0])
+        y = int(point[1])
+
+        cv2.circle(
+            image_depth, (x, y), 10, (0, 0, 0),
+            thickness=-1, lineType=8)
+
+        cv2.putText(
+            image_depth, str(idx), (x - 5, y + 5),
+            cv2.FONT_HERSHEY_SIMPLEX, .5, (255, 255, 255), thickness=2)
     
-    for i in range(keypoints.shape[0]):
-        for j in range(keypoints.shape[1]):
-            x, y = keypoints[i, j]
-            keypoints[i, j] = _map(int(x), int(y), map1x, map1y)
+    plt.imshow(image_depth)
+    plt.show()
 
+    # Create a figure and a 3D axis
+    fig = plt.figure(figsize=(20, 20))
+    ax = fig.add_subplot(111, projection='3d')
 
-    # Remove magic number .8
-    image_inf = cv2.resize(
-        image_inf,
-        (data_loader.IMAGE_RGB_WIDTH, data_loader.IMAGE_RGB_HEIGHT))
-    image_inf = cv2.remap(image_inf, map2x, map2y, cv2.INTER_LANCZOS4)
+    # Define the data for the scatter plot
+    x = [point[0] for point in keypoints_3d]
+    y = [point[2] for point in keypoints_3d]
+    z = [1080 - point[1] for point in keypoints_3d]
 
-    # Add the dispartiy between RGB and INFRARED cameras
-    image_inf = np.roll(image_inf, DISPARITY, axis=1)
-    image_inf = np.clip(
-            image_inf.astype(np.float32) * .1, 0, 255).astype('uint8')
-    
-    # keypoints = _get_skeleton(image_rgb, mmpose, visualize=False)
-    
-    for person_keypoints in keypoints:
-        for idx, point in enumerate(person_keypoints):
-            x = int(point[0])
-            y = int(point[1])
+    # Create the scatter plot
+    scatter = ax.scatter(x, y, z, c='r', marker='o')
+    ax.view_init(elev=1, azim=-89)
 
-            cv2.circle(
-                image_rgb, (x, y), 10, (0, 0, 0),
-                thickness=-1, lineType=8)
-            cv2.circle(
-                image_inf, (x, y), 10, (0, 0, 0),
-                thickness=-1, lineType=8)
+    # Remove the grid background
+    ax.grid(False)
 
-            cv2.putText(
-                image_rgb, str(idx), (x - 5, y + 5),
-                cv2.FONT_HERSHEY_SIMPLEX, .5, (255, 255, 255), thickness=2)
-            cv2.putText(
-                image_inf, str(idx), (x - 5, y + 5),
-                cv2.FONT_HERSHEY_SIMPLEX, .5, (255, 255, 255), thickness=2)
-    
-    image_rgb = cv2.cvtColor(image_rgb, cv2.COLOR_BGR2GRAY)
+    # Add the index of each point as a text on top of each point
+    for i, txt in enumerate(range(len(x))):
+        ax.text(x[i], y[i], z[i], str(txt), color='black')
 
-    f, axarr = plt.subplots(1, 2)
-    axarr[0].imshow(image_rgb)
-    axarr[1].imshow(image_inf)
+    # Set the labels for the axes
+    ax.set_xlabel('X Label')
+    ax.set_ylabel('Y Label')
+    ax.set_zlabel('Z Label')
 
+    ax.axes.set_xlim3d(0, 1920)
+    ax.axes.set_zlim3d(0, 1080)
+    ax.axes.set_ylim3d(0, 2000)
+
+    # Show the plot
     plt.show()
 
 
@@ -135,7 +148,8 @@ if __name__ == "__main__":
 
     keypoints = _get_skeleton(img_rgb, mmpose)
 
-    points_to_depth(keypoints, img_rgb, img_dpt, camera, cache)
+    for i in range(len(keypoints)):
+        points_to_depth(keypoints[i], img_dpt, camera, cache)
 
     # img_dpt = np.clip(img_dpt.astype(np.float32) * 2, 0, 255).astype('uint8')
     # cv2.imshow("Depth", img_dpt)
