@@ -73,13 +73,18 @@ def points_to_depth(keypoints, image_depth, camera, cache):
     image_depth = cv2.remap(image_depth, map2x, map2y, cv2.INTER_LANCZOS4)
     image_depth = np.roll(image_depth, DISPARITY, axis=1)
     
+    REGION = 15
     keypoints_3d = []
     for i in range(len(keypoints)):
         x, y = keypoints[i]
         x = int(x)
         y = int(y)
         x_new, y_new = _map(x, y, map1x, map1y)
-        keypoints_3d.append((x_new, y_new, image_depth[int(y_new), int(x_new)]))
+        x_new = int(x_new)
+        y_new = int(y_new)
+        roi = image_depth[y_new-REGION:y_new+REGION, x_new-REGION:x_new+REGION]
+        depth = np.mean(roi[roi != 0])
+        keypoints_3d.append((x_new, y_new, depth))
 
     print(keypoints_3d)
 
@@ -125,7 +130,7 @@ def points_to_depth(keypoints, image_depth, camera, cache):
 
     ax.axes.set_xlim3d(0, 1920)
     ax.axes.set_zlim3d(0, 1080)
-    ax.axes.set_ylim3d(0, 2000)
+    ax.axes.set_ylim3d(0, 3000)
 
     # Show the plot
     plt.show()
