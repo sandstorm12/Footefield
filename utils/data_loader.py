@@ -28,19 +28,19 @@ PATTERN_NAME = r"(color|depth|infrared)"
 
 
 def list_rgb_images(dir):
-    file_paths = glob.glob(os.path.join(dir, "color*"))
+    file_paths = sorted(glob.glob(os.path.join(dir, "color*")))
 
     return file_paths
 
 
 def list_depth_images(dir):
-    file_paths = glob.glob(os.path.join(dir, "depth*"))
+    file_paths = sorted(glob.glob(os.path.join(dir, "depth*")))
 
     return file_paths
 
 
 def list_infrared_images(dir):
-    file_paths = glob.glob(os.path.join(dir, "infrared*"))
+    file_paths = sorted(glob.glob(os.path.join(dir, "infrared*")))
 
     return file_paths
 
