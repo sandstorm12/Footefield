@@ -73,7 +73,7 @@ def align_image_depth(image, camera, cache):
 
     return image_depth
 
-
+# Remove image alignment here and get aligned image as input
 def points_to_depth(people_keypoints, image_depth, camera, cache):
     if not cache.__contains__('depth_matching'):
         raise Exception('Depth matching not cached. '
