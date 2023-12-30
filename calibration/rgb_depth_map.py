@@ -8,7 +8,9 @@ import matplotlib.pyplot as plt
 
 
 DISPARITY = -18
-DEPTH_AREA = 5
+DEPTH_AREA = 10
+MAX_DIST = 3000
+MIN_DIST = 100
 
 
 def _map(x, y, mapx, mapy):
@@ -68,7 +70,7 @@ def points_to_depth(people_keypoints, image_depth, camera, cache):
             x_new, y_new = _map(x, y, map1x, map1y)
             roi = image_depth[y_new-DEPTH_AREA:y_new+DEPTH_AREA,
                             x_new-DEPTH_AREA:x_new+DEPTH_AREA]
-            roi = roi[roi != 0]
+            roi = roi[np.logical_and(roi > MIN_DIST, roi < MAX_DIST)]
             if len(roi) > 0:
                 depth = np.max(roi)
                 keypoints_3d[-1].append((x_new, y_new, depth))
@@ -114,13 +116,13 @@ if __name__ == "__main__":
             y = int(point[1])
 
             cv2.circle(
-                img_dpt, (x, y), 10, (3000, 3000, 3000),
+                img_dpt, (x, y), 10, (MAX_DIST, MAX_DIST, MAX_DIST),
                 thickness=-1, lineType=8)
 
             cv2.putText(
                 img_dpt, str(idx), (x - 5, y + 5),
                 cv2.FONT_HERSHEY_SIMPLEX, .5,
-                (3000, 3000, 3000), thickness=2)
+                (MAX_DIST, MAX_DIST, MAX_DIST), thickness=2)
         
     plt.imshow(img_dpt)
     plt.show()
