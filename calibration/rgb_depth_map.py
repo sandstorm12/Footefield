@@ -6,24 +6,9 @@ import diskcache
 import numpy as np
 import matplotlib.pyplot as plt
 
-from utils import data_loader
-from mpl_toolkits.mplot3d import Axes3D
-
 
 DISPARITY = -18
-
-
-# Just for test
-def _get_skeleton(image, inferencer):
-    result_generator = inferencer(image)
-    
-    detected_keypoints = []
-    for result in result_generator:
-        for predictions in result['predictions'][0]:
-            keypoints = predictions['keypoints']
-            detected_keypoints.append(keypoints)
-
-    return np.array(detected_keypoints)
+DEPTH_AREA = 5
 
 
 def _map(x, y, mapx, mapy):
@@ -60,7 +45,7 @@ def _map(x, y, mapx, mapy):
     return next_i, next_j
 
 
-def points_to_depth(keypoints, image_depth, camera, cache):
+def points_to_depth(people_keypoints, image_depth, camera, cache):
     if not cache.__contains__('depth_matching'):
         raise Exception('Depth matching not cached. '
                         'Run rgb_depth_calibration script.')
@@ -73,47 +58,85 @@ def points_to_depth(keypoints, image_depth, camera, cache):
     image_depth = cv2.remap(image_depth, map2x, map2y, cv2.INTER_LANCZOS4)
     image_depth = np.roll(image_depth, DISPARITY, axis=1)
     
-    REGION = 15
     keypoints_3d = []
-    for i in range(len(keypoints)):
-        x, y = keypoints[i]
-        x = int(x)
-        y = int(y)
-        x_new, y_new = _map(x, y, map1x, map1y)
-        x_new = int(x_new)
-        y_new = int(y_new)
-        roi = image_depth[y_new-REGION:y_new+REGION, x_new-REGION:x_new+REGION]
-        depth = np.mean(roi[roi != 0])
-        keypoints_3d.append((x_new, y_new, depth))
+    for keypoints in people_keypoints:
+        keypoints_3d.append([])
+        for i in range(len(keypoints)):
+            x, y = keypoints[i]
+            x = int(x)
+            y = int(y)
+            x_new, y_new = _map(x, y, map1x, map1y)
+            roi = image_depth[y_new-DEPTH_AREA:y_new+DEPTH_AREA,
+                            x_new-DEPTH_AREA:x_new+DEPTH_AREA]
+            roi = roi[roi != 0]
+            if len(roi) > 0:
+                depth = np.max(roi)
+                keypoints_3d[-1].append((x_new, y_new, depth))
 
-    print(keypoints_3d)
+    return keypoints_3d, image_depth
 
-    for idx, point in enumerate(keypoints_3d):
-        x = int(point[0])
-        y = int(point[1])
 
-        cv2.circle(
-            image_depth, (x, y), 10, (0, 0, 0),
-            thickness=-1, lineType=8)
+# Just for test
+# Clean and shorten the test
+if __name__ == "__main__":
+    cache = diskcache.Cache('cache')
 
-        cv2.putText(
-            image_depth, str(idx), (x - 5, y + 5),
-            cv2.FONT_HERSHEY_SIMPLEX, .5, (255, 255, 255), thickness=2)
-    
-    plt.imshow(image_depth)
+    from mmpose.apis import MMPoseInferencer
+    mmpose = MMPoseInferencer('human')
+
+    def _get_skeleton(image, inferencer):
+        result_generator = inferencer(image)
+        
+        detected_keypoints = []
+        for result in result_generator:
+            for predictions in result['predictions'][0]:
+                keypoints = predictions['keypoints']
+                detected_keypoints.append(keypoints)
+
+        return np.array(detected_keypoints)
+
+    camera = 'azure_kinect3_4_calib_snap'
+
+    img_rgb_path = '/home/hamid/Documents/footefield/data/AzureKinectRecord_0729/a1/azure_kinect3_4/color/color00000.jpg'
+    img_dpt_path = '/home/hamid/Documents/footefield/data/AzureKinectRecord_0729/a1/azure_kinect3_4/depth/depth00000.png'
+    img_rgb = cv2.imread(img_rgb_path)
+    img_dpt = cv2.imread(img_dpt_path, -1)
+    img_dpt = cv2.resize(img_dpt, (1920, 1080))
+
+    people_keypoints = _get_skeleton(img_rgb, mmpose)
+
+    people_keypoints_3d, img_dpt = points_to_depth(
+        people_keypoints, img_dpt, camera, cache)
+
+    for keypoints_3d in people_keypoints_3d:
+        for idx, point in enumerate(keypoints_3d):
+            x = int(point[0])
+            y = int(point[1])
+
+            cv2.circle(
+                img_dpt, (x, y), 10, (3000, 3000, 3000),
+                thickness=-1, lineType=8)
+
+            cv2.putText(
+                img_dpt, str(idx), (x - 5, y + 5),
+                cv2.FONT_HERSHEY_SIMPLEX, .5,
+                (3000, 3000, 3000), thickness=2)
+        
+    plt.imshow(img_dpt)
     plt.show()
 
     # Create a figure and a 3D axis
     fig = plt.figure(figsize=(20, 20))
     ax = fig.add_subplot(111, projection='3d')
 
-    # Define the data for the scatter plot
-    x = [point[0] for point in keypoints_3d]
-    y = [point[2] for point in keypoints_3d]
-    z = [1080 - point[1] for point in keypoints_3d]
-
     # Create the scatter plot
-    scatter = ax.scatter(x, y, z, c='r', marker='o')
+    for keypoints_3d in people_keypoints_3d:
+        # Define the data for the scatter plot
+        x = [point[0] for point in keypoints_3d]
+        y = [point[2] for point in keypoints_3d]
+        z = [1080 - point[1] for point in keypoints_3d]
+
+        scatter = ax.scatter(x, y, z, c='r', marker='o')
     ax.view_init(elev=1, azim=-89)
 
     # Remove the grid background
@@ -134,28 +157,3 @@ def points_to_depth(keypoints, image_depth, camera, cache):
 
     # Show the plot
     plt.show()
-
-
-# Just for test
-if __name__ == "__main__":
-    cache = diskcache.Cache('cache')
-
-    from mmpose.apis import MMPoseInferencer
-    mmpose = MMPoseInferencer('human')
-
-    camera = 'azure_kinect3_4_calib_snap'
-
-    img_rgb_path = '/home/hamid/Documents/footefield/data/AzureKinectRecord_0729/a1/azure_kinect3_4/color/color00000.jpg'
-    img_dpt_path = '/home/hamid/Documents/footefield/data/AzureKinectRecord_0729/a1/azure_kinect3_4/depth/depth00000.png'
-    img_rgb = cv2.imread(img_rgb_path)
-    img_dpt = cv2.imread(img_dpt_path, -1)
-    img_dpt = cv2.resize(img_dpt, (1920, 1080))
-
-    keypoints = _get_skeleton(img_rgb, mmpose)
-
-    for i in range(len(keypoints)):
-        points_to_depth(keypoints[i], img_dpt, camera, cache)
-
-    # img_dpt = np.clip(img_dpt.astype(np.float32) * 2, 0, 255).astype('uint8')
-    # cv2.imshow("Depth", img_dpt)
-    # cv2.waitKey(0)
