@@ -6,23 +6,9 @@ import diskcache
 import numpy as np
 import matplotlib.pyplot as plt
 
-from utils import data_loader
-
 
 DISPARITY = -18
-
-
-# Just for test
-def _get_skeleton(image, inferencer):
-    result_generator = inferencer(image)
-    
-    detected_keypoints = []
-    for result in result_generator:
-        for predictions in result['predictions'][0]:
-            keypoints = predictions['keypoints']
-            detected_keypoints.append(keypoints)
-
-    return np.array(detected_keypoints)
+DEPTH_AREA = 10
 
 
 def _map(x, y, mapx, mapy):
@@ -59,85 +45,97 @@ def _map(x, y, mapx, mapy):
     return next_i, next_j
 
 
-def points_to_depth(keypoints, image_rgb, image_inf, camera, cache):
+def align_image_rgb(image, camera, cache):
     if not cache.__contains__('depth_matching'):
         raise Exception('Depth matching not cached. '
                         'Run rgb_depth_calibration script.')
     
     map1x = cache['depth_matching'][camera]['map_rgb_x']
     map1y = cache['depth_matching'][camera]['map_rgb_y']
+
+    image_rgb = cv2.remap(image, map1x, map1y, cv2.INTER_LANCZOS4)
+
+    return image_rgb
+
+
+def align_image_depth(image, camera, cache):
+    if not cache.__contains__('depth_matching'):
+        raise Exception('Depth matching not cached. '
+                        'Run rgb_depth_calibration script.')
+    
     map2x = cache['depth_matching'][camera]['map_infrared_x']
     map2y = cache['depth_matching'][camera]['map_infrared_y']
+
+    image_depth = cv2.remap(image, map2x, map2y, cv2.INTER_LANCZOS4)
+    image_depth = np.roll(image_depth, DISPARITY, axis=1)
+
+    return image_depth
+
+
+def points_to_depth(people_keypoints, image_depth, camera, cache):
+    image_depth = align_image_depth(image_depth, camera, cache)
+
+    map1x = cache['depth_matching'][camera]['map_rgb_x']
+    map1y = cache['depth_matching'][camera]['map_rgb_y']
     
-    image_rgb = cv2.remap(image_rgb, map1x, map1y, cv2.INTER_LINEAR)
-    
-    for i in range(keypoints.shape[0]):
-        for j in range(keypoints.shape[1]):
-            x, y = keypoints[i, j]
-            keypoints[i, j] = _map(int(x), int(y), map1x, map1y)
+    keypoints_3d = []
+    for keypoints in people_keypoints:
+        keypoints_3d.append([])
+        for i in range(len(keypoints)):
+            x, y = keypoints[i]
+            x = int(x)
+            y = int(y)
+            x_new, y_new = _map(x, y, map1x, map1y)
+            roi = image_depth[y_new-DEPTH_AREA:y_new+DEPTH_AREA,
+                            x_new-DEPTH_AREA:x_new+DEPTH_AREA]
+            roi = roi[roi != 0]
+            if len(roi) > 0:
+                depth = np.max(roi)
+                keypoints_3d[-1].append((x_new, y_new, depth))
 
-
-    # Remove magic number .8
-    image_inf = cv2.resize(
-        image_inf,
-        (data_loader.IMAGE_RGB_WIDTH, data_loader.IMAGE_RGB_HEIGHT))
-    image_inf = cv2.remap(image_inf, map2x, map2y, cv2.INTER_LANCZOS4)
-
-    # Add the dispartiy between RGB and INFRARED cameras
-    image_inf = np.roll(image_inf, DISPARITY, axis=1)
-    image_inf = np.clip(
-            image_inf.astype(np.float32) * .1, 0, 255).astype('uint8')
-    
-    # keypoints = _get_skeleton(image_rgb, mmpose, visualize=False)
-    
-    for person_keypoints in keypoints:
-        for idx, point in enumerate(person_keypoints):
-            x = int(point[0])
-            y = int(point[1])
-
-            cv2.circle(
-                image_rgb, (x, y), 10, (0, 0, 0),
-                thickness=-1, lineType=8)
-            cv2.circle(
-                image_inf, (x, y), 10, (0, 0, 0),
-                thickness=-1, lineType=8)
-
-            cv2.putText(
-                image_rgb, str(idx), (x - 5, y + 5),
-                cv2.FONT_HERSHEY_SIMPLEX, .5, (255, 255, 255), thickness=2)
-            cv2.putText(
-                image_inf, str(idx), (x - 5, y + 5),
-                cv2.FONT_HERSHEY_SIMPLEX, .5, (255, 255, 255), thickness=2)
-    
-    image_rgb = cv2.cvtColor(image_rgb, cv2.COLOR_BGR2GRAY)
-
-    f, axarr = plt.subplots(1, 2)
-    axarr[0].imshow(image_rgb)
-    axarr[1].imshow(image_inf)
-
-    plt.show()
+    return keypoints_3d
 
 
 # Just for test
+# Clean and shorten the test
 if __name__ == "__main__":
     cache = diskcache.Cache('cache')
-
-    from mmpose.apis import MMPoseInferencer
-    mmpose = MMPoseInferencer('human')
-
+    
     camera = 'azure_kinect3_4_calib_snap'
-
     img_rgb_path = '/home/hamid/Documents/footefield/data/AzureKinectRecord_0729/a1/azure_kinect3_4/color/color00000.jpg'
     img_dpt_path = '/home/hamid/Documents/footefield/data/AzureKinectRecord_0729/a1/azure_kinect3_4/depth/depth00000.png'
+
     img_rgb = cv2.imread(img_rgb_path)
     img_dpt = cv2.imread(img_dpt_path, -1)
     img_dpt = cv2.resize(img_dpt, (1920, 1080))
 
-    keypoints = _get_skeleton(img_rgb, mmpose)
+    img_rgb = align_image_rgb(img_rgb, camera, cache)
+    img_dpt = align_image_depth(img_dpt, camera, cache)
 
-    points_to_depth(keypoints, img_rgb, img_dpt, camera, cache)
+    f, axarr = plt.subplots(1,2)
+    implot = axarr[0].imshow(img_rgb)
+    implot = axarr[1].imshow(img_dpt)
 
-    # img_dpt = np.clip(img_dpt.astype(np.float32) * 2, 0, 255).astype('uint8')
-    # cv2.imshow("Depth", img_dpt)
-    # cv2.waitKey(0)
- 
+    def onclick(event):
+        if event.xdata != None and event.ydata != None:
+            print(event.xdata, event.ydata)
+            x = int(event.xdata)
+            y = int(event.ydata)
+            
+            circle = plt.Circle((x, y), 10, color="red", fill=True)
+            axarr[0].add_patch(circle)
+
+            roi = img_dpt[y-DEPTH_AREA:y+DEPTH_AREA,
+                            x-DEPTH_AREA:x+DEPTH_AREA]
+            roi = roi[roi != 0]
+            if len(roi) > 0:
+                depth = np.max(roi)
+                axarr[1].annotate(str(depth), (x, y), color='w', weight='bold', fontsize=6, ha='center', va='center')
+            else:
+                circle = plt.Circle((x, y), 10, color=(1, 1, 1, 1), fill=True)
+                axarr[1].add_patch(circle)
+            plt.draw()
+
+    cid = f.canvas.mpl_connect('button_press_event', onclick)
+
+    plt.show()
