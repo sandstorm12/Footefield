@@ -1,6 +1,6 @@
 # Foote Field 3D Human Pose Estimation
 
-Foote field 3D pose estimation project source code
+Foote field camera calibration and 3D pose estimation project.
 
 ## Components
 
@@ -57,16 +57,25 @@ pip install -r requirements
 
 Run the scripts in this order:
 
-a -> b -> c -> d > e
+`calibration/detect_chessboard.py` -> `calibration/calc_intrinsic.py` -> `calibration/calc_extrinsic.py` -> `calibration/rgb_depth_calibration.py` -> `calibration/pose_animation.py`
 
 
 ## TODO
 
+1. Feature: Calculate point depths using triangulation between adjacent cameras.
+1. BugFix: Make `calibration/pose_animation.py` more stable.
+1. Feature: Make the calibration process simpler by implementing a single end-to-end script.
+1. Feature: Add SMPL to the pose animation.
+1. Feature: Make pose estimation in the pose animation fasters or increase its hardware utilization (can use GPU?)
+1. Feature: Remove unwanted skeletons from the pose animation
+
 
 ## Known issues
 
+1. Depth estimation using single camera depth information is noisy.
 
-## Contributing
+
+## Contributors
 
 - Shihao Zou: szou2@ualberta.ca
 - Hamid Mohammadi: hamid4@ualberta.ca
