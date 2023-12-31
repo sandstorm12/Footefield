@@ -57,7 +57,7 @@ pip install -r requirements
 
 Run the scripts in this order:
 
-`calibration/detect_chessboard.py` -> `calibration/calc_intrinsic.py` -> `calibration/calc_extrinsic.py` -> `calibration/rgb_depth_calibration.py` -> `calibration/pose_animation.py`
+`calibration/detect_chessboard.py` -> `calibration/calc_intrinsic.py` -> `calibration/calc_extrinsic.py` -> `calibration/rgb_depth_calibration.py` -> `pose_estimation/pose_animation.py`
 
 
 ## TODO
