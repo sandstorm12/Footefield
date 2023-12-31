@@ -8,10 +8,8 @@ import numpy as np
 import matplotlib.animation
 import matplotlib.pyplot as plt
 
-from utils import data_loader
-from data_loader import *
-
 from tqdm import tqdm
+from utils import data_loader
 from calibration import rgb_depth_map
 from mmpose.apis import MMPoseInferencer
 
@@ -72,6 +70,7 @@ def extract_poses(dir, camera):
     return poses
 
 # Its too long
+# Make it also more robust
 def visualize_poses(poses):
     fig = plt.figure()
     ax = fig.add_subplot(111, projection='3d')
@@ -93,12 +92,15 @@ def visualize_poses(poses):
         graph = ax.scatter(x, y, z, c='r', marker='o')
         graphs.append(graph)
         lines.append([])
-        for idx in range(len(MMPOSE_EDGES)):
+        for idx in range(len(data_loader.MMPOSE_EDGES)):
             lines[-1].append(
                 ax.plot(
-                    (x[MMPOSE_EDGES[idx][0]], x[MMPOSE_EDGES[idx][1]]),
-                    (y[MMPOSE_EDGES[idx][0]], y[MMPOSE_EDGES[idx][1]]),
-                    (z[MMPOSE_EDGES[idx][0]], z[MMPOSE_EDGES[idx][1]])
+                    (x[data_loader.MMPOSE_EDGES[idx][0]],
+                     x[data_loader.MMPOSE_EDGES[idx][1]]),
+                    (y[data_loader.MMPOSE_EDGES[idx][0]],
+                     y[data_loader.MMPOSE_EDGES[idx][1]]),
+                    (z[data_loader.MMPOSE_EDGES[idx][0]],
+                     z[data_loader.MMPOSE_EDGES[idx][1]])
                 )[0]
             )
 
@@ -130,10 +132,13 @@ def visualize_poses(poses):
 
             for idx, line in enumerate(lines[person]):
                 line.set_data(
-                    (x[MMPOSE_EDGES[idx][0]], x[MMPOSE_EDGES[idx][1]]),
-                    (y[MMPOSE_EDGES[idx][0]], y[MMPOSE_EDGES[idx][1]]))
+                    (x[data_loader.MMPOSE_EDGES[idx][0]],
+                     x[data_loader.MMPOSE_EDGES[idx][1]]),
+                    (y[data_loader.MMPOSE_EDGES[idx][0]],
+                     y[data_loader.MMPOSE_EDGES[idx][1]]))
                 line.set_3d_properties(
-                    (z[MMPOSE_EDGES[idx][0]], z[MMPOSE_EDGES[idx][1]])
+                    (z[data_loader.MMPOSE_EDGES[idx][0]],
+                     z[data_loader.MMPOSE_EDGES[idx][1]])
                 )
 
     ani = matplotlib.animation.FuncAnimation(
@@ -152,8 +157,8 @@ if __name__ == "__main__":
 
     mmpose = MMPoseInferencer('human')
 
-    for expriment in EXPERIMENTS.keys():
-        for dir in EXPERIMENTS[expriment]:
+    for expriment in data_loader.EXPERIMENTS.keys():
+        for dir in data_loader.EXPERIMENTS[expriment]:
             camera = dir.split("/")[-1] + "_calib_snap"
             
             id_exp = f'{expriment}_{camera}'
