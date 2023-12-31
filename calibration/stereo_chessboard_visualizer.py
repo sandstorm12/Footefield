@@ -55,7 +55,7 @@ def load_image_points(cache, images):
         if not ret:
             continue
         
-        image_gray = cv2.imread(images_info[key]['fullpath'], cv2.IMREAD_GRAYSCALE)
+        image_gray = cv2.imread(images_info[key]['fullpath_rgb'], cv2.IMREAD_GRAYSCALE)
         corners_refined = cv2.cornerSubPix(image_gray, corners, (5, 5), (-1, -1), criteria)
 
         img_points.append(corners_refined)
@@ -120,9 +120,9 @@ if __name__ == "__main__":
                 cache, images=[item['cam_2_img'] for item in matching_pairs.values()])
 
             for idx, key in enumerate(matching_pairs.keys()):
-                image_1_addr = images_info[matching_pairs[key]['cam_1_img']]['fullpath']
+                image_1_addr = images_info[matching_pairs[key]['cam_1_img']]['fullpath_rgb']
                 image_1 = cv2.imread(image_1_addr)
-                image_2_addr = images_info[matching_pairs[key]['cam_2_img']]['fullpath']
+                image_2_addr = images_info[matching_pairs[key]['cam_2_img']]['fullpath_rgb']
                 image_2 = cv2.imread(image_2_addr)
 
                 for idx_point, point in enumerate(img_points_1[idx]):
