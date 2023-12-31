@@ -47,6 +47,33 @@ def _map(x, y, mapx, mapy):
     return next_i, next_j
 
 
+def align_image_rgb(image, camera, cache):
+    if not cache.__contains__('depth_matching'):
+        raise Exception('Depth matching not cached. '
+                        'Run rgb_depth_calibration script.')
+    
+    map1x = cache['depth_matching'][camera]['map_rgb_x']
+    map1y = cache['depth_matching'][camera]['map_rgb_y']
+
+    image_rgb = cv2.remap(image, map1x, map1y, cv2.INTER_LANCZOS4)
+
+    return image_rgb
+
+
+def align_image_depth(image, camera, cache):
+    if not cache.__contains__('depth_matching'):
+        raise Exception('Depth matching not cached. '
+                        'Run rgb_depth_calibration script.')
+    
+    map2x = cache['depth_matching'][camera]['map_infrared_x']
+    map2y = cache['depth_matching'][camera]['map_infrared_y']
+
+    image_depth = cv2.remap(image, map2x, map2y, cv2.INTER_LANCZOS4)
+    image_depth = np.roll(image_depth, DISPARITY, axis=1)
+
+    return image_depth
+
+# Remove image alignment here and get aligned image as input
 def points_to_depth(people_keypoints, image_depth, camera, cache):
     if not cache.__contains__('depth_matching'):
         raise Exception('Depth matching not cached. '
