@@ -68,6 +68,8 @@ Run the scripts in this order:
 1. Feature: Add SMPL to the pose animation.
 1. Feature: Make pose estimation in the pose animation fasters or increase its hardware utilization (can use GPU?)
 1. Feature: Remove unwanted skeletons from the pose animation
+1. Feature: Add dataset information
+1. Feature: Add arguments for script execution
 
 
 ## Known issues
