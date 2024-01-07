@@ -12,6 +12,10 @@ from tqdm import tqdm
 from utils import data_loader
 from calibration import rgb_depth_map
 from mmpose.apis import MMPoseInferencer
+# from ultralytics import YOLO
+
+
+OVERWRITE = True
 
 
 def _get_skeleton(image, inferencer):
@@ -47,7 +51,7 @@ def points_to_depth(people_keypoints, image_depth):
     return keypoints_3d
 
 
-def extract_poses(dir, camera):
+def extract_poses(dir, camera, model):
     poses = []
     
     img_rgb_paths = data_loader.list_rgb_images(os.path.join(dir, "color"))
@@ -61,10 +65,12 @@ def extract_poses(dir, camera):
         img_rgb = rgb_depth_map.align_image_rgb(img_rgb, camera, cache)
         img_dpt = rgb_depth_map.align_image_depth(img_dpt, camera, cache)
 
-        people_keypoints = _get_skeleton(img_rgb, mmpose)
+        people_keypoints = _get_skeleton(img_rgb, model)
+
+        print(people_keypoints.shape)
 
         people_keypoints_3d = points_to_depth(
-            people_keypoints, img_dpt, camera, cache)
+            people_keypoints, img_dpt)
         poses.append(people_keypoints_3d)
 
     return poses
@@ -79,8 +85,7 @@ def visualize_poses(poses):
     # Create the scatter plot
     people_keypoints = np.array(poses[0])
 
-    # num_people = len(people_keypoints)
-    num_people = 0
+    num_people = len(people_keypoints)
 
     lines = []
     graphs = []
@@ -93,18 +98,17 @@ def visualize_poses(poses):
         graph = ax.scatter(x, y, z, c='r', marker='o')
         graphs.append(graph)
         lines.append([])
-        for idx in range(len(data_loader.COCO_EDGES)):
+        for idx in range(len(data_loader.MMPOSE_EDGES)):
             lines[-1].append(
                 ax.plot(
-                    (x[data_loader.COCO_EDGES[idx][0]],
-                     x[data_loader.COCO_EDGES[idx][1]]),
-                    (y[data_loader.COCO_EDGES[idx][0]],
-                     y[data_loader.COCO_EDGES[idx][1]]),
-                    (z[data_loader.COCO_EDGES[idx][0]],
-                     z[data_loader.COCO_EDGES[idx][1]])
+                    (x[data_loader.MMPOSE_EDGES[idx][0]],
+                     x[data_loader.MMPOSE_EDGES[idx][1]]),
+                    (y[data_loader.MMPOSE_EDGES[idx][0]],
+                     y[data_loader.MMPOSE_EDGES[idx][1]]),
+                    (z[data_loader.MMPOSE_EDGES[idx][0]],
+                     z[data_loader.MMPOSE_EDGES[idx][1]])
                 )[0]
             )
-        break
 
     ax.view_init(elev=1, azim=-89)
 
@@ -134,13 +138,13 @@ def visualize_poses(poses):
 
             for idx, line in enumerate(lines[person]):
                 line.set_data(
-                    (x[data_loader.COCO_EDGES[idx][0]],
-                     x[data_loader.COCO_EDGES[idx][1]]),
-                    (y[data_loader.COCO_EDGES[idx][0]],
-                     y[data_loader.COCO_EDGES[idx][1]]))
+                    (x[data_loader.MMPOSE_EDGES[idx][0]],
+                     x[data_loader.MMPOSE_EDGES[idx][1]]),
+                    (y[data_loader.MMPOSE_EDGES[idx][0]],
+                     y[data_loader.MMPOSE_EDGES[idx][1]]))
                 line.set_3d_properties(
-                    (z[data_loader.COCO_EDGES[idx][0]],
-                     z[data_loader.COCO_EDGES[idx][1]])
+                    (z[data_loader.MMPOSE_EDGES[idx][0]],
+                     z[data_loader.MMPOSE_EDGES[idx][1]])
                 )
 
     ani = matplotlib.animation.FuncAnimation(
@@ -158,18 +162,18 @@ if __name__ == "__main__":
     cache_process = cache.get('process', {})
 
     mmpose = MMPoseInferencer('human')
+    # mmpose = MMPoseInferencer('rtmpose-l_8xb256-420e_aic-coco-384x288')
+    # model = YOLO('yolov8x-pose.pt')
 
     for expriment in data_loader.EXPERIMENTS.keys():
         for dir in data_loader.EXPERIMENTS[expriment]:
             camera = dir.split("/")[-1] + "_calib_snap"
             
             id_exp = f'{expriment}_{camera}_skeleton_3D'
-            if not cache_process.__contains__(id_exp):
-                poses = extract_poses(dir, camera)
+            if not cache_process.__contains__(id_exp) or OVERWRITE:
+                poses = extract_poses(dir, camera, mmpose)
 
                 cache_process[id_exp] = poses
                 cache['process'] = cache_process
             else:
                 poses = cache_process[id_exp]
-
-            visualize_poses(poses)
