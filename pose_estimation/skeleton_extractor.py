@@ -12,7 +12,6 @@ from tqdm import tqdm
 from utils import data_loader
 from calibration import rgb_depth_map
 from mmpose.apis import MMPoseInferencer
-# from ultralytics import YOLO
 
 
 OVERWRITE = True
@@ -162,8 +161,6 @@ if __name__ == "__main__":
     cache_process = cache.get('process', {})
 
     mmpose = MMPoseInferencer('human')
-    # mmpose = MMPoseInferencer('rtmpose-l_8xb256-420e_aic-coco-384x288')
-    # model = YOLO('yolov8x-pose.pt')
 
     for expriment in data_loader.EXPERIMENTS.keys():
         for dir in data_loader.EXPERIMENTS[expriment]:
