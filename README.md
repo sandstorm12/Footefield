@@ -70,6 +70,7 @@ Run the scripts in this order:
 1. Feature: Remove unwanted skeletons from the pose animation
 1. Feature: Add dataset information
 1. Feature: Add arguments for script execution
+1. BugFix: Update the extrinsic parameters estimation using your new knowledge of rvecs and tvecs
 
 
 ## Known issues
