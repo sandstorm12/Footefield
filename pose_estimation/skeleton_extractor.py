@@ -15,6 +15,8 @@ from mmpose.apis import MMPoseInferencer
 
 
 OVERWRITE = True
+VISUALIZE = False
+EXP_LENGTH = 10
 
 
 def _get_skeleton(image, inferencer):
@@ -28,34 +30,13 @@ def _get_skeleton(image, inferencer):
 
     return np.array(detected_keypoints)
 
-# Remove this and use the one in the rgb_depth_map
-def points_to_depth(people_keypoints, image_depth):
-    keypoints_3d = []
-    for keypoints in people_keypoints:
-        keypoints_3d.append([])
-        for i in range(len(keypoints)):
-            x, y = keypoints[i]
-            x = int(x)
-            y = int(y)
-            roi = image_depth[
-                y-rgb_depth_map.DEPTH_AREA:y+rgb_depth_map.DEPTH_AREA,
-                x-rgb_depth_map.DEPTH_AREA:x+rgb_depth_map.DEPTH_AREA]
-            roi = roi[np.logical_and(roi < 3000, roi > 100)]
-            if len(roi) > 0:
-                depth = np.max(roi)
-                keypoints_3d[-1].append((x, y, depth))
-            else:
-                keypoints_3d[-1].append((x, y, 0))
-
-    return keypoints_3d
-
 
 def extract_poses(dir, camera, model):
     poses = []
     
     img_rgb_paths = data_loader.list_rgb_images(os.path.join(dir, "color"))
     img_dpt_paths = data_loader.list_depth_images(os.path.join(dir, "depth"))
-    for idx in tqdm(range(len(img_dpt_paths[:100]))):
+    for idx in tqdm(range(len(img_dpt_paths[:EXP_LENGTH]))):
         img_rgb = cv2.imread(img_rgb_paths[idx])
         
         img_dpt = cv2.imread(img_dpt_paths[idx], -1)
@@ -66,9 +47,7 @@ def extract_poses(dir, camera, model):
 
         people_keypoints = _get_skeleton(img_rgb, model)
 
-        print(people_keypoints.shape)
-
-        people_keypoints_3d = points_to_depth(
+        people_keypoints_3d = rgb_depth_map.points_to_depth(
             people_keypoints, img_dpt)
         poses.append(people_keypoints_3d)
 
@@ -174,3 +153,6 @@ if __name__ == "__main__":
                 cache['process'] = cache_process
             else:
                 poses = cache_process[id_exp]
+
+            if VISUALIZE:
+                visualize_poses(poses=poses)
