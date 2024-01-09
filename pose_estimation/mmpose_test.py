@@ -9,7 +9,8 @@ img_path = (
 )
 image = cv2.imread(img_path)
 
-inferencer = MMPoseInferencer('human')
+# inferencer = MMPoseInferencer('human')
+inferencer = MMPoseInferencer('rtmpose-x_8xb256-700e_body8-halpe26-384x288')
 
 result_generator = inferencer(image)
 for result in result_generator:
