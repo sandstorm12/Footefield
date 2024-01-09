@@ -1,15 +1,17 @@
 import cv2
+
 from mmpose.apis import MMPoseInferencer
 
 
-img_path = '/home/hamid/Documents/footefield/data/AzureKinectRecord_0729/a1/azure_kinect3_5/color/color00000.jpg'
+img_path = (
+    '/home/hamid/Documents/footefield/data/AzureKinectRecord_0729'
+    '/a1/azure_kinect3_5/color/color00000.jpg'
+)
 image = cv2.imread(img_path)
 
-# instantiate the inferencer using the model alias
-inferencer = MMPoseInferencer('human')
+# inferencer = MMPoseInferencer('human')
+inferencer = MMPoseInferencer('rtmpose-x_8xb256-700e_body8-halpe26-384x288')
 
-# The MMPoseInferencer API employs a lazy inference approach,
-# creating a prediction generator when given input
 result_generator = inferencer(image)
 for result in result_generator:
     for predictions in result['predictions'][0]:

@@ -9,40 +9,9 @@ import matplotlib.pyplot as plt
 
 DISPARITY = -18
 DEPTH_AREA = 10
-
-
-def _map(x, y, mapx, mapy):
-    i = x
-    j = y
-
-    # Calculate the distance of original point and out guessed point
-    delta_old = abs(mapx[y, x] - x) + abs(mapy[y, x] - y)
-    while True:
-        next_i = i
-        next_j = j
-        # Searching the 8 neighbour points for the smallest distance
-        for dx in range(-1, 2):
-            for dy in range(-1, 2):
-                # Make sure we don't go out of the image using a max-min
-                search_point_x = max(min(i+dx, mapx.shape[1] - 1), 0)
-                search_point_y = max(min(j+dy, mapx.shape[0] - 1), 0)
-                delta_x = abs(mapx[search_point_y, search_point_x] - x)
-                delta_y = abs(mapy[search_point_y, search_point_x] - y)
-                # If the distance of the new point was less than
-                # the distance of the older point, replace the point
-                if delta_old >= delta_x + delta_y:
-                    delta_old = delta_x + delta_y
-                    next_i = search_point_x
-                    next_j = search_point_y
-
-        # If the newly found point is no better than the old point we stop
-        if next_i == i and next_j == j:
-            break
-        else:
-            i = next_i
-            j = next_j
-
-    return next_i, next_j
+MAX_DIST = 5000
+MIN_DIST = 100
+MAX_STD = 30
 
 
 def align_image_rgb(image, camera, cache):
@@ -72,28 +41,12 @@ def align_image_depth(image, camera, cache):
     return image_depth
 
 
-def points_to_depth(people_keypoints, image_depth, camera, cache):
-    image_depth = align_image_depth(image_depth, camera, cache)
+def reject_outliers(data, quantile_lower=.4, quantile_upper=.6):
+    lower = np.quantile(data, quantile_lower)
+    upper = np.quantile(data, quantile_upper)
+    filtered = [x for x in data if lower <= x <= upper]
 
-    map1x = cache['depth_matching'][camera]['map_rgb_x']
-    map1y = cache['depth_matching'][camera]['map_rgb_y']
-    
-    keypoints_3d = []
-    for keypoints in people_keypoints:
-        keypoints_3d.append([])
-        for i in range(len(keypoints)):
-            x, y = keypoints[i]
-            x = int(x)
-            y = int(y)
-            x_new, y_new = _map(x, y, map1x, map1y)
-            roi = image_depth[y_new-DEPTH_AREA:y_new+DEPTH_AREA,
-                            x_new-DEPTH_AREA:x_new+DEPTH_AREA]
-            roi = roi[roi != 0]
-            if len(roi) > 0:
-                depth = np.max(roi)
-                keypoints_3d[-1].append((x_new, y_new, depth))
-
-    return keypoints_3d
+    return filtered
 
 
 # Just for test
@@ -127,9 +80,14 @@ if __name__ == "__main__":
 
             roi = img_dpt[y-DEPTH_AREA:y+DEPTH_AREA,
                             x-DEPTH_AREA:x+DEPTH_AREA]
-            roi = roi[roi != 0]
+            # roi = roi[roi != 0]
+            roi = roi[np.logical_and(roi > MIN_DIST, roi < MAX_DIST)]
+
             if len(roi) > 0:
-                depth = np.max(roi)
+                roi = reject_outliers(roi)
+
+            if len(roi) > 0 and np.std(roi) < MAX_STD:
+                depth = np.median(roi)
                 axarr[1].annotate(str(depth), (x, y), color='w', weight='bold', fontsize=6, ha='center', va='center')
             else:
                 circle = plt.Circle((x, y), 10, color=(1, 1, 1, 1), fill=True)

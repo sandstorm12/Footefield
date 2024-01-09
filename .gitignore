@@ -1,3 +1,6 @@
+# Model files
+*.pt
+
 # Videos
 *.mp4
 
