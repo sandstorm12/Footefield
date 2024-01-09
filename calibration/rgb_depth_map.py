@@ -62,7 +62,7 @@ def points_to_depth(people_keypoints, image_depth):
                 keypoints_3d[-1].append((x, y, 0))
 
 
-    return keypoints_3d, image_depth
+    return keypoints_3d
 
 
 def reject_outliers(data, quantile_lower=.4, quantile_upper=.6):
@@ -104,7 +104,7 @@ if __name__ == "__main__":
 
     people_keypoints = _get_skeleton(img_rgb, mmpose)
 
-    people_keypoints_3d, img_dpt = points_to_depth(
+    people_keypoints_3d = points_to_depth(
         people_keypoints, img_dpt)
 
     for keypoints_3d in people_keypoints_3d:
