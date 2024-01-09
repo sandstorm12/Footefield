@@ -14,9 +14,9 @@ from calibration import rgb_depth_map
 from mmpose.apis import MMPoseInferencer
 
 
-OVERWRITE = True
+OVERWRITE = False
 VISUALIZE = False
-EXP_LENGTH = 10
+EXP_LENGTH = 50
 
 
 def _get_skeleton(image, inferencer):
