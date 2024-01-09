@@ -1,3 +1,6 @@
+# Pose to SMPL input files
+*.npy
+
 # Model files
 *.pt
 
