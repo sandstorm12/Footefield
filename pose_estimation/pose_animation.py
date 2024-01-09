@@ -7,14 +7,12 @@ import matplotlib.animation
 import matplotlib.pyplot as plt
 
 from utils import data_loader
-from mmpose.apis import MMPoseInferencer
 
 
 def init_graph(poses, ax):
     lines = []
     graphs = []
     for keypoints in np.array(poses[0]):
-        # Define the data for the scatter plot
         x = [point[0] for point in keypoints]
         y = [point[2] for point in keypoints]
         z = [1080 - point[1] for point in keypoints]
@@ -89,19 +87,19 @@ def visualize_poses(poses):
     plt.show()
 
 
-# Just for test
 if __name__ == "__main__":
     cache = diskcache.Cache('../calibration/cache')
 
     cache_process = cache.get('process', {})
 
-    mmpose = MMPoseInferencer('human')
-
     for expriment in data_loader.EXPERIMENTS.keys():
         for dir in data_loader.EXPERIMENTS[expriment]:
             camera = dir.split("/")[-1] + "_calib_snap"
             
-            id_exp = f'{expriment}_{camera}_skeleton_3D'
+            # id_exp = f'{expriment}_{camera}_skeleton_3D'
+            id_exp = f'{expriment}_{camera}_skeleton_3D_smooth'
+
+            print(f"Visualizing {id_exp}")
 
             poses = cache_process[id_exp]
 
