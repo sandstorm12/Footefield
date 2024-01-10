@@ -43,8 +43,6 @@ def get_all_keys(cache):
 def load_image_points(cache, images):
     images_info = cache['images_info']
 
-    criteria = (cv2.TERM_CRITERIA_MAX_ITER | cv2.TERM_CRITERIA_EPS, 30, 0.001)
-    
     if not images_info:
         print("'images_info' not found.")
 
@@ -57,16 +55,9 @@ def load_image_points(cache, images):
         if not ret:
             continue
         
-        image_gray = cv2.imread(
-            images_info[key]['fullpath_rgb'], cv2.IMREAD_GRAYSCALE)
-        corners_refined = cv2.cornerSubPix(
-            image_gray, corners, (5, 5), (-1, -1), criteria)
+        img_points.append(corners)
 
-        img_points.append(corners_refined)
-        width = image_gray.shape[1] # images_info[key]['width']
-        height = image_gray.shape[0] # ['height']
-
-    return img_points, width, height
+    return img_points
 
 
 def find_matching_images(images_info, cam_1, cam_2):
@@ -99,15 +90,17 @@ def calc_extrinsics(cam_1, cam_2, obj_points, cache):
 
     print(f"Matching pairs: {len(matching_pairs)}")
 
-    img_points_1, width, height = load_image_points(
+    img_points_1 = load_image_points(
         cache, images=[item['cam_1_img'] for item in matching_pairs.values()])
-    img_points_2, width, height = load_image_points(
+    img_points_2 = load_image_points(
         cache, images=[item['cam_2_img'] for item in matching_pairs.values()])
 
     _, mtx_1, dist_1, mtx_2, dist_2, R, T, _, _ = cv2.stereoCalibrate(
         np.tile(obj_points, (len(img_points_1), 1, 1)),
         img_points_1, img_points_2,
-        None, None, None, None, (width, height),
+        None, None, None, None,
+        (data_loader.IMAGE_INFRARED_WIDTH,
+         data_loader.IMAGE_INFRARED_HEIGHT),
         criteria=STEREO_CALIBRATION_CRITERIA, flags=0)
     
     if not cache.__contains__('extrinsics'):
@@ -133,9 +126,9 @@ def calc_reprojection_error(cam_1, cam_2, obj_points, cache):
 
     print(f"Matching pairs: {len(matching_pairs)}")
 
-    img_points_1, _, _ = load_image_points(
+    img_points_1 = load_image_points(
         cache, images=[item['cam_1_img'] for item in matching_pairs.values()])
-    img_points_2, _, _ = load_image_points(
+    img_points_2 = load_image_points(
         cache, images=[item['cam_2_img'] for item in matching_pairs.values()])
 
     if not cache.__contains__('extrinsics'):

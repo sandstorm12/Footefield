@@ -18,8 +18,6 @@ from utils import data_loader
 def load_image_points(cache):
     images_info = cache['images_info']
 
-    criteria = (cv2.TERM_CRITERIA_MAX_ITER | cv2.TERM_CRITERIA_EPS, 30, 0.001)
-    
     if not images_info:
         print("'images_info' not found.")
 
@@ -31,7 +29,7 @@ def load_image_points(cache):
         camera = key.split("/")[0]
 
         if not cameras.__contains__(camera):
-            cameras[camera] = {'img_points': [], 'width': 0, 'height': 0}
+            cameras[camera] = {'img_points': []}
         camera_points = cameras[camera]
 
         ret, corners = images_info[key]['findchessboardcorners_rgb']
@@ -39,8 +37,6 @@ def load_image_points(cache):
             continue
         
         camera_points['img_points'].append(corners)
-        camera_points['width'] = images_info[key]['width'] # images_info[key]['width']
-        camera_points['height'] = images_info[key]['height'] # ['height']
 
     return cameras
 
@@ -57,8 +53,8 @@ def calculate_intrinsics(cameras_info, cache):
     for key in tqdm(cameras_info.keys()):
         img_points = cameras_info[key]['img_points']
 
-        width = cameras_info[key]['width']
-        height = cameras_info[key]['height']
+        width = data_loader.IMAGE_INFRARED_WIDTH
+        height = data_loader.IMAGE_INFRARED_HEIGHT
 
         ret, mtx, dist, rvecs, tvecs = \
             cv2.calibrateCamera(
