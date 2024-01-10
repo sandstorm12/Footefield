@@ -1,5 +1,6 @@
 import os
 import re
+import cv2
 import glob
 
 
@@ -61,7 +62,7 @@ CHESSBOARD_SQRS = 60.
 IMAGE_RGB_WIDTH = 1920
 IMAGE_RGB_HEIGHT = 1080
 IMAGE_INFRARED_WIDTH = 640
-IMAGE_INFRARED_HEIGH = 576
+IMAGE_INFRARED_HEIGHT = 576
 
 PATTERN_NAME = r"(color|depth|infrared)"
 
@@ -103,3 +104,27 @@ def image_name_from_fullpath(fullpath):
     image_name = f"{dir}/{name}"
     
     return image_name
+
+
+def downsample_keep_aspect_ratio(img, size):
+    aspect_ratio_org = img.shape[0] / img.shape[1]
+    aspect_ratio_new = size[1] / size[0]
+
+    if aspect_ratio_new > aspect_ratio_org:
+        width_resize = int(img.shape[1] * (size[1] / img.shape[0]))
+        height_resize = size[1]
+        center = width_resize // 2
+
+        img_resize = cv2.resize(img, (width_resize, height_resize))
+        img_resize = img_resize[
+            :, center - size[0] // 2:center + size[0] // 2]
+    else:
+        width_resize = size[0]
+        height_resize = int(img.shape[0] * (size[0] / img.shape[1]))
+        center = height_resize // 2
+
+        img_resize = cv2.resize(img, (width_resize, height_resize))
+        img_resize = img_resize[
+            center - size[0] // 2:center + size[0] // 2, :]
+
+    return img_resize

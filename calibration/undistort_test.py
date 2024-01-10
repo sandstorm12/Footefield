@@ -1,8 +1,12 @@
+import sys
+sys.path.append('../')
+
 import os
 import cv2
 import glob
 import diskcache
-import numpy as np
+
+from utils import data_loader
 
 
 IMAGE_DIRS = [
@@ -32,6 +36,11 @@ if __name__ == "__main__":
         file_paths = glob.glob(os.path.join(image_dir, "color*"))
         for file_path in file_paths:
             img = cv2.imread(file_path)
+
+            img = data_loader.downsample_keep_aspect_ratio(
+                img,
+                (data_loader.IMAGE_INFRARED_WIDTH,
+                 data_loader.IMAGE_INFRARED_HEIGHT))
 
             # Undistort the image using cv2.undistort function
             # The new camera matrix can be the same as the original one
