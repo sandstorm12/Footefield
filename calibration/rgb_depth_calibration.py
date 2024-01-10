@@ -25,42 +25,11 @@ def get_obj_points():
     return obj_points
 
 
-def load_image_points(cache, images):
-    images_info = cache['images_info']
-
-    criteria = (cv2.TERM_CRITERIA_MAX_ITER | cv2.TERM_CRITERIA_EPS, 30, 0.001)
-    
-    if not images_info:
-        print("'images_info' not found.")
-
-    if len(images_info.keys()) == 0:
-        print("No images in images_info. Please run detect_chessboard first.")
-
-    img_points = []
-    for key in tqdm(images):
-        ret, corners = images_info[key]['findchessboardcorners_rgb']
-        if not ret:
-            continue
-        
-        image_gray = cv2.imread(
-            images_info[key]['fullpath'], cv2.IMREAD_GRAYSCALE)
-        corners_refined = cv2.cornerSubPix(
-            image_gray, corners, (5, 5), (-1, -1), criteria)
-
-        img_points.append(corners_refined)
-        width = image_gray.shape[1] # images_info[key]['width']
-        height = image_gray.shape[0] # ['height']
-
-    return img_points, width, height
-
-
 def find_rgb_depth_images(images_info, camera):
     images_info = cache['images_info']
 
     image_points_rgb = []
     image_points_infrared = []
-    width = None
-    height = None
     for key in images_info.keys():
         if key.split("/")[0] == camera:
             points_found_rgb, points_rgb = \
@@ -70,14 +39,10 @@ def find_rgb_depth_images(images_info, camera):
             if points_found_rgb and points_found_infrared:
                 image_points_rgb.append(points_rgb)
                 image_points_infrared.append(points_infrared)
-                width = images_info[key]['width']
-                height = images_info[key]['height']
 
     rgb_depth_pairs = {
         "image_points_rgb": image_points_rgb,
         "image_points_infrared": image_points_infrared,
-        "width": width,
-        "height": height,
     }
             
     return rgb_depth_pairs
@@ -90,12 +55,15 @@ def calc_depth_rgb_match(camera, obj_points, cache):
 
     print(f"Matching pairs: {len(rgb_depth_pairs['image_points_rgb'])}")
 
+    print(np.max(rgb_depth_pairs['image_points_rgb']), np.max(rgb_depth_pairs['image_points_infrared']))
+
     _, mtx_1, dist_1, mtx_2, dist_2, R, T, _, _ = cv2.stereoCalibrate(
         np.tile(obj_points, (len(rgb_depth_pairs['image_points_rgb']), 1, 1)),
         rgb_depth_pairs['image_points_rgb'],
         rgb_depth_pairs['image_points_infrared'],
         None, None, None, None,
-        (rgb_depth_pairs['width'], rgb_depth_pairs['height']),
+        (data_loader.IMAGE_INFRARED_WIDTH,
+         data_loader.IMAGE_INFRARED_HEIGHT),
         criteria=STEREO_CALIBRATION_CRITERIA, flags=0)
     
     if not cache.__contains__('extrinsics'):
@@ -123,16 +91,16 @@ def calc_rectification_params(camera, cache):
     
     R1, R2, P1, P2, Q, roi1, roi2 = cv2.stereoRectify(
         mtx_1, dist_1, mtx_2, dist_2,
-        (data_loader.IMAGE_RGB_WIDTH, data_loader.IMAGE_RGB_HEIGHT),
+        (data_loader.IMAGE_INFRARED_WIDTH, data_loader.IMAGE_INFRARED_HEIGHT),
         R, T, flags=cv2.CALIB_ZERO_DISPARITY, alpha=-1)
     
     map1x, map1y = cv2.initUndistortRectifyMap(
         mtx_1, dist_1, R1, P1,
-        (data_loader.IMAGE_RGB_WIDTH, data_loader.IMAGE_RGB_HEIGHT),
+        (data_loader.IMAGE_INFRARED_WIDTH, data_loader.IMAGE_INFRARED_HEIGHT),
         cv2.CV_32FC1)
     map2x, map2y = cv2.initUndistortRectifyMap(
         mtx_2, dist_2, R2, P2,
-        (data_loader.IMAGE_RGB_WIDTH, data_loader.IMAGE_RGB_HEIGHT),
+        (data_loader.IMAGE_INFRARED_WIDTH, data_loader.IMAGE_INFRARED_HEIGHT),
         cv2.CV_32FC1)
 
     depth_matching = cache['depth_matching']

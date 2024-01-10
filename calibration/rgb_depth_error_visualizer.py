@@ -25,35 +25,6 @@ def get_obj_points():
     return obj_points
 
 
-def load_image_points(cache, images):
-    images_info = cache['images_info']
-
-    criteria = (cv2.TERM_CRITERIA_MAX_ITER | cv2.TERM_CRITERIA_EPS, 30, 0.001)
-    
-    if not images_info:
-        print("'images_info' not found.")
-
-    if len(images_info.keys()) == 0:
-        print("No images in images_info. Please run detect_chessboard first.")
-
-    img_points = []
-    for key in tqdm(images):
-        ret, corners = images_info[key]['findchessboardcorners_rgb']
-        if not ret:
-            continue
-        
-        image_gray = cv2.imread(
-            images_info[key]['fullpath'], cv2.IMREAD_GRAYSCALE)
-        corners_refined = cv2.cornerSubPix(
-            image_gray, corners, (11, 11), (-1, -1), criteria)
-
-        img_points.append(corners_refined)
-        width = image_gray.shape[1] # images_info[key]['width']
-        height = image_gray.shape[0] # ['height']
-
-    return img_points, width, height
-
-
 def find_rgb_depth_images(images_info, cam_1):
     images_info = cache['images_info']
 
@@ -61,8 +32,6 @@ def find_rgb_depth_images(images_info, cam_1):
     image_paths_infrared = []
     image_points_rgb = []
     image_points_infrared = []
-    width = None
-    height = None
     for key in images_info.keys():
         if key.split("/")[0] == cam_1:
             points_found_rgb, points_rgb = \
@@ -75,16 +44,12 @@ def find_rgb_depth_images(images_info, cam_1):
                     images_info[key]['fullpath_infrared'])
                 image_points_rgb.append(points_rgb)
                 image_points_infrared.append(points_infrared)
-                width = images_info[key]['width']
-                height = images_info[key]['height']
 
     rgb_depth_pairs = {
         "image_paths_rgb": image_paths_rgb,
         "image_paths_infrared": image_paths_infrared,
         "image_points_rgb": image_points_rgb,
         "image_points_infrared": image_points_infrared,
-        "width": width,
-        "height": height,
     }
             
     return rgb_depth_pairs
@@ -124,7 +89,8 @@ def calc_reprojection_error(cam_1, obj_points, cache):
             img_inf.astype(np.float32) * .8, 0, 255).astype('uint8')
         img_inf = cv2.resize(
             img_inf,
-            (data_loader.IMAGE_RGB_WIDTH, data_loader.IMAGE_RGB_HEIGHT))
+            (data_loader.IMAGE_INFRARED_WIDTH,
+             data_loader.IMAGE_INFRARED_HEIGHT))
         for idx_point, point in enumerate(imgpoints2_projected):
             x = int(point[0][0])
             y = int(point[0][1])
