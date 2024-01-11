@@ -1,16 +1,23 @@
+import sys
+sys.path.append('../')
+
 import cv2
 
+from utils import data_loader
 from mmpose.apis import MMPoseInferencer
 
 
 img_path = (
     '/home/hamid/Documents/footefield/data/AzureKinectRecord_0729'
-    '/a1/azure_kinect3_5/color/color00000.jpg'
+    '/a1/azure_kinect1_4/color/color00000.jpg'
 )
 image = cv2.imread(img_path)
+image = data_loader.downsample_keep_aspect_ratio(
+    image,
+    (data_loader.IMAGE_INFRARED_WIDTH, data_loader.IMAGE_INFRARED_HEIGHT))
 
-# inferencer = MMPoseInferencer('human')
-inferencer = MMPoseInferencer('rtmpose-x_8xb256-700e_body8-halpe26-384x288')
+inferencer = MMPoseInferencer('human')
+# inferencer = MMPoseInferencer('rtmpose-x_8xb256-700e_body8-halpe26-384x288')
 
 result_generator = inferencer(image)
 for result in result_generator:
