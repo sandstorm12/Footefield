@@ -75,7 +75,8 @@ Run the scripts in this order:
 
 ## Known issues
 
-1. Depth estimation using single camera depth information is noisy.
+1. Depth estimation using single camera depth information is noisy
+1. Move or remove the `calibration/rgb_resize_test.py`
 
 
 ## Contributors
