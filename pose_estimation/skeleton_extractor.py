@@ -14,7 +14,7 @@ from calibration import rgb_depth_map
 from mmpose.apis import MMPoseInferencer
 
 
-OVERWRITE = False
+OVERWRITE = True
 VISUALIZE = False
 EXP_LENGTH = 50
 
@@ -38,9 +38,10 @@ def extract_poses(dir, camera, model):
     img_dpt_paths = data_loader.list_depth_images(os.path.join(dir, "depth"))
     for idx in tqdm(range(len(img_dpt_paths[:EXP_LENGTH]))):
         img_rgb = cv2.imread(img_rgb_paths[idx])
-        
+        img_rgb = data_loader.downsample_keep_aspect_ratio(
+            img_rgb,
+            (data_loader.IMAGE_INFRARED_WIDTH, data_loader.IMAGE_INFRARED_HEIGHT))
         img_dpt = cv2.imread(img_dpt_paths[idx], -1)
-        img_dpt = cv2.resize(img_dpt, (1920, 1080))
 
         img_rgb = rgb_depth_map.align_image_rgb(img_rgb, camera, cache)
         img_dpt = rgb_depth_map.align_image_depth(img_dpt, camera, cache)

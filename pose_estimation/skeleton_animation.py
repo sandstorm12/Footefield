@@ -15,7 +15,7 @@ def init_graph(poses, ax):
     for keypoints in np.array(poses[0]):
         x = [point[0] for point in keypoints]
         y = [point[2] for point in keypoints]
-        z = [1080 - point[1] for point in keypoints]
+        z = [576 - point[1] for point in keypoints]
 
         graph = ax.scatter(x, y, z, c='r', marker='o')
         graphs.append(graph)
@@ -41,7 +41,7 @@ def update_graph(idx, poses, graphs, lines, title):
         # Define the data for the scatter plot
         x = [point[0] for point in keypoints[person_idx]]
         y = [point[2] for point in keypoints[person_idx]]
-        z = [1080 - point[1] for point in keypoints[person_idx]]
+        z = [576 - point[1] for point in keypoints[person_idx]]
 
         graphs[person_idx]._offsets3d = (x, y, z)
 
@@ -76,9 +76,9 @@ def visualize_poses(poses):
     ax.set_ylabel('Y Label')
     ax.set_zlabel('Z Label')
 
-    ax.axes.set_xlim3d(0, 1920)
-    ax.axes.set_zlim3d(0, 1080)
-    ax.axes.set_ylim3d(0, 3000)
+    ax.axes.set_xlim3d(0, 640)
+    ax.axes.set_zlim3d(0, 576)
+    ax.axes.set_ylim3d(0, 5000)
 
     ani = matplotlib.animation.FuncAnimation(
         fig, update_graph, len(poses), fargs=(poses, graphs, lines, title),

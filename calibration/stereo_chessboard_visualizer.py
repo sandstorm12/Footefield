@@ -39,8 +39,6 @@ def get_all_keys(cache):
 def load_image_points(cache, images):
     images_info = cache['images_info']
 
-    criteria = (cv2.TERM_CRITERIA_MAX_ITER | cv2.TERM_CRITERIA_EPS, 30, 0.001)
-    
     if not images_info:
         print("'images_info' not found.")
 
@@ -49,20 +47,13 @@ def load_image_points(cache, images):
 
     img_points = []
     for key in tqdm(images):
-        camera = key.split("/")[0]
-
         ret, corners = images_info[key]['findchessboardcorners_rgb']
         if not ret:
             continue
         
-        image_gray = cv2.imread(images_info[key]['fullpath_rgb'], cv2.IMREAD_GRAYSCALE)
-        corners_refined = cv2.cornerSubPix(image_gray, corners, (5, 5), (-1, -1), criteria)
+        img_points.append(corners)
 
-        img_points.append(corners_refined)
-        width = image_gray.shape[1] # images_info[key]['width']
-        height = image_gray.shape[0] # ['height']
-
-    return img_points, width, height
+    return img_points
 
 
 def find_matching_images(images_info, cam_1, cam_2):
@@ -114,9 +105,9 @@ if __name__ == "__main__":
             if len(matching_pairs) == 0:
                 continue
             
-            img_points_1, width, height = load_image_points(
+            img_points_1 = load_image_points(
                 cache, images=[item['cam_1_img'] for item in matching_pairs.values()])
-            img_points_2, width, height = load_image_points(
+            img_points_2 = load_image_points(
                 cache, images=[item['cam_2_img'] for item in matching_pairs.values()])
 
             for idx, key in enumerate(matching_pairs.keys()):
@@ -124,6 +115,16 @@ if __name__ == "__main__":
                 image_1 = cv2.imread(image_1_addr)
                 image_2_addr = images_info[matching_pairs[key]['cam_2_img']]['fullpath_rgb']
                 image_2 = cv2.imread(image_2_addr)
+
+                image_1 = data_loader.downsample_keep_aspect_ratio(
+                    image_1,
+                    (data_loader.IMAGE_INFRARED_WIDTH,
+                     data_loader.IMAGE_INFRARED_HEIGHT))
+                
+                image_2 = data_loader.downsample_keep_aspect_ratio(
+                    image_2,
+                    (data_loader.IMAGE_INFRARED_WIDTH,
+                     data_loader.IMAGE_INFRARED_HEIGHT))
 
                 for idx_point, point in enumerate(img_points_1[idx]):
                     x = int(point[0][0])

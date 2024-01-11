@@ -15,16 +15,14 @@ def skeleton_2_numpypkl(output_dir, cache_process):
             skeleton = np.array([keypoints[0]
                                  for keypoints in cache_process[key]],
                                 dtype=float)
+            print(skeleton.shape)
             for i in range(len(skeleton)):
+                depth_max = np.max(skeleton[i, :, 2])
                 for j in range(len(skeleton[i])):
                     #TODO: Remove the normalization from here
-                    # skeleton[i][j][0] = (skeleton[i][j][0] / (1920. / 2.) - 1)
-                    # skeleton[i][j][1] = (skeleton[i][j][1] / (1080. / 2.) - 1)
-                    # skeleton[i][j][2] = (skeleton[i][j][2] / (4000. / 2.) - 1)
-
-                    skeleton[i][j][0] = (skeleton[i][j][0]) / 1920
-                    skeleton[i][j][1] = (1080 - skeleton[i][j][1]) / 1080
-                    skeleton[i][j][2] = (skeleton[i][j][2]) / np.mean(skeleton[i][j][2])
+                    skeleton[i][j][0] = (skeleton[i][j][0] / (640. / 2.) - 1)
+                    skeleton[i][j][1] = ((576 - skeleton[i][j][1]) / (576. / 2.) - 1)
+                    skeleton[i][j][2] = (skeleton[i][j][2] / (depth_max / 2.) - 1)
 
             output_path = os.path.join(output_dir, f'{key}.npy')
             with open(output_path, 'wb') as handle:

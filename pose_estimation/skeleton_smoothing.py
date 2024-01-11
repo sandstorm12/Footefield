@@ -33,7 +33,7 @@ def smooth_depth(poses):
                 last_non_zero = poses[i, idx_point, 2]
 
         
-        # poses[:, idx_point, 2] = savgol_filter(poses[:, idx_point, 2], 30, 1)
+        poses[:, idx_point, 2] = savgol_filter(poses[:, idx_point, 2], 30, 1)
     
 
 def visualize_depth(poses):
@@ -73,6 +73,11 @@ if __name__ == "__main__":
             print(f"Visualizing {id_exp}")
 
             poses = copy.deepcopy(cache_process[id_exp])
+
+            print(len(poses),
+                  len(poses[0]),
+                  len(poses[0][0]),
+                  len(poses[0][0][0]))
 
             for i in range(2):
                 person_points = get_person_spatiotemporal_points(i, poses)
