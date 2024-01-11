@@ -14,6 +14,7 @@ Scripts to extract 2D skeletons and project them to 3D world coordinates using d
 ## TODO
 
 1. Feature: Use Halpe keypoints to get more accurate SMPL estimations
+1. Feature: Optimize SMPL for each frame separately
 1. Feature: Use `local search` to find acceptable depth for the keypoints with no depth
 1. Feature: Introduce triangulation to improve the accuracy of keypoints.
 1. Feature: Create 3D point cloud using the multi-camera depth images.
