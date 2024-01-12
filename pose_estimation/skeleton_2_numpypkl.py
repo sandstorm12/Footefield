@@ -15,14 +15,20 @@ def skeleton_2_numpypkl(output_dir, cache_process):
             skeleton = np.array([keypoints[0]
                                  for keypoints in cache_process[key]],
                                 dtype=float)
-            print(skeleton.shape)
+            x_range = np.max(skeleton[:, :, 0]) - np.min(skeleton[:, :, 0])
+            x_middle = int(np.max(skeleton[:, :, 0]) + np.min(skeleton[:, :, 0])) // 2
+            y_range = np.max(skeleton[:, :, 1]) - np.min(skeleton[:, :, 1])
+            y_middle = int(np.max(skeleton[:, :, 1]) + np.min(skeleton[:, :, 1])) // 2
+            z_range = np.max(skeleton[:, :, 2]) - np.min(skeleton[:, :, 2])
+            z_middle = int(np.max(skeleton[:, :, 2]) + np.min(skeleton[:, :, 2])) // 2
+            g_range = max(x_range, y_range, z_range) / 2
+            
             for i in range(len(skeleton)):
-                depth_max = np.max(skeleton[i, :, 2])
                 for j in range(len(skeleton[i])):
                     #TODO: Remove the normalization from here
-                    skeleton[i][j][0] = (skeleton[i][j][0] / (640. / 2.) - 1)
-                    skeleton[i][j][1] = ((576 - skeleton[i][j][1]) / (576. / 2.) - 1)
-                    skeleton[i][j][2] = (skeleton[i][j][2] / (depth_max / 2.) - 1)
+                    skeleton[i][j][0] = (skeleton[i][j][0] - x_middle) / g_range
+                    skeleton[i][j][1] = ((skeleton[i][j][1] - y_middle) / g_range)
+                    skeleton[i][j][2] = (skeleton[i][j][2] - z_middle) / g_range
 
             output_path = os.path.join(output_dir, f'{key}.npy')
             with open(output_path, 'wb') as handle:
