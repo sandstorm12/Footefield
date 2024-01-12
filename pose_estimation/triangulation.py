@@ -172,6 +172,9 @@ for person in point_3d_01:
     x = [point[0] for point in person]
     y = [point[2] for point in person]
     z = [point[1] for point in person]
+    x.append(0)
+    y.append(0)
+    z.append(0)
 
     center = (int(np.mean(x)), int(np.mean(y)), int(np.mean(z)))
 
