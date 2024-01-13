@@ -64,7 +64,8 @@ Run the scripts in this order:
 
 1. Feature: Fix the scaling problem with the triangulated skeletons in the animation
 1. Feature: Convert the triangulated 3d skeletons to a correct scale and rotation
-1. Feature: Add 2d head keypoints detection
+1. Refactor: Add the SMPL 
+1. ~~Feature: Add 2d head keypoints detection~~
 1. Feature: Add 3d head keypoints to the 3d skeleton keypoints
 1. Feature: Add 2d hand keypoints detection
 1. Feature: Add 3d hand keypoints to the 3d skeleton keypoints
@@ -74,14 +75,14 @@ Run the scripts in this order:
 1. Feature: Render the whole scene using SMPL
 1. Feature: Fit SMPLX model
 1. Feature: Calculate point depths using triangulation between adjacent cameras.
-1. Bug: Make `calibration/pose_animation.py` more stable.
+1. ~~Bug: Make `calibration/pose_animation.py` more stable.~~
 1. Feature: Make the calibration process simpler by implementing a single end-to-end script.
 1. Feature: Add SMPL to the pose animation.
-1. Feature: Make pose estimation in the pose animation fasters or increase its hardware utilization (can use GPU?)
-1. Feature: Remove unwanted skeletons from the pose animation
+1. ~~Feature: Make pose estimation in the pose animation fasters or increase its hardware utilization (can use GPU?)~~
+1. ~~Feature: Remove unwanted skeletons from the pose animation~~
 1. Feature: Add dataset information
 1. Feature: Add arguments for script execution
-1. Bug: Update the extrinsic parameters estimation using your new knowledge of rvecs and tvecs
+1. ~~Bug: Update the extrinsic parameters estimation using your new knowledge of rvecs and tvecs~~
 
 
 ## Known issues
