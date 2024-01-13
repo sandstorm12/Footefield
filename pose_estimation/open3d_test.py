@@ -12,10 +12,10 @@ from calibration import rgb_depth_map
 
 cache = diskcache.Cache('../calibration/cache')
 
-camera = 'azure_kinect1_4_calib_snap'
-
-img_depth_path = '/home/hamid/Documents/footefield/data/AzureKinectRecord_0729/a1/azure_kinect1_4/depth/depth00000.png'
-img_color_path = '/home/hamid/Documents/footefield/data/AzureKinectRecord_0729/a1/azure_kinect1_4/color/color00000.jpg'
+cam = '2_4'
+camera = f'azure_kinect{cam}_calib_snap'
+img_depth_path = f'/home/hamid/Documents/footefield/data/AzureKinectRecord_0729/a1/azure_kinect{cam}/depth/depth00000.png'
+img_color_path = f'/home/hamid/Documents/footefield/data/AzureKinectRecord_0729/a1/azure_kinect{cam}/color/color00000.jpg'
 
 img_depth = cv2.imread(img_depth_path, -1)
 img_color = cv2.imread(img_color_path)
@@ -29,8 +29,6 @@ img_color = data_loader.downsample_keep_aspect_ratio(
 
 img_color = rgb_depth_map.align_image_rgb(img_color, camera, cache)
 img_depth = rgb_depth_map.align_image_depth(img_depth, camera, cache)
-
-print(img_depth.shape)
 
 point_cloud = []
 colors = []
