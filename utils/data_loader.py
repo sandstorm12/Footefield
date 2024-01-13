@@ -13,20 +13,20 @@ PATH_CALIBS = [
 ]
 
 EXPERIMENTS = {
-    'a1': [
-        "/home/hamid/Documents/footefield/data/AzureKinectRecord_0729/a1/azure_kinect1_4",
-        "/home/hamid/Documents/footefield/data/AzureKinectRecord_0729/a1/azure_kinect1_5",
-        "/home/hamid/Documents/footefield/data/AzureKinectRecord_0729/a1/azure_kinect2_4",
-        "/home/hamid/Documents/footefield/data/AzureKinectRecord_0729/a1/azure_kinect3_4",
-        "/home/hamid/Documents/footefield/data/AzureKinectRecord_0729/a1/azure_kinect3_5",
-    ],
-    'a2': [
-        "/home/hamid/Documents/footefield/data/AzureKinectRecord_0729/a2/azure_kinect1_4",
-        "/home/hamid/Documents/footefield/data/AzureKinectRecord_0729/a2/azure_kinect1_5",
-        "/home/hamid/Documents/footefield/data/AzureKinectRecord_0729/a2/azure_kinect2_4",
-        "/home/hamid/Documents/footefield/data/AzureKinectRecord_0729/a2/azure_kinect3_4",
-        "/home/hamid/Documents/footefield/data/AzureKinectRecord_0729/a2/azure_kinect3_5",
-    ]
+    'a1': {
+        "azure_kinect1_4_calib_snap": "/home/hamid/Documents/footefield/data/AzureKinectRecord_0729/a1/azure_kinect1_4",
+        "azure_kinect1_5_calib_snap": "/home/hamid/Documents/footefield/data/AzureKinectRecord_0729/a1/azure_kinect1_5",
+        "azure_kinect2_4_calib_snap": "/home/hamid/Documents/footefield/data/AzureKinectRecord_0729/a1/azure_kinect2_4",
+        "azure_kinect3_4_calib_snap": "/home/hamid/Documents/footefield/data/AzureKinectRecord_0729/a1/azure_kinect3_4",
+        "azure_kinect3_5_calib_snap": "/home/hamid/Documents/footefield/data/AzureKinectRecord_0729/a1/azure_kinect3_5",
+    },
+    'a2': {
+        "azure_kinect1_4_calib_snap": "/home/hamid/Documents/footefield/data/AzureKinectRecord_0729/a2/azure_kinect1_4",
+        "azure_kinect1_5_calib_snap": "/home/hamid/Documents/footefield/data/AzureKinectRecord_0729/a2/azure_kinect1_5",
+        "azure_kinect2_4_calib_snap": "/home/hamid/Documents/footefield/data/AzureKinectRecord_0729/a2/azure_kinect2_4",
+        "azure_kinect3_4_calib_snap": "/home/hamid/Documents/footefield/data/AzureKinectRecord_0729/a2/azure_kinect3_4",
+        "azure_kinect3_5_calib_snap": "/home/hamid/Documents/footefield/data/AzureKinectRecord_0729/a2/azure_kinect3_5",
+    }
 }
 
 MMPOSE_EDGES = [
