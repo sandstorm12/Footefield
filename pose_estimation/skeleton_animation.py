@@ -94,15 +94,10 @@ if __name__ == "__main__":
 
     cache_process = cache.get('process', {})
 
-    for expriment in data_loader.EXPERIMENTS.keys():
-        for dir in data_loader.EXPERIMENTS[expriment]:
-            camera = dir.split("/")[-1] + "_calib_snap"
-            
-            # id_exp = f'{expriment}_{camera}_skeleton_3D'
-            id_exp = f'{expriment}_{camera}_skeleton_3D_smooth'
+    for key in cache_process.keys():
+        if "skeleton_3D_smooth" in key:
+            print(f"Visualizing {key}")
 
-            print(f"Visualizing {id_exp}")
-
-            poses = cache_process[id_exp]
+            poses = cache_process[key]
 
             visualize_poses(poses)
