@@ -2,6 +2,10 @@ import os
 import diskcache
 import numpy as np
 
+import math
+from scipy.spatial.transform import Rotation
+from numpy.linalg import norm
+
 
 OUTPUT_DIR = './skeleton_numpypkl'
 
@@ -29,6 +33,17 @@ def skeleton_2_numpypkl(output_dir, cache_process):
                     skeleton[i][j][0] = (skeleton[i][j][0] - x_middle) / g_range
                     skeleton[i][j][1] = ((skeleton[i][j][1] - y_middle) / g_range)
                     skeleton[i][j][2] = (skeleton[i][j][2] - z_middle) / g_range
+
+                axis = [0, 1, 0]
+                theta = math.radians(65)
+                axis = axis / norm([axis])
+                rot = Rotation.from_rotvec(theta * axis)
+                skeleton[i] = rot.apply(skeleton[i])
+
+                skeleton[i][7] += .1
+                skeleton[i][8] += -.1
+                skeleton[i][13] += .05
+                skeleton[i][14] += -.05
 
             output_path = os.path.join(output_dir, f'{key}.npy')
             with open(output_path, 'wb') as handle:
