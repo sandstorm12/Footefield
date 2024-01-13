@@ -26,10 +26,12 @@ images = [
     '/home/hamid/Documents/footefield/data/AzureKinectRecord_0729/a1/azure_kinect2_4/color/color00001.jpg',
 ]
 
-cam0 = cams[2]
-cam1 = cams[3]
-img0 = cv2.imread(images[2])
-img1 = cv2.imread(images[3])
+idx0 = 2
+idx1 = 3
+cam0 = cams[idx0]
+cam1 = cams[idx1]
+img0 = cv2.imread(images[idx0])
+img1 = cv2.imread(images[idx1])
 
 
 img0 = data_loader.downsample_keep_aspect_ratio(
@@ -80,7 +82,6 @@ for person in img0_people:
             cv2.FONT_HERSHEY_SIMPLEX, .5, (255, 255, 255), thickness=2)
             
 cv2.imshow('frame', img0)
-cv2.waitKey(0)
 
 for person in img1_people:
     for idx, point in enumerate(person):
@@ -95,7 +96,7 @@ for person in img1_people:
             img1, '1_'+str(idx), (x - 5, y + 5),
             cv2.FONT_HERSHEY_SIMPLEX, .5, (255, 255, 255), thickness=2)
             
-cv2.imshow('frame', img1)
+cv2.imshow('frame1', img1)
 cv2.waitKey(0)
 
 # Loading camera parameters
@@ -171,7 +172,7 @@ for person in point_3d_01:
     # Define the data for the scatter plot
     x = [point[0] for point in person]
     y = [point[2] for point in person]
-    z = [point[1] for point in person]
+    z = [-1 * point[1] for point in person]
     x.append(0)
     y.append(0)
     z.append(0)
@@ -199,8 +200,8 @@ ax.set_xlabel('X Label')
 ax.set_ylabel('Y Label')
 ax.set_zlabel('Z Label')
 
-ax.axes.set_xlim3d(center[0] - 500, center[0] + 500)
-ax.axes.set_ylim3d(center[1] - 500, center[1] + 500)
-ax.axes.set_zlim3d(center[2] - 500, center[2] + 500)
+# ax.axes.set_xlim3d(center[0] - 500, center[0] + 500)
+# ax.axes.set_ylim3d(center[1] - 500, center[1] + 500)
+# ax.axes.set_zlim3d(center[2] - 500, center[2] + 500)
 
 plt.show()
