@@ -51,7 +51,7 @@ def load_pairing_images(idx0, idx1):
 
 
 def extract_skeletons(img0, img1):
-    inferencer = MMPoseInferencer('human')
+    inferencer = MMPoseInferencer('rtmpose-x_8xb256-700e_body8-halpe26-384x288')
 
     img0_people = detect_keypoints(img0, inferencer)[0:2]
     img1_people = detect_keypoints(img1, inferencer)[0:2]
@@ -192,7 +192,7 @@ def triangulate_points(idx0, img0, img1, cache):
     # Convert from homogeneous to Euclidean coordinates
     points_3d = cv2.convertPointsFromHomogeneous(points_3d.T)
 
-    points_3d = points_3d.reshape((-1, 17, 3))
+    points_3d = points_3d.reshape((-1, 26, 3))
 
     return points_3d
 
