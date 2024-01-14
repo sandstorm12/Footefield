@@ -65,7 +65,7 @@ if __name__ == "__main__":
 
     cam_pairs = [
         ("azure_kinect3_4_calib_snap", "azure_kinect3_5_calib_snap"),
-        ("azure_kinect3_5_calib_snap", "azure_kinect2_4_calib_snap"),
+        ("azure_kinect2_4_calib_snap", "azure_kinect1_5_calib_snap"),
     ]
 
     for expriment in data_loader.EXPERIMENTS.keys():
