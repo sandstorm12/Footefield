@@ -10,11 +10,10 @@ import matplotlib.pyplot as plt
 
 from tqdm import tqdm
 from utils import data_loader
-from calibration import rgb_depth_map
 from mmpose.apis import MMPoseInferencer
 
 
-OVERWRITE = True
+OVERWRITE = False
 VISUALIZE = False
 EXP_LENGTH = 50
 
@@ -191,14 +190,14 @@ def visualize_poses(poses):
 if __name__ == "__main__":
     cache = diskcache.Cache('../calibration/cache')
 
+    # cache['process'] = {}  # Removes all the caches processes
     cache_process = cache.get('process', {})
 
-    # mmpose = MMPoseInferencer('human')
     mmpose = MMPoseInferencer('rtmpose-x_8xb256-700e_body8-halpe26-384x288')
 
     cam_pairs = [
         ("azure_kinect3_4_calib_snap", "azure_kinect3_5_calib_snap"),
-        ("azure_kinect3_5_calib_snap", "azure_kinect2_4_calib_snap"),
+        ("azure_kinect2_4_calib_snap", "azure_kinect1_5_calib_snap"),
     ]
 
     for expriment in data_loader.EXPERIMENTS.keys():
