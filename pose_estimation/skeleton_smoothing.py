@@ -63,12 +63,18 @@ if __name__ == "__main__":
 
     cache_process = cache.get('process', {})
 
+    cam_pairs = [
+        ("azure_kinect3_4_calib_snap", "azure_kinect3_5_calib_snap"),
+        ("azure_kinect2_4_calib_snap", "azure_kinect1_5_calib_snap"),
+    ]
+
     for expriment in data_loader.EXPERIMENTS.keys():
-        for dir in data_loader.EXPERIMENTS[expriment]:
-            camera = dir.split("/")[-1] + "_calib_snap"
+        for cam_pair in cam_pairs:
+            cam0 = cam_pair[0]
+            cam1 = cam_pair[1]
             
-            id_exp = f'{expriment}_{camera}_skeleton_3D'
-            id_exp_smooth = f'{expriment}_{camera}_skeleton_3D_smooth'
+            id_exp = f'{expriment}_{cam0}_{cam1}_skeleton_3D'
+            id_exp_smooth = f'{expriment}_{cam0}_{cam1}_skeleton_3D_smooth'
 
             print(f"Visualizing {id_exp}")
 

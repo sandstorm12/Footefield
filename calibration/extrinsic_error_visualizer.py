@@ -55,11 +55,9 @@ def load_image_points(cache, images):
             continue
         
         img_points.append(corners)
-        width = images_info[key]['width']
-        height = images_info[key]['height']
         img_paths.append(images_info[key]['fullpath_rgb'])
 
-    return img_points, width, height, img_paths
+    return img_points, img_paths
 
 
 def find_matching_images(images_info, cam_1, cam_2):
@@ -149,9 +147,9 @@ if __name__ == "__main__":
 
             print(f"Matching pairs: {len(matching_pairs)}")
 
-            img_points_1, width, height, img_paths_1 = load_image_points(
+            img_points_1, img_paths_1 = load_image_points(
                 cache, images=[item['cam_1_img'] for item in matching_pairs.values()])
-            img_points_2, width, height, img_paths_2 = load_image_points(
+            img_points_2, img_paths_2 = load_image_points(
                 cache, images=[item['cam_2_img'] for item in matching_pairs.values()])
 
             mtx_1 = intrinsics[cam_1]['mtx']
@@ -170,7 +168,8 @@ if __name__ == "__main__":
             ret, mtx_1, dist_1, mtx_2, dist_2, R, T, E, F = cv2.stereoCalibrate(
                 np.tile(obj_points, (len(img_points_1), 1, 1)),
                 img_points_1, img_points_2,
-                mtx_1, dist_1, mtx_2, dist_2, (width, height),
+                None, None, None, None,
+                (data_loader.IMAGE_INFRARED_WIDTH, data_loader.IMAGE_INFRARED_HEIGHT),
                 criteria=stereocalibration_criteria, flags=0)
 
             total_error = 0
