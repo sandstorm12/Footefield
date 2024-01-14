@@ -13,9 +13,11 @@ Scripts to extract 2D skeletons and project them to 3D world coordinates using d
 
 ## TODO
 
-1. Feature: Automate the skeleton normalization (+rotation+smplfix)
+1. ~~Bug: Fix tracking from all camera pairs for triangulation base 3d skeleton detection~~
+1. ~~Feature: Automate the skeleton normalization (+rotation+smplfix)~~
 1. Feature: Visualize a full scene using SMPL
-1. Feature: Use Halpe keypoints to get more accurate SMPL estimations
+1. ~~Feature: Use Halpe keypoints to get more accurate SMPL estimations~~
+1. Bug: Fix the triangulation issue between `3_4` and `3_5` cameras
 1. Feature: Optimize SMPL for each frame separately
 1. Feature: Use `local search` to find acceptable depth for the keypoints with no depth
 1. Feature: Introduce triangulation to improve the accuracy of keypoints.
