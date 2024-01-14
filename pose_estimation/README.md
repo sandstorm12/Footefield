@@ -4,8 +4,17 @@ Scripts to extract 2D skeletons and project them to 3D world coordinates using d
 
 ## Components
 
+1. **test_mmpose.py**: Visualizes the skeleton keypoints found by the `mmpose` library on an arbitrary image.
 
-## Setup
+mmpose sample 1 | mmpose sample 2
+:-------------------------:|:-------------------------:
+![](../README_data/mmpose_1.png)  |  ![](../README_data/mmpose_2.png)
+
+1. **skeleton_visualizer.py**: Visualizes a 3D animation of the skeletons detected from subsequent frames of each experiment.
+
+Skeleton animation (angle 1) | Skeleton animation (angle 2)
+:-------------------------:|:-------------------------:
+![](../README_data/pose_animation_1.gif)  |  ![](../README_data/pose_animation_2.gif)
 
 
 ## Usage
@@ -26,6 +35,7 @@ Scripts to extract 2D skeletons and project them to 3D world coordinates using d
 1. Feature: We need explicit tracking of each person.
 1. ~~Feature: Normalize the 3D coordinates~~
 1. ~~Feature: Separate the the skeleton extraction from skeleton animation~~
+1. Refactor: Update the readme
 
 
 ## Known issues
