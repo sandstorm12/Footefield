@@ -40,6 +40,7 @@ pip install -r requirements
 1. Feature: Construct 3D point cloud of the scene using multiple cameras
 1. Feature: Detect face and hand keypoints
 1. Feature: Regress SMPLX joint to the body, face, and hand keypoints
+1. Feature: Render SMPL the multi-person skeletons in the orignal coordinate system
 
 ## Known issues
 
