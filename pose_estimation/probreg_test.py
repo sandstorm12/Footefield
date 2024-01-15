@@ -1,23 +1,15 @@
 import sys
 sys.path.append('../')
 
-import cv2
 import copy
+import cv2
 import diskcache
 import numpy as np
 import open3d as o3d
 
+from probreg import cpd
 from utils import data_loader
 from calibration import rgb_depth_map
-
-
-def draw_registration_result(source, target, transformation):
-    source_temp = copy.deepcopy(source)
-    target_temp = copy.deepcopy(target)
-    source_temp.paint_uniform_color([1, 0.706, 0])
-    target_temp.paint_uniform_color([0, 0.651, 0.929])
-    source_temp.transform(transformation)
-    o3d.visualization.draw_geometries([source_temp, target_temp])
 
 
 def load_pcd(cam, cache):
@@ -68,31 +60,25 @@ if __name__ == "__main__":
     source.estimate_normals()
     target.estimate_normals()
 
-    threshold = 0.5
-    trans_init = np.identity (4)
+    # load source and target point cloud
+    source.remove_non_finite_points()
+    
+    # transform target point cloud
+    th = np.deg2rad(30.0)
+    target.transform(np.array([[np.cos(th), -np.sin(th), 0.0, 0.0],
+                            [np.sin(th), np.cos(th), 0.0, 0.0],
+                            [0.0, 0.0, 1.0, 0.0],
+                            [0.0, 0.0, 0.0, 1.0]]))
+    source = source.voxel_down_sample(voxel_size=0.005)
+    target = target.voxel_down_sample(voxel_size=0.005)
 
-    draw_registration_result(source, target, trans_init)
-    print("Initial alignment")
-    evaluation = o3d.pipelines.registration.evaluate_registration(source, target,
-                                                        threshold, trans_init)
-    print(evaluation)
+    # compute cpd registration
+    tf_param, _, _ = cpd.registration_cpd(source, target)
+    result = copy.deepcopy(source)
+    result.points = tf_param.transform(result.points)
 
-    print("Apply point-to-point ICP")
-    reg_p2p = o3d.pipelines.registration.registration_icp(
-        source, target, threshold, trans_init,
-        o3d.pipelines.registration.TransformationEstimationPointToPoint())
-    print(reg_p2p)
-    print("Transformation is:")
-    print(reg_p2p.transformation)
-    print("")
-    draw_registration_result(source, target, reg_p2p.transformation)
-
-    print("Apply point-to-plane ICP")
-    reg_p2l = o3d.pipelines.registration.registration_icp(
-        source, target, threshold, trans_init,
-        o3d.pipelines.registration.TransformationEstimationPointToPlane())
-    print(reg_p2l)
-    print("Transformation is:")
-    print(reg_p2l.transformation)
-    print("")
-    draw_registration_result(source, target, reg_p2l.transformation)
+    # draw result
+    source.paint_uniform_color([1, 0, 0])
+    target.paint_uniform_color([0, 1, 0])
+    result.paint_uniform_color([0, 0, 1])
+    o3d.visualization.draw_geometries([source, target, result])
