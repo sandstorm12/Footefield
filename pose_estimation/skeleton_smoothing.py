@@ -36,6 +36,7 @@ def smooth_depth(poses):
         poses[:, idx_point, 2] = savgol_filter(poses[:, idx_point, 2], 30, 1)
     
 
+# TODO: Refactor magic numbers
 def visualize_depth(poses):
     rows = 4
     cols = 5
