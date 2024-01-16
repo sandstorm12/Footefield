@@ -85,4 +85,9 @@ print(np.min(pcd2_np[:, 0]), np.max(pcd2_np[:, 0]))
 pcd = pcd1 + pcd2
 
 # Visualize the point cloud
-o3d.visualization.draw_geometries([pcd])
+vis = o3d.visualization.Visualizer()
+vis.create_window(visible=True)
+# Call only after creating visualizer window.
+vis.get_render_option().background_color = [.9, .9, .9]
+vis.add_geometry(pcd)
+vis.run()
