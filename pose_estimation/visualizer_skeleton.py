@@ -34,11 +34,13 @@ def init_graph(poses, ax):
                      z[data_loader.MMPOSE_EDGES[idx][1]])
                 )[0]
             )
+
+        ax.view_init(-160, 56, 0)
     
     return graphs, lines
 
 
-def update_graph(idx, poses, graphs, lines, title):
+def update_graph(idx, poses, graphs, lines, title, ax):
     keypoints = np.array(poses[idx])
     for person_idx in range(min(len(keypoints), len(graphs))):
         # Define the data for the scatter plot
@@ -61,6 +63,7 @@ def update_graph(idx, poses, graphs, lines, title):
                 (z[data_loader.MMPOSE_EDGES[line_idx][0]],
                     z[data_loader.MMPOSE_EDGES[line_idx][1]])
             )
+    ax.view_init(-160, -180 + (360 / 200) * idx, 0)
     title.set_text('3D Test, time={}'.format(idx))
 
 # Its too long
@@ -82,8 +85,11 @@ def visualize_poses(poses):
     ax.set_ylabel('Y Label')
     ax.set_zlabel('Z Label')
 
+    ax.set_xlim([1200, 2100])
+    ax.set_ylim([700, 1100])
+
     ani = matplotlib.animation.FuncAnimation(
-        fig, update_graph, len(poses), fargs=(poses, graphs, lines, title),
+        fig, update_graph, len(poses), fargs=(poses, graphs, lines, title, ax),
         interval=100, blit=False)
 
     plt.show()
