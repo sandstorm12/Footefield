@@ -23,6 +23,7 @@ Scripts to extract 2D skeletons and project them to 3D world coordinates using d
 1. ~~Feature: Normalize the 3D coordinates~~
 1. ~~Feature: Separate the the skeleton extraction from skeleton animation~~
 1. Feature: Use all the cameras for 3D skeleton extraction
+1. Feature: Visualize 3D keypoints using open3d
 
 
 ## Known issues
