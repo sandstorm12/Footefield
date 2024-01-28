@@ -12,8 +12,11 @@ Converting the 3D skeleton keypoints and RGBD point cloud to the skinned model o
 
 ## TODO
 
-1. Feature: Automate point cloud registeration
-1. Feature: Combine the RGBD point cloud from all cameras
+1. ~~Feature: Automate point cloud registeration~~
+1. ~~Feature: Combine the RGBD point cloud from all cameras~~
+1. Feature: Automate or make it easier to register pointclouds
+1. Feature: Extract each person's point cloud separately
+1. Feature: Align pointclouds and 3D skeletons
 
 
 ## Known issues
