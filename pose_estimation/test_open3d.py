@@ -45,4 +45,16 @@ for i in range(img_depth.shape[1]):
 pcd = o3d.geometry.PointCloud()
 pcd.points = o3d.utility.Vector3dVector(point_cloud)
 pcd.colors = o3d.utility.Vector3dVector(colors)
-o3d.visualization.draw_geometries([pcd])
+# o3d.visualization.draw_geometries([pcd])
+
+vis = o3d.visualization.Visualizer()
+vis.create_window()
+
+opt = vis.get_render_option()
+opt.show_coordinate_frame = True
+opt.background_color = np.asarray([0.5, 0.5, 0.5])
+
+vis.add_geometry(pcd)
+vis.update_renderer()
+vis.run()
+vis.destroy_window()
