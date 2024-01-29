@@ -15,7 +15,10 @@ def init_graph(poses, ax):
     for keypoints in np.array(poses[0]):
         x = [point[0] for point in keypoints]
         y = [point[2] for point in keypoints]
-        z = [576 - point[1] for point in keypoints]
+        z = [point[1] for point in keypoints]
+        x.append(0)
+        y.append(0)
+        z.append(0)
 
         graph = ax.scatter(x, y, z, c='r', marker='o')
         graphs.append(graph)
@@ -31,17 +34,22 @@ def init_graph(poses, ax):
                      z[data_loader.MMPOSE_EDGES[idx][1]])
                 )[0]
             )
+
+        ax.view_init(-160, 56, 0)
     
     return graphs, lines
 
 
-def update_graph(idx, poses, graphs, lines, title):
+def update_graph(idx, poses, graphs, lines, title, ax):
     keypoints = np.array(poses[idx])
     for person_idx in range(min(len(keypoints), len(graphs))):
         # Define the data for the scatter plot
         x = [point[0] for point in keypoints[person_idx]]
         y = [point[2] for point in keypoints[person_idx]]
-        z = [576 - point[1] for point in keypoints[person_idx]]
+        z = [point[1] for point in keypoints[person_idx]]
+        x.append(0)
+        y.append(0)
+        z.append(0)
 
         graphs[person_idx]._offsets3d = (x, y, z)
 
@@ -55,6 +63,7 @@ def update_graph(idx, poses, graphs, lines, title):
                 (z[data_loader.MMPOSE_EDGES[line_idx][0]],
                     z[data_loader.MMPOSE_EDGES[line_idx][1]])
             )
+    ax.view_init(-160, -180 + (360 / 200) * idx, 0)
     title.set_text('3D Test, time={}'.format(idx))
 
 # Its too long
@@ -76,12 +85,11 @@ def visualize_poses(poses):
     ax.set_ylabel('Y Label')
     ax.set_zlabel('Z Label')
 
-    ax.axes.set_xlim3d(0, 640)
-    ax.axes.set_zlim3d(0, 576)
-    ax.axes.set_ylim3d(0, 5000)
+    ax.set_xlim([1200, 2100])
+    ax.set_ylim([700, 1100])
 
     ani = matplotlib.animation.FuncAnimation(
-        fig, update_graph, len(poses), fargs=(poses, graphs, lines, title),
+        fig, update_graph, len(poses), fargs=(poses, graphs, lines, title, ax),
         interval=100, blit=False)
 
     plt.show()
@@ -92,15 +100,10 @@ if __name__ == "__main__":
 
     cache_process = cache.get('process', {})
 
-    for expriment in data_loader.EXPERIMENTS.keys():
-        for dir in data_loader.EXPERIMENTS[expriment]:
-            camera = dir.split("/")[-1] + "_calib_snap"
-            
-            # id_exp = f'{expriment}_{camera}_skeleton_3D'
-            id_exp = f'{expriment}_{camera}_skeleton_3D_smooth'
+    for key in cache_process.keys():
+        if "skeleton_3D_smooth" in key:
+            print(f"Visualizing {key}")
 
-            print(f"Visualizing {id_exp}")
-
-            poses = cache_process[id_exp]
+            poses = cache_process[key]
 
             visualize_poses(poses)

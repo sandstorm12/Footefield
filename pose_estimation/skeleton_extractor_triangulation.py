@@ -10,7 +10,6 @@ import matplotlib.pyplot as plt
 
 from tqdm import tqdm
 from utils import data_loader
-from calibration import rgb_depth_map
 from mmpose.apis import MMPoseInferencer
 
 
@@ -191,25 +190,31 @@ def visualize_poses(poses):
 if __name__ == "__main__":
     cache = diskcache.Cache('../calibration/cache')
 
+    # cache['process'] = {}  # Removes all the caches processes
     cache_process = cache.get('process', {})
 
-    # mmpose = MMPoseInferencer('human')
     mmpose = MMPoseInferencer('rtmpose-x_8xb256-700e_body8-halpe26-384x288')
 
+    cam_pairs = [
+        ("azure_kinect3_4_calib_snap", "azure_kinect3_5_calib_snap"),
+        ("azure_kinect2_4_calib_snap", "azure_kinect1_5_calib_snap"),
+    ]
+
     for expriment in data_loader.EXPERIMENTS.keys():
-        cam0 = "azure_kinect3_4_calib_snap"
-        cam1 = "azure_kinect3_5_calib_snap"
-        dir0 = data_loader.EXPERIMENTS[expriment][3]
-        dir1 = data_loader.EXPERIMENTS[expriment][4]
-        
-        id_exp = f'{expriment}_{cam0}_skeleton_3D'
-        if not cache_process.__contains__(id_exp) or OVERWRITE:
-            poses = extract_poses(dir0, dir1, cam0, cam1, mmpose, cache)
+        for cam_pair in cam_pairs:
+            cam0 = cam_pair[0]
+            cam1 = cam_pair[1]
+            dir0 = data_loader.EXPERIMENTS[expriment][cam0]
+            dir1 = data_loader.EXPERIMENTS[expriment][cam1]
+            
+            id_exp = f'{expriment}_{cam0}_{cam1}_skeleton_3D'
+            if not cache_process.__contains__(id_exp) or OVERWRITE:
+                poses = extract_poses(dir0, dir1, cam0, cam1, mmpose, cache)
 
-            cache_process[id_exp] = poses
-            cache['process'] = cache_process
-        else:
-            poses = cache_process[id_exp]
+                cache_process[id_exp] = poses
+                cache['process'] = cache_process
+            else:
+                poses = cache_process[id_exp]
 
-        if VISUALIZE:
-            visualize_poses(poses=poses)
+            if VISUALIZE:
+                visualize_poses(poses=poses)
