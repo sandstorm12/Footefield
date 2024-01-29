@@ -21,4 +21,5 @@ Converting the 3D skeleton keypoints and RGBD point cloud to the skinned model o
 
 ## Known issues
 
-1. Point clouds seems not matching perfectly with each other
+1. ~~Point clouds seems not matching perfectly with each other~~
+1. Giving the output of the manual registeration as its input doesn't create the same rotation and transition.

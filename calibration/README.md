@@ -47,11 +47,14 @@ Run the scripts in this order:
 
 1. Refactor: Move or remove the `calibration/rgb_resize_test.py`
 1. Refactor: Update the readme
+1. Feature: Calculate intrinsics and exterinsics for depth camera as well
 
 
 ## Known issues
 
 1. ~~Depth estimation using single camera depth information is noisy~~
+1. `data_loader.downsample_keep_aspect_ratio` doesn't work correctly if the image size and the requested size are the same
+1. Cannot find matching pairs for some camera pairs for extrinsic parameter calculation
 
 
 ## Contributors
