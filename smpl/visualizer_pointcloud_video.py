@@ -78,6 +78,26 @@ def get_pcd(cam, idx, cache):
         T = cache['extrinsics'][get_cam(cam_name_0)]['transition']
         R2 = cache['extrinsics'][cam0]['rotation']
         T2 = cache['extrinsics'][cam0]['transition']
+    elif cam == cam_name_3:
+        cam0 = get_cam(cam_name_2)
+        mtx0 = cache['extrinsics'][cam0]['mtx_r']
+        R = cache['extrinsics'][get_cam(cam_name_0)]['rotation']
+        T = cache['extrinsics'][get_cam(cam_name_0)]['transition']
+        R2 = cache['extrinsics'][get_cam(cam_name_1)]['rotation']
+        T2 = cache['extrinsics'][get_cam(cam_name_1)]['transition']
+        R3 = cache['extrinsics'][cam0]['rotation']
+        T3 = cache['extrinsics'][cam0]['transition']
+    elif cam == cam_name_4:
+        cam0 = get_cam(cam_name_3)
+        mtx0 = cache['extrinsics'][cam0]['mtx_r']
+        R = cache['extrinsics'][get_cam(cam_name_0)]['rotation']
+        T = cache['extrinsics'][get_cam(cam_name_0)]['transition']
+        R2 = cache['extrinsics'][get_cam(cam_name_1)]['rotation']
+        T2 = cache['extrinsics'][get_cam(cam_name_1)]['transition']
+        R3 = cache['extrinsics'][get_cam(cam_name_2)]['rotation']
+        T3 = cache['extrinsics'][get_cam(cam_name_2)]['transition']
+        R4 = cache['extrinsics'][cam0]['rotation']
+        T4 = cache['extrinsics'][cam0]['transition']
 
     color0 = cv2.imread(img_color_0)
     color0 = cv2.resize(color0, (640, 576))
@@ -106,14 +126,32 @@ def get_pcd(cam, idx, cache):
         T2_com = (np.dot(R2, T).reshape(3, 1) + T2).reshape(3,)
         extrinsic0[:3, :3] = R2_com
         extrinsic0[:3, 3] = (T2_com / 1000) + np.array([0, 0, 0])
+    elif cam == cam_name_3:
+        extrinsic0 = np.identity(4) # Extrinsic matrix
+        R2_com = np.dot(R2, R)
+        T2_com = (np.dot(R2, T).reshape(3, 1) + T2).reshape(3,)
+        R3_com = np.dot(R3, R2_com)
+        T3_com = (np.dot(R3, T2_com).reshape(3, 1) + T3).reshape(3,)
+        extrinsic0[:3, :3] = R3_com
+        extrinsic0[:3, 3] = (T3_com / 1000) + np.array([0, 0, 0])
+    elif cam == cam_name_4:
+        extrinsic0 = np.identity(4) # Extrinsic matrix
+        R2_com = np.dot(R2, R)
+        T2_com = (np.dot(R2, T).reshape(3, 1) + T2).reshape(3,)
+        R3_com = np.dot(R3, R2_com)
+        T3_com = (np.dot(R3, T2_com).reshape(3, 1) + T3).reshape(3,)
+        R4_com = np.dot(R4, R3_com)
+        T4_com = (np.dot(R4, T3_com).reshape(3, 1) + T4).reshape(3,)
+        extrinsic0[:3, :3] = R4_com
+        extrinsic0[:3, 3] = (T4_com / 1000) + np.array([0, 0, 0])
 
     pcd0 = o3d.geometry.PointCloud.create_from_rgbd_image(rgbd0, intrinsic0, extrinsic0)
 
     if cam == cam_name_0:
         pass
     elif cam == cam_name_1:
-        transition = [-0.070000000000000005, -0.03, 0]
-        angle = [1.8, 0, 0]
+        transition = [-0.06500000000000002, -0.045000000000000005, -0.034]
+        angle = [0.3999999999999998, -0.1, 0.10000000000000003]
         rm = rotation_matrix_from_euler_angles(np.deg2rad(angle[0]),
                                             np.deg2rad(angle[1]),
                                             np.deg2rad(angle[2]))
@@ -122,6 +160,22 @@ def get_pcd(cam, idx, cache):
     elif cam == cam_name_2:
         transition = [0.07, 0.019999999999999997, 0.060000000000000005]
         angle = [9.099999999999984, 3.300000000000001, 3.3000000000000016]
+        rm = rotation_matrix_from_euler_angles(np.deg2rad(angle[0]),
+                                            np.deg2rad(angle[1]),
+                                            np.deg2rad(angle[2]))
+        pcd0.rotate(rm)
+        pcd0.translate(transition)
+    elif cam == cam_name_3:
+        transition = [0.08, -0.08, 0.10999999999999996]
+        angle = [6.999999999999991, 6.299999999999994, -3.100000000000002]
+        rm = rotation_matrix_from_euler_angles(np.deg2rad(angle[0]),
+                                            np.deg2rad(angle[1]),
+                                            np.deg2rad(angle[2]))
+        pcd0.rotate(rm)
+        pcd0.translate(transition)
+    elif cam == cam_name_4:
+        transition = [0.07999999999999997, -0.06999999999999998, 0.21000000000000002]
+        angle = [11.999999999999973, 3.100000000000001, -6.099999999999995]
         rm = rotation_matrix_from_euler_angles(np.deg2rad(angle[0]),
                                             np.deg2rad(angle[1]),
                                             np.deg2rad(angle[2]))
@@ -141,25 +195,52 @@ if __name__ == "__main__":
     
     vis = o3d.visualization.Visualizer()
     vis.create_window()
+    # vis.get_render_option().mesh_show_back_face = True
+    # material = o3d.visualization.rendering.Material()
+    # material.shader = "defaultLit"
 
     geometry = o3d.geometry.PointCloud()
+    geometry_mesh = o3d.geometry.TriangleMesh()
 
     for i in range(1000):
         pcd0 = get_pcd(cam_name_0, i, cache)
         pcd1 = get_pcd(cam_name_1, i, cache)
         pcd2 = get_pcd(cam_name_2, i, cache)
+        pcd3 = get_pcd(cam_name_3, i, cache)
+        pcd4 = get_pcd(cam_name_4, i, cache)
 
-        pcd = pcd0 + pcd1 + pcd2
+        # pcd = pcd0
+        pcd = pcd0 + pcd1 + pcd2 + pcd3 + pcd4
+        # pcd.estimate_normals()
+
+        alpha = .01
+        voxel_down_pcd = pcd.voxel_down_sample(voxel_size=0.01)
+        mesh = o3d.geometry.TriangleMesh.create_from_point_cloud_alpha_shape(voxel_down_pcd, alpha)
+        # mesh = mesh.filter_smooth_simple(number_of_iterations=1)
+        mesh.compute_vertex_normals()
+        mesh.compute_triangle_normals()
+        
+        # radii = [0.005, 0.01, 0.02, 0.04]
+        # mesh = o3d.geometry.TriangleMesh.create_from_point_cloud_ball_pivoting(
+        # pcd, o3d.utility.DoubleVector(radii))
         
         # now modify the points of your geometry
         # you can use whatever method suits you best, this is just an example
-        geometry.points = pcd.points
+        geometry.points = voxel_down_pcd.points
+        geometry_mesh.vertices = mesh.vertices
+        geometry_mesh.triangles = mesh.triangles
+        geometry_mesh.vertex_normals = mesh.vertex_normals
+        geometry_mesh.triangle_normals = mesh.triangle_normals
         if i == 0:
-            vis.add_geometry(geometry)
+            # vis.add_geometry(geometry)
+            vis.add_geometry(geometry_mesh)
+            # vis.get_render_option().mesh_show_back_face = True
+            # vis.get_renderer().scene.set_material(mesh, material)
         else:
-            vis.update_geometry(geometry)
+            # vis.update_geometry(geometry)
+            vis.update_geometry(geometry_mesh)
         vis.poll_events()
         vis.update_renderer()
 
-        print(f"Update {time.time()}")
-        time.sleep(.05)
+        print(f"Update {i}: {time.time()}")
+        # time.sleep(.05)
