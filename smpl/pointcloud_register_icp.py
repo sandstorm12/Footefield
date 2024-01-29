@@ -136,15 +136,6 @@ T4_com = (np.dot(R4, T3_com).reshape(3, 1) + T4).reshape(3,)
 extrinsic5[:3, :3] = R4_com
 extrinsic5[:3, 3] = T4_com / 1000
 
-# print(extrinsic1)
-# print(extrinsic2)
-# print(extrinsic3)
-# print(extrinsic4)
-# print(extrinsic5)
-
-# # Transform the second RGBD image using the extrinsic matrix
-# rgbd2.transform(extrinsic)
-
 # Create point clouds from RGBD images
 pcd1 = o3d.geometry.PointCloud.create_from_rgbd_image(rgbd1, intrinsic1, extrinsic1)
 pcd1.paint_uniform_color([1, 0, 0])
@@ -171,7 +162,7 @@ vis.add_geometry(pcd)
 vis.run()
 
 
-##################################################################################
+#Registeration ##################################################################################
 
 def draw_registration_result(source, target, transformation=None):
     source_temp = copy.deepcopy(source)
@@ -201,6 +192,7 @@ reg_p2l = o3d.pipelines.registration.registration_icp(
 print("Fitness:", reg_p2l)
 print("Fitness:", reg_p2l.fitness)
 print("Correspondence_set:", reg_p2l.correspondence_set)
+print("Correspondence_set:", reg_p2l.transformation)
 print("")
 draw_registration_result(pcd1, pcd2, reg_p2l.transformation)
 
