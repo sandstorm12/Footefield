@@ -47,6 +47,7 @@ Run the scripts in this order:
 
 1. Refactor: Move or remove the `calibration/rgb_resize_test.py`
 1. Refactor: Update the readme
+1. Feature: Calculate intrinsics and exterinsics for depth camera as well
 
 
 ## Known issues
