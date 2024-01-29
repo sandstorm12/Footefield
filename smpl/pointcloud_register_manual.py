@@ -8,6 +8,7 @@ import diskcache
 
 from probreg import cpd
 
+INDEX = '00750'
 
 # # Good pairs
 # 2_4 & 1_5
@@ -25,16 +26,16 @@ cam1 = f'azure_kinect{cam_name_1}_calib_snap'
 cam2 = f'azure_kinect{cam_name_2}_calib_snap'
 cam3 = f'azure_kinect{cam_name_3}_calib_snap'
 cam4 = f'azure_kinect{cam_name_4}_calib_snap'
-img_0_depth = f'/home/hamid/Documents/footefield/data/AzureKinectRecord_0729/a1/azure_kinect{cam_name_0}/depth/depth00100.png'
-img_0_color = f'/home/hamid/Documents/footefield/data/AzureKinectRecord_0729/a1/azure_kinect{cam_name_0}/color/color00100.jpg'
-img_1_depth = f'/home/hamid/Documents/footefield/data/AzureKinectRecord_0729/a1/azure_kinect{cam_name_1}/depth/depth00100.png'
-img_1_color = f'/home/hamid/Documents/footefield/data/AzureKinectRecord_0729/a1/azure_kinect{cam_name_1}/color/color00100.jpg'
-img_2_depth = f'/home/hamid/Documents/footefield/data/AzureKinectRecord_0729/a1/azure_kinect{cam_name_2}/depth/depth00100.png'
-img_2_color = f'/home/hamid/Documents/footefield/data/AzureKinectRecord_0729/a1/azure_kinect{cam_name_2}/color/color00100.jpg'
-img_3_depth = f'/home/hamid/Documents/footefield/data/AzureKinectRecord_0729/a1/azure_kinect{cam_name_3}/depth/depth00100.png'
-img_3_color = f'/home/hamid/Documents/footefield/data/AzureKinectRecord_0729/a1/azure_kinect{cam_name_3}/color/color00100.jpg'
-img_4_depth = f'/home/hamid/Documents/footefield/data/AzureKinectRecord_0729/a1/azure_kinect{cam_name_4}/depth/depth00100.png'
-img_4_color = f'/home/hamid/Documents/footefield/data/AzureKinectRecord_0729/a1/azure_kinect{cam_name_4}/color/color00100.jpg'
+img_0_depth = f'/home/hamid/Documents/footefield/data/AzureKinectRecord_0729/a1/azure_kinect{cam_name_0}/depth/depth{INDEX}.png'
+img_0_color = f'/home/hamid/Documents/footefield/data/AzureKinectRecord_0729/a1/azure_kinect{cam_name_0}/color/color{INDEX}.jpg'
+img_1_depth = f'/home/hamid/Documents/footefield/data/AzureKinectRecord_0729/a1/azure_kinect{cam_name_1}/depth/depth{INDEX}.png'
+img_1_color = f'/home/hamid/Documents/footefield/data/AzureKinectRecord_0729/a1/azure_kinect{cam_name_1}/color/color{INDEX}.jpg'
+img_2_depth = f'/home/hamid/Documents/footefield/data/AzureKinectRecord_0729/a1/azure_kinect{cam_name_2}/depth/depth{INDEX}.png'
+img_2_color = f'/home/hamid/Documents/footefield/data/AzureKinectRecord_0729/a1/azure_kinect{cam_name_2}/color/color{INDEX}.jpg'
+img_3_depth = f'/home/hamid/Documents/footefield/data/AzureKinectRecord_0729/a1/azure_kinect{cam_name_3}/depth/depth{INDEX}.png'
+img_3_color = f'/home/hamid/Documents/footefield/data/AzureKinectRecord_0729/a1/azure_kinect{cam_name_3}/color/color{INDEX}.jpg'
+img_4_depth = f'/home/hamid/Documents/footefield/data/AzureKinectRecord_0729/a1/azure_kinect{cam_name_4}/depth/depth{INDEX}.png'
+img_4_color = f'/home/hamid/Documents/footefield/data/AzureKinectRecord_0729/a1/azure_kinect{cam_name_4}/color/color{INDEX}.jpg'
 
 color1 = cv2.imread(img_0_color)
 color1 = cv2.resize(color1, (640, 576))
@@ -154,9 +155,9 @@ pcd2.paint_uniform_color([0, 1, 0])
 pcd3 = o3d.geometry.PointCloud.create_from_rgbd_image(rgbd3, intrinsic3, extrinsic3)
 pcd3.paint_uniform_color([0, 0, 1])
 pcd4 = o3d.geometry.PointCloud.create_from_rgbd_image(rgbd4, intrinsic4, extrinsic4)
-pcd4.paint_uniform_color([.5, .5, 0])
+pcd4.paint_uniform_color([0, 1, 0])
 pcd5 = o3d.geometry.PointCloud.create_from_rgbd_image(rgbd5, intrinsic5, extrinsic5)
-pcd5.paint_uniform_color([.5, .5, 0])
+pcd5.paint_uniform_color([0, 1, 0])
 
 # Combine the point clouds
 # pcd = pcd2
@@ -262,7 +263,7 @@ def key_callback_r(vis):
 
 def key_callback_t(vis):
     angle[1] += .1
-    rm = rotation_matrix_from_euler_angles(0, np.deg2rad(.1), 0)
+    rm = rotation_matrix_from_euler_angles(0, np.deg2rad(1), 0)
     pcd2.rotate(rm)
     vis.update_geometry(pcd2)
 
@@ -270,7 +271,7 @@ def key_callback_t(vis):
 
 def key_callback_g(vis):
     angle[1] += -.1
-    rm = rotation_matrix_from_euler_angles(0, np.deg2rad(-.1), 0)
+    rm = rotation_matrix_from_euler_angles(0, np.deg2rad(-1), 0)
     pcd2.rotate(rm)
     vis.update_geometry(pcd2)
 
@@ -278,7 +279,7 @@ def key_callback_g(vis):
 
 def key_callback_f(vis):
     angle[0] += .1
-    rm = rotation_matrix_from_euler_angles(np.deg2rad(.1), 0, 0)
+    rm = rotation_matrix_from_euler_angles(np.deg2rad(1), 0, 0)
     pcd2.rotate(rm)
     vis.update_geometry(pcd2)
 
@@ -286,7 +287,7 @@ def key_callback_f(vis):
 
 def key_callback_h(vis):
     angle[0] += -.1
-    rm = rotation_matrix_from_euler_angles(np.deg2rad(-.1), 0, 0)
+    rm = rotation_matrix_from_euler_angles(np.deg2rad(-1), 0, 0)
     pcd2.rotate(rm)
     vis.update_geometry(pcd2)
 
@@ -294,7 +295,7 @@ def key_callback_h(vis):
 
 def key_callback_y(vis):
     angle[2] += .1
-    rm = rotation_matrix_from_euler_angles(0, 0, np.deg2rad(.1))
+    rm = rotation_matrix_from_euler_angles(0, 0, np.deg2rad(1))
     pcd2.rotate(rm)
     vis.update_geometry(pcd2)
 
@@ -302,18 +303,25 @@ def key_callback_y(vis):
 
 def key_callback_u(vis):
     angle[2] += -.1
-    rm = rotation_matrix_from_euler_angles(0, 0, np.deg2rad(-.1))
+    rm = rotation_matrix_from_euler_angles(0, 0, np.deg2rad(-1))
     pcd2.rotate(rm)
     vis.update_geometry(pcd2)
 
     print(transition, angle)
 
+# transition = [0.07, 0.019999999999999997, 0.060000000000000005]
+# angle = [9.099999999999984, 3.300000000000001, 3.3000000000000016]
+# rm = rotation_matrix_from_euler_angles(np.deg2rad(angle[0]),
+#                                        np.deg2rad(angle[1]),
+#                                        np.deg2rad(angle[2]))
+# pcd3.rotate(rm)
+# pcd3.translate(transition)
 
 pcd1 = pcd1
-pcd2 = pcd3
+pcd2 = pcd2
 
-transition = [0.07, 0.019999999999999997, 0.060000000000000005]
-angle = [9.099999999999984, 3.300000000000001, 3.3000000000000016]
+transition = [-0.03500000000000001, -0.005, 0.006]
+angle = [0.09999999999999981, -0.1, 0.10000000000000003]
 rm = rotation_matrix_from_euler_angles(np.deg2rad(angle[0]),
                                        np.deg2rad(angle[1]),
                                        np.deg2rad(angle[2]))
@@ -325,6 +333,9 @@ vis.create_window()
 
 vis.add_geometry(pcd1)
 vis.add_geometry(pcd2)
+
+opt = vis.get_render_option()
+opt.show_coordinate_frame = True
 
 vis.register_key_callback(87, key_callback_w)
 vis.register_key_callback(83, key_callback_s)
@@ -343,6 +354,12 @@ vis.register_key_callback(85, key_callback_u)
 vis.run()
 vis.destroy_window()
 
-
 # pcd2 to pcd1 [-0.070000000000000005, -0.03, 0] [1.8, 0, 0]
+# [-0.03500000000000001, -0.005, 0.006] [0.09999999999999981, -0.1, 0.10000000000000003]
+# [-0.06500000000000002, -0.045000000000000005, -0.034] [0.3999999999999998, -0.1, 0.10000000000000003]
 # pcd3 to pcd1 [0.07, 0.019999999999999997, 0.060000000000000005] [9.099999999999984, 3.300000000000001, 3.3000000000000016]
+# pcd4 to pcd1 [0.07, -0.09999999999999999, 0.10999999999999996] [11.399999999999975, 6.699999999999992, -3.100000000000002]
+# [0.08, -0.08, 0.10999999999999996] [6.999999999999991, 6.299999999999994, -3.100000000000002]
+# pcd5 to pcd1 [0.10999999999999999, -0.09, 0.21] [12.499999999999972, 4.000000000000002, -6.499999999999994][12.499999999999972, 4.000000000000002, -6.499999999999994]
+# [0.08, -0.08999999999999997, 0.24000000000000005] [12.499999999999972, 4.000000000000002, -6.499999999999994]
+# [0.07999999999999997, -0.06999999999999998, 0.21000000000000002] [11.999999999999973, 3.100000000000001, -6.099999999999995]
