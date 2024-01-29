@@ -35,7 +35,8 @@ Skeleton animation (angle 1) | Skeleton animation (angle 2)
 1. Feature: We need explicit tracking of each person.
 1. ~~Feature: Normalize the 3D coordinates~~
 1. ~~Feature: Separate the the skeleton extraction from skeleton animation~~
-1. Refactor: Update the readme
+1. Feature: Use all the cameras for 3D skeleton extraction
+1. Feature: Visualize 3D keypoints using open3d
 
 
 ## Known issues
