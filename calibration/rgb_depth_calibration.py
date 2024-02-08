@@ -166,7 +166,9 @@ if __name__ == "__main__":
     obj_points = get_obj_points()
     intrinsics = cache['intrinsics']
 
-    cameras = list(intrinsics.keys())
+    # TODO: Not very clean
+    cameras = [camera for camera in intrinsics.keys()
+               if '_infrared' not in camera]
     for camera in cameras:
         calc_depth_rgb_match(camera, obj_points, cache)
         calc_rectification_params(camera, cache)
