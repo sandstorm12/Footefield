@@ -85,8 +85,8 @@ def visualize_poses(poses):
     ax.set_ylabel('Y Label')
     ax.set_zlabel('Z Label')
 
-    ax.set_xlim([1200, 2100])
-    ax.set_ylim([700, 1100])
+    # ax.set_xlim([1200, 2100])
+    # ax.set_ylim([700, 1100])
 
     ani = matplotlib.animation.FuncAnimation(
         fig, update_graph, len(poses), fargs=(poses, graphs, lines, title, ax),
@@ -100,8 +100,10 @@ if __name__ == "__main__":
 
     cache_process = cache.get('process', {})
 
+    print(cache_process.keys())
+
     for key in cache_process.keys():
-        if "skeleton_3D" in key:
+        if "skeleton_3D" in key and "smooth" not in key:
             print(f"Visualizing {key}")
 
             poses = cache_process[key]

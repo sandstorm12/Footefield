@@ -16,6 +16,7 @@ from mmpose.apis import MMPoseInferencer
 
 OVERWRITE = True
 VISUALIZE = False
+REMOVE_PREVIOUS = False
 EXP_LENGTH = 50
 
 
@@ -33,7 +34,7 @@ def _get_skeleton(image, inferencer):
 
 def extract_poses(dir, camera, model):
     poses = []
-    
+
     img_rgb_paths = data_loader.list_rgb_images(os.path.join(dir, "color"))
     img_dpt_paths = data_loader.list_depth_images(os.path.join(dir, "depth"))
     for idx in tqdm(range(len(img_dpt_paths[:EXP_LENGTH]))):
@@ -138,17 +139,20 @@ def visualize_poses(poses):
 if __name__ == "__main__":
     cache = diskcache.Cache('../calibration/cache')
 
+    if REMOVE_PREVIOUS:
+        cache['process'] = {}
+
     cache_process = cache.get('process', {})
 
     mmpose = MMPoseInferencer('human')
 
     for expriment in data_loader.EXPERIMENTS.keys():
-        for dir in data_loader.EXPERIMENTS[expriment]:
-            camera = dir.split("/")[-1] + "_calib_snap"
+        for exp_cam in data_loader.EXPERIMENTS[expriment].keys():
+            dir = data_loader.EXPERIMENTS[expriment][exp_cam]
             
-            id_exp = f'{expriment}_{camera}_skeleton_3D'
+            id_exp = f'{expriment}_{exp_cam}_skeleton_3D'
             if not cache_process.__contains__(id_exp) or OVERWRITE:
-                poses = extract_poses(dir, camera, mmpose)
+                poses = extract_poses(dir, exp_cam, mmpose)
 
                 cache_process[id_exp] = poses
                 cache['process'] = cache_process
