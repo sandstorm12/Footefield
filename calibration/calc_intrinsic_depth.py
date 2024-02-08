@@ -49,7 +49,7 @@ def calculate_intrinsics(cameras_info, cache):
     obj_points = np.zeros((cols * rows, 3), np.float32)
     obj_points[:, :2] = np.mgrid[0:cols, 0:rows].T.reshape(-1, 2) * square_size
 
-    intrinsics = {}
+    intrinsics = cache.get('intrinsics', {})
     for key in tqdm(cameras_info.keys()):
         img_points = cameras_info[key]['img_points']
 
@@ -62,7 +62,7 @@ def calculate_intrinsics(cameras_info, cache):
                 img_points,
                 (width, height), None, None, flags=cv2.CALIB_RATIONAL_MODEL)
 
-        intrinsics[key + 'infrared'] = {
+        intrinsics[key + '_infrared'] = {
             "ret": ret,
             "mtx": mtx,
             "dist": dist,
@@ -73,8 +73,12 @@ def calculate_intrinsics(cameras_info, cache):
     cache['intrinsics'] = intrinsics
 
 
-if __name__ == "__main__":
+def calc_intrinsic():
     cache = diskcache.Cache('cache')
 
     cameras_info = load_image_points(cache)
     calculate_intrinsics(cameras_info, cache)
+
+
+if __name__ == "__main__":
+    calc_intrinsic()    

@@ -9,19 +9,11 @@ import diskcache
 from utils import data_loader
 
 
-IMAGE_DIRS = [
-    "/home/hamid/Documents/footefield/data/AzureKinectRecord_0729/azure_kinect1_4_calib_snap",
-    "/home/hamid/Documents/footefield/data/AzureKinectRecord_0729/azure_kinect1_5_calib_snap",
-    "/home/hamid/Documents/footefield/data/AzureKinectRecord_0729/azure_kinect2_4_calib_snap",
-    "/home/hamid/Documents/footefield/data/AzureKinectRecord_0729/azure_kinect3_4_calib_snap",
-    "/home/hamid/Documents/footefield/data/AzureKinectRecord_0729/azure_kinect3_5_calib_snap",
-]
-
 if __name__ == "__main__":
     cache = diskcache.Cache('cache')
     intrinsics = cache.get("intrinsics", None)
 
-    for image_dir in IMAGE_DIRS:
+    for image_dir in data_loader.PATH_CALIBS:
         key = image_dir.split("/")[-1]
         print(key)
 
@@ -42,13 +34,10 @@ if __name__ == "__main__":
                 (data_loader.IMAGE_INFRARED_WIDTH,
                  data_loader.IMAGE_INFRARED_HEIGHT))
 
-            # Undistort the image using cv2.undistort function
-            # The new camera matrix can be the same as the original one
             undistorted_img = cv2.undistort(img, mtx, dist, None, mtx)
 
-            # Display the undistorted image
-            cv2.imshow("Undistorted Image", cv2.resize(undistorted_img, (720, 480)))
-            cv2.imshow("Original Image", cv2.resize(img, (720, 480)))
+            cv2.imshow("Undistorted Image", undistorted_img)
+            cv2.imshow("Original Image", img)
             
             if cv2.waitKey(0) == ord('q'):
                 break

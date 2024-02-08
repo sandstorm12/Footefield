@@ -61,8 +61,6 @@ def load_image_points(cache, images):
 
 
 def find_matching_images(images_info, cam_1, cam_2):
-    images_info = cache['images_info']
-
     matching_pairs = {}
     for image in images_info.keys():
         img_name = image.split("/")[1]
@@ -170,7 +168,7 @@ def calc_reprojection_error(cam_1, cam_2, obj_points, cache):
     print("Average projection error: ", total_error / len(img_points_1))
 
 
-if __name__ == "__main__":
+def calc_extrinsic():
     cache = diskcache.Cache('cache')
 
     print("Cache keys:", get_all_keys(cache))
@@ -189,3 +187,7 @@ if __name__ == "__main__":
                     
             calc_extrinsics(cam_1, cam_2, obj_points, cache)
             calc_reprojection_error(cam_1, cam_2, obj_points, cache)
+
+
+if __name__ == "__main__":
+    calc_extrinsic()    
