@@ -8,7 +8,7 @@ from utils import data_loader
 from mmpose.apis import MMPoseInferencer
 
 
-dir = "/home/hamid/Documents/footefield/data/AzureKinectRecord_0729/a1/azure_kinect3_4/color"
+dir = "/home/hamid/Documents/phd/footefield/data/AzureKinectRecord_0729/a1/azure_kinect3_4/color"
 img_rgb_paths = data_loader.list_rgb_images(dir)
 
 print(img_rgb_paths)
