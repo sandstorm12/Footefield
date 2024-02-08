@@ -114,7 +114,9 @@ if __name__ == "__main__":
     obj_points = get_obj_points()
     intrinsics = cache['intrinsics']
 
-    cameras = list(intrinsics.keys())
+    # TODO: Not very clean
+    cameras = [camera for camera in intrinsics.keys()
+               if '_infrared' not in camera]
     for cam1_idx in range(len(cameras)):
         cam_1 = cameras[cam1_idx]
 
