@@ -95,8 +95,8 @@ if __name__ == "__main__":
 
     camera = 'azure_kinect3_4_calib_snap'
 
-    img_rgb_path = '/home/hamid/Documents/footefield/data/AzureKinectRecord_0729/a1/azure_kinect3_4/color/color00000.jpg'
-    img_dpt_path = '/home/hamid/Documents/footefield/data/AzureKinectRecord_0729/a1/azure_kinect3_4/depth/depth00000.png'
+    img_rgb_path = '/home/hamid/Documents/phd/footefield/data/AzureKinectRecord_0729/a1/azure_kinect3_4/color/color00000.jpg'
+    img_dpt_path = '/home/hamid/Documents/phd/footefield/data/AzureKinectRecord_0729/a1/azure_kinect3_4/depth/depth00000.png'
     img_rgb = cv2.imread(img_rgb_path)
     img_rgb = data_loader.downsample_keep_aspect_ratio(
         img_rgb,
