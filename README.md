@@ -9,6 +9,8 @@ Foote field camera calibration and 3D pose estimation project.
 pip install -r requirements
 ```
 
+For mmpose installation please refer to [https://mmcv.readthedocs.io/en/latest/get_started/installation.html](https://mmcv.readthedocs.io/en/latest/get_started/installation.html)
+
 ## Usage
 
 - Calculate intrinsic and extrinsic parameters using the scripts in the calibration dir
