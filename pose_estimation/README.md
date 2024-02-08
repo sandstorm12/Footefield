@@ -2,6 +2,7 @@
 
 Scripts to extract 2D skeletons and project them to 3D world coordinates using depth data and triangulation.
 
+
 ## Components
 
 1. **test_mmpose.py**: Visualizes the skeleton keypoints found by the `mmpose` library on an arbitrary image.
@@ -18,6 +19,29 @@ Skeleton animation (angle 1) | Skeleton animation (angle 2)
 
 
 ## Usage
+
+
+
+## Troubleshooting
+
+- If you get this error:
+
+    ```bash
+    libGL error: MESA-LOADER: failed to open radeonsi: /usr/lib/dri/radeonsi_dri.so: cannot open shared object file: No such file or directory (search paths /usr/lib/x86_64-linux-gnu/dri:\$${ORIGIN}/dri:/usr/lib/dri, suffix _dri)
+    libGL error: failed to load driver: radeonsi
+    libGL error: MESA-LOADER: failed to open radeonsi: /usr/lib/dri/radeonsi_dri.so: cannot open shared object file: No such file or directory (search paths /usr/lib/x86_64-linux-gnu/dri:\$${ORIGIN}/dri:/usr/lib/dri, suffix _dri)
+    libGL error: failed to load driver: radeonsi
+    libGL error: MESA-LOADER: failed to open swrast: /usr/lib/dri/swrast_dri.so: cannot open shared object file: No such file or directory (search paths /usr/lib/x86_64-linux-gnu/dri:\$${ORIGIN}/dri:/usr/lib/dri, suffix _dri)
+    libGL error: failed to load driver: swrast
+    [Open3D WARNING] GLFW Error: GLX: Failed to create context: GLXBadFBConfig
+    [Open3D WARNING] Failed to create window
+    ```
+
+    Install this package:
+
+    ```bash
+    conda install -c conda-forge libstdcxx-ng
+    ```
 
 
 ## TODO
