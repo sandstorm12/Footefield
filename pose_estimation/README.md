@@ -61,6 +61,7 @@ Skeleton animation (angle 1) | Skeleton animation (angle 2)
 1. ~~Feature: Separate the the skeleton extraction from skeleton animation~~
 1. Feature: Use all the cameras for 3D skeleton extraction
 1. Feature: Visualize 3D keypoints using open3d
+1. Feature: Add frame limit to the `skeleton_extractor_video_mbert.py` for longer videos
 
 
 ## Known issues
