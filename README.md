@@ -43,6 +43,7 @@ For mmpose installation please refer to [https://mmcv.readthedocs.io/en/latest/g
 1. Feature: Detect face and hand keypoints
 1. Feature: Regress SMPLX joint to the body, face, and hand keypoints
 1. Feature: Render SMPL the multi-person skeletons in the orignal coordinate system
+1. Feature: Add config files for all the scripts
 
 ## Known issues
 
