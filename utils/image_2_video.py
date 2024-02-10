@@ -4,6 +4,8 @@ import glob
 
 import data_loader
 
+from tqdm import tqdm
+
 
 OUTPUT_DIR = './videos'
 
@@ -28,7 +30,7 @@ def images_2_video(image_paths, video_name, fps, width, height):
         fps,
         (data_loader.IMAGE_RGB_WIDTH, data_loader.IMAGE_RGB_HEIGHT))
     
-    for image_path in image_paths:
+    for image_path in tqdm(image_paths):
         frame = cv2.imread(image_path)
         writer.write(frame)
 
@@ -36,9 +38,11 @@ def images_2_video(image_paths, video_name, fps, width, height):
 
 
 if __name__ == "__main__":
-    for experiment in data_loader.EXPERIMENTS:
-        exp_dirs = data_loader.EXPERIMENTS[experiment]
+    for experiment in data_loader.EXPERIMENTS.keys():
+        exp_dirs = data_loader.EXPERIMENTS[experiment].values()
         for exp_dir in exp_dirs:
+            print(exp_dir)
+
             exp_dir_rgb = os.path.join(exp_dir, 'color')
             image_paths = load_image_paths(exp_dir_rgb)
 
