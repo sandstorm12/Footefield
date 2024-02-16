@@ -5,8 +5,6 @@ import cv2
 import diskcache
 import numpy as np
 
-import detect_chessboard
-
 from tqdm import tqdm
 from utils import data_loader
 
@@ -29,13 +27,6 @@ def get_obj_points():
     obj_points[:, :2] = np.mgrid[0:cols, 0:rows].T.reshape(-1, 2) * square_size
 
     return obj_points
-
-
-def get_all_keys(cache):
-    keys_all = cache._sql('SELECT key FROM Cache').fetchall()
-    keys_all = [item[0] for item in keys_all]
-
-    return keys_all
 
 
 def load_image_points(cache, images):
@@ -126,8 +117,6 @@ def visualize_points(img_paths_1, img_paths_2, imgpoints1_projected, imgpoints2_
 if __name__ == "__main__":
     cache = diskcache.Cache('cache')
 
-    print("Cache keys:", get_all_keys(cache))
-
     obj_points = get_obj_points()
     intrinsics = cache['intrinsics']
 
@@ -140,7 +129,7 @@ if __name__ == "__main__":
             if f"{cam_1}/{cam_2}" not in ORDER_VALID:
                 continue
             
-            print(f"Calibrating... {cameras[cam1_idx]}"
+            print(f"Visualizing reprojection error for {cameras[cam1_idx]}"
                   f" vs {cameras[cam2_idx]}")
 
             matching_pairs = find_matching_images(cache['images_info'], cam_1, cam_2)
@@ -190,11 +179,8 @@ if __name__ == "__main__":
                     img_paths_1, img_paths_2,
                     imgpoints1_projected, imgpoints2_projected)
 
-                cv2.imshow("image1", cv2.resize(image_l, (960, 1080)))
-                cv2.imshow("image2", cv2.resize(image_r, (960, 1080)))
                 key = cv2.waitKey(0)
                 if key == ord('q'):
                     break
 
-            # Print the average projection error
             print("Average projection error: ", total_error / len(img_points_1))
