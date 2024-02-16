@@ -74,11 +74,11 @@ if __name__ == "__main__":
     faces = get_smpl_faces()
     print("SMPL faces:", faces.shape)
 
-    path = "/home/hamid/Documents/phd/footefield/MotionBERT/output/vertices.npy"
+    path = "/home/hamid/Documents/phd/footefield/MotionBERT/output/2_4_woman_1000/vertices.npy"
     poses = np.load(path)
     print("MoCap vertices:", poses.shape)
 
-    path = "/home/hamid/Documents/phd/footefield/MotionBERT/output/joints.npy"
+    path = "/home/hamid/Documents/phd/footefield/MotionBERT/output/2_4_woman_1000/joints.npy"
     joints = np.load(path)
     print("MoCap joints:", joints.shape)
 
