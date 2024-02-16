@@ -21,8 +21,6 @@ criteria = (cv2.TERM_CRITERIA_MAX_ITER | cv2.TERM_CRITERIA_EPS, 30, 0.001)
 
 # TODO: Shorten
 def extract_chessboardcorners(image_paths, images_info, display=False):
-    # print(f"Processing --> {os.path.dirname(image_paths[0])}")
-    
     camera_name = image_paths[0].split("/")[-2]
 
     success_count = 0
@@ -43,7 +41,7 @@ def extract_chessboardcorners(image_paths, images_info, display=False):
             cv2.CALIB_CB_ADAPTIVE_THRESH + cv2.CALIB_CB_NORMALIZE_IMAGE)
         
         if ret:
-            corners = cv2.cornerSubPix(gray, corners, (5, 5), (-1, -1), criteria)
+            corners = cv2.cornerSubPix(gray, corners, (3, 3), (-1, -1), criteria)
 
         if images_info.__contains__(image_name):
             images_info[image_name]['findchessboardcorners_rgb'] = \
@@ -54,8 +52,6 @@ def extract_chessboardcorners(image_paths, images_info, display=False):
                 "fullpath_rgb": image_path,
                 "findchessboardcorners_rgb": (ret, corners),
             }
-
-        # print(f"{chessboard[0]} --> {image_path}")
 
         if display:
             if ret:
@@ -74,7 +70,6 @@ def extract_chessboardcorners(image_paths, images_info, display=False):
 
         if ret:
             success_count += 1
-
 
     print(f"Found {success_count} chessboards from " +
         f"{len(image_paths)} image for {camera_name}")

@@ -155,7 +155,6 @@ def calc_reprojection_error(cam_1, cam_2, obj_points, cache):
         error2 = cv2.norm(
             img_points_2[i], imgpoints2_projected, cv2.NORM_L2) \
                 / len(imgpoints2_projected)
-        print(f"Errors: cam1 {error1} cam2 {error2}")
         total_error += (error1 + error2) / 2
 
     # Print the average projection error
