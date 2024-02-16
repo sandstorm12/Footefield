@@ -10,10 +10,11 @@ from mmpose.apis import MMPoseInferencer
 
 
 VISUALIZE = False
+MAX_LENGTH = 1000
 OUTPUT_PATH = "alphapose_keypoints.json"
 
 
-path_video = "/home/hamid/Documents/phd/footefield/footefield/videos/a1_azure_kinect2_4_crop.mp4"
+path_video = "/home/hamid/Documents/phd/footefield/footefield/videos/a2_azure_kinect2_4.mp4"
 
 
 def filter_sort(people_keypoints, num_select=2):
@@ -81,7 +82,7 @@ if __name__ == "__main__":
 
     cap = cv2.VideoCapture(path_video)
     length = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
-    for idx_frame in tqdm(range(length)):
+    for idx_frame in tqdm(range(min(MAX_LENGTH, length))):
         ret, frame = cap.read()
 
         if not ret:
