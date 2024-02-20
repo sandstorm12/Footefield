@@ -35,7 +35,7 @@ def extract_chessboardcorners(image_paths, images_info, display=False):
 
         gray_org = cv2.imread(image_path, -1)
 
-        for thr in reversed([2., 1., .8, .5, .2, .1]):
+        for thr in reversed([1., .8, .5, .2]):
             gray = np.clip(
                 gray_org.astype(np.float32) * thr, 0, 255).astype('uint8')
             ret, corners = cv2.findChessboardCorners(
@@ -106,7 +106,7 @@ def detect_chessboards():
         images_info = {}
 
     processes = []
-    for path_calib in data_loader.PATH_CALIBS[:]:
+    for path_calib in data_loader.PATH_CALIBS:
         calibration_images = data_loader.list_calibration_images(path_calib)
         process = Thread(
             target=extract_chessboardcorners,
