@@ -17,6 +17,7 @@ Converting the 3D skeleton keypoints and RGBD point cloud to the skinned model o
 1. Feature: Automate or make it easier to register pointclouds
 1. Feature: Extract each person's point cloud separately
 1. Feature: Align pointclouds and 3D skeletons
+1. Feature: Get intrinsic parameters from the more accurate single camera chessboard calibration results
 
 
 ## Known issues
