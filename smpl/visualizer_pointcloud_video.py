@@ -9,8 +9,8 @@ def get_cam(cam_name):
     return f'azure_kinect{cam_name}_calib_snap'
 
 def get_images(cam_name, idx):
-    img_depth = '/home/hamid/Documents/footefield/data/AzureKinectRecord_0729/a1/azure_kinect{}/depth/depth{:05d}.png'.format(cam_name, idx)
-    img_color = '/home/hamid/Documents/footefield/data/AzureKinectRecord_0729/a1/azure_kinect{}/color/color{:05d}.jpg'.format(cam_name, idx)
+    img_depth = '/home/hamid/Documents/phd/footefield/data/AzureKinectRecord_0729/a1/azure_kinect{}/depth/depth{:05d}.png'.format(cam_name, idx)
+    img_color = '/home/hamid/Documents/phd/footefield/data/AzureKinectRecord_0729/a1/azure_kinect{}/color/color{:05d}.jpg'.format(cam_name, idx)
 
     return img_color, img_depth
 
@@ -78,6 +78,15 @@ def get_pcd(cam, idx, cache):
         T = cache['extrinsics'][get_cam(cam_name_0) + 'infrared']['transition']
         R2 = cache['extrinsics'][cam0 + 'infrared']['rotation']
         T2 = cache['extrinsics'][cam0 + 'infrared']['transition']
+    elif cam == cam_name_3:
+        cam0 = get_cam(cam_name_2)
+        mtx0 = cache['extrinsics'][cam0 + 'infrared']['mtx_r']
+        R = cache['extrinsics'][get_cam(cam_name_0) + 'infrared']['rotation']
+        T = cache['extrinsics'][get_cam(cam_name_0) + 'infrared']['transition']
+        R2 = cache['extrinsics'][get_cam(cam_name_1) + 'infrared']['rotation']
+        T2 = cache['extrinsics'][get_cam(cam_name_1) + 'infrared']['transition']
+        R3 = cache['extrinsics'][cam0 + 'infrared']['rotation']
+        T3 = cache['extrinsics'][cam0 + 'infrared']['transition']
 
     color0 = cv2.imread(img_color_0)
     color0 = cv2.resize(color0, (640, 576))
@@ -106,6 +115,14 @@ def get_pcd(cam, idx, cache):
         T2_com = (np.dot(R2, T).reshape(3, 1) + T2).reshape(3,)
         extrinsic0[:3, :3] = R2_com
         extrinsic0[:3, 3] = (T2_com / 1000) + np.array([0, 0, 0])
+    elif cam == cam_name_3:
+        extrinsic0 = np.identity(4) # Extrinsic matrix
+        R2_com = np.dot(R2, R)
+        T2_com = (np.dot(R2, T).reshape(3, 1) + T2).reshape(3,)
+        R3_com = np.dot(R3, R2_com)
+        T3_com = (np.dot(R3, T2_com).reshape(3, 1) + T3).reshape(3,)
+        extrinsic0[:3, :3] = R3_com
+        extrinsic0[:3, 3] = (T3_com / 1000) + np.array([0, 0, 0])
 
     pcd0 = o3d.geometry.PointCloud.create_from_rgbd_image(rgbd0, intrinsic0, extrinsic0)
 
@@ -120,8 +137,8 @@ def get_pcd(cam, idx, cache):
         pcd0.rotate(rm)
         pcd0.translate(transition)
     elif cam == cam_name_2:
-        transition = [0.009999999999999997, 0.03, 0.060000000000000005]
-        angle = [0.0, 2.1000000000000005, 0.0]
+        transition = [0, 0, 0]
+        angle = [0, 0, 0]
         rm = rotation_matrix_from_euler_angles(np.deg2rad(angle[0]),
                                             np.deg2rad(angle[1]),
                                             np.deg2rad(angle[2]))
@@ -134,6 +151,7 @@ def get_pcd(cam, idx, cache):
 cam_name_0 = '1_5'
 cam_name_1 = '1_4'
 cam_name_2 = '3_4'
+cam_name_3 = '3_5'
 if __name__ == "__main__":
     cache = diskcache.Cache('../calibration/cache')
     
@@ -150,30 +168,32 @@ if __name__ == "__main__":
         pcd0 = get_pcd(cam_name_0, i, cache)
         pcd1 = get_pcd(cam_name_1, i, cache)
         pcd2 = get_pcd(cam_name_2, i, cache)
+        pcd3 = get_pcd(cam_name_3, i, cache)
 
         # pcd = pcd0
-        pcd = pcd0 + pcd1 + pcd2
+        pcd = pcd0 + pcd1 + pcd2 + pcd3
+        # pcd = pcd0 + pcd3
         # pcd.estimate_normals()
 
-        alpha = .02
-        voxel_down_pcd = pcd.voxel_down_sample(voxel_size=0.02)
-        mesh = o3d.geometry.TriangleMesh.create_from_point_cloud_alpha_shape(voxel_down_pcd, alpha)
-        mesh = mesh.filter_smooth_simple(number_of_iterations=1)
-        mesh.compute_vertex_normals()
-        mesh.compute_triangle_normals()
+        # alpha = .02
+        # voxel_down_pcd = pcd.voxel_down_sample(voxel_size=0.02)
+        # mesh = o3d.geometry.TriangleMesh.create_from_point_cloud_alpha_shape(voxel_down_pcd, alpha)
+        # mesh = mesh.filter_smooth_simple(number_of_iterations=1)
+        # mesh.compute_vertex_normals()
+        # mesh.compute_triangle_normals()
 
         geometry.points = pcd.points
-        geometry_mesh.vertices = mesh.vertices
-        geometry_mesh.triangles = mesh.triangles
-        geometry_mesh.vertex_normals = mesh.vertex_normals
-        geometry_mesh.triangle_normals = mesh.triangle_normals
+        # geometry_mesh.vertices = mesh.vertices
+        # geometry_mesh.triangles = mesh.triangles
+        # geometry_mesh.vertex_normals = mesh.vertex_normals
+        # geometry_mesh.triangle_normals = mesh.triangle_normals
         if i == 0:
-            # vis.add_geometry(geometry)
-            vis.add_geometry(geometry_mesh)
-            vis.get_render_option().mesh_show_back_face = True
+            vis.add_geometry(geometry)
+            # vis.add_geometry(geometry_mesh)
+            # vis.get_render_option().mesh_show_back_face = True
         else:
-            # vis.update_geometry(geometry)
-            vis.update_geometry(geometry_mesh)
+            vis.update_geometry(geometry)
+            # vis.update_geometry(geometry_mesh)
         vis.poll_events()
         vis.update_renderer()
 
