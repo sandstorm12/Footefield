@@ -14,7 +14,7 @@ from utils import data_loader
 from sklearn.cluster import KMeans
 
 
-VISUALIZE = False
+COLOR_SPACE_GRAY = [0.203921569, 0.239215686, 0.274509804]
 
 
 def load_pointcloud(path, cam, idx, cache):
@@ -151,7 +151,6 @@ def get_subject(experiment, subject, idx, voxel_size, cache):
     pc24 = preprocess(pc24, voxel_size)
     pc_np = np.asarray(pc24.points)
     kmeans = KMeans(n_clusters=2, random_state=47, init=start_pts, n_init=1).fit(pc_np)
-    print("Centers: ", kmeans.cluster_centers_)
     # TODO: Explain what (subject + 1 % 2) is
     pc24.points = o3d.utility.Vector3dVector(pc_np[kmeans.labels_ == (subject + 1) % 2])
     
@@ -161,7 +160,6 @@ def get_subject(experiment, subject, idx, voxel_size, cache):
     pc15 = preprocess(pc15, voxel_size)
     pc_np = np.asarray(pc15.points)
     kmeans = KMeans(n_clusters=2, random_state=47, init=start_pts, n_init=1).fit(pc_np)
-    print("Centers: ", kmeans.cluster_centers_)
     pc15.points = o3d.utility.Vector3dVector(pc_np[kmeans.labels_ == (subject + 1) % 2])
 
     # Cam14
@@ -175,7 +173,6 @@ def get_subject(experiment, subject, idx, voxel_size, cache):
     pc34 = preprocess(pc34, voxel_size)
     pc_np = np.asarray(pc34.points)
     kmeans = KMeans(n_clusters=2, random_state=47, init=start_pts, n_init=1).fit(pc_np)
-    print("Centers: ", kmeans.cluster_centers_)
     pc34.points = o3d.utility.Vector3dVector(pc_np[kmeans.labels_ == (subject + 1) % 2])
 
     # Cam35
@@ -184,7 +181,6 @@ def get_subject(experiment, subject, idx, voxel_size, cache):
     pc35 = preprocess(pc35, voxel_size)
     pc_np = np.asarray(pc35.points)
     kmeans = KMeans(n_clusters=2, random_state=47, init=start_pts, n_init=1).fit(pc_np)
-    print("Centers: ", kmeans.cluster_centers_)
     pc35.points = o3d.utility.Vector3dVector(pc_np[kmeans.labels_ == (subject + 1) % 2])
 
     return {
@@ -257,16 +253,6 @@ def finetune_extrinsics(cams, experiment, subject, interval, voxel_size, cache):
 
         pcds_down = [pcs_subject[cam] for cam in cams]
 
-        if VISUALIZE:
-            vis = o3d.visualization.Visualizer()
-            vis.create_window(visible=True)
-            # Call only after creating visualizer window.
-            vis.get_render_option().background_color = [.5, .5, .5]
-            vis.get_render_option().show_coordinate_frame = True
-            for point_id, pcd_down in enumerate(pcds_down):
-                vis.add_geometry(pcd_down)
-            vis.run()
-
         max_correspondence_distance_coarse = voxel_size * 15
         max_correspondence_distance_fine = voxel_size * 1.5
         with o3d.utility.VerbosityContextManager(
@@ -287,25 +273,22 @@ def finetune_extrinsics(cams, experiment, subject, interval, voxel_size, cache):
                 o3d.pipelines.registration.GlobalOptimizationLevenbergMarquardt(),
                 o3d.pipelines.registration.GlobalOptimizationConvergenceCriteria(),
                 option)
-        
-        for point_id in range(len(pcds_down)):
-            if pose_avg[point_id] is None:
-                pose_avg[point_id] = np.array(pose_graph.nodes[point_id].pose)
-            else:
-                pose_avg[point_id] = (pose_avg[point_id] * i + np.array(pose_graph.nodes[point_id].pose)) / (i + 1)
 
-        if VISUALIZE:
-            vis = o3d.visualization.Visualizer()
-            vis.create_window(visible=True)
-            # Call only after creating visualizer window.
-            vis.get_render_option().background_color = [.5, .5, .5]
-            vis.get_render_option().show_coordinate_frame = True
-            for point_id, pcd_down in enumerate(pcds_down):
-                pcd_down_copy = copy.deepcopy(pcd_down)
-                # pcd_down_copy.transform(pose_avg[point_id])
-                pcd_down_copy.transform(pose_graph.nodes[point_id].pose)
-                vis.add_geometry(pcd_down_copy)
-            vis.run()
+        vis = o3d.visualization.Visualizer()
+        vis.create_window(visible=True)
+        # Call only after creating visualizer window.
+        vis.get_render_option().background_color = COLOR_SPACE_GRAY
+        vis.get_render_option().show_coordinate_frame = True
+        pose = []
+        for point_id, pcd_down in enumerate(pcds_down):
+            pcd_down_copy = copy.deepcopy(pcd_down)
+            pcd_down_copy.transform(pose_graph.nodes[point_id].pose)
+            pose.append(np.array(pose_graph.nodes[point_id].pose))
+            vis.add_geometry(pcd_down_copy)
+
+        print(pose, '\n')
+
+        vis.run()
 
     return pose_avg
 
@@ -314,7 +297,7 @@ def finetune_extrinsics(cams, experiment, subject, interval, voxel_size, cache):
 VOXEL_SIZE = .005
 EXPERIMENT = 'a1'
 INTERVAL = 25
-SUBJECT = 0
+SUBJECT = 1
 
 # TODO: Move cameras to dataloader
 cam24 = 'azure_kinect2_4_calib_snap'
@@ -328,22 +311,9 @@ if __name__ == "__main__":
     cams = [
         cam24,
         cam15,
-        cam14,
+        # cam14,
         cam34,
         cam35
     ]
 
-    pose = finetune_extrinsics(cams, EXPERIMENT, SUBJECT, INTERVAL, VOXEL_SIZE, cache)
-
-    # TODO: Code smell
-    extrinsics_finetuned = cache.get('extrinsics_finetuned', {})
-    extrinsics_finetuned[EXPERIMENT] = extrinsics_finetuned.get(EXPERIMENT, {})
-    for idx, cam in enumerate(cams):
-        extrinsics_finetuned[EXPERIMENT][cam + '_' + str(SUBJECT)] = pose[idx]
-
-    cache['extrinsics_finetuned'] = extrinsics_finetuned
-
-    print('Finetuned extrinsic parameters for '
-          'experiment {} subject {}:\n{}\n'.format(
-              EXPERIMENT, SUBJECT, cache['extrinsics_finetuned'][EXPERIMENT]
-          ))
+    finetune_extrinsics(cams, EXPERIMENT, SUBJECT, INTERVAL, VOXEL_SIZE, cache)

@@ -14,6 +14,9 @@ from sklearn.cluster import KMeans
 from utils import data_loader
 
 
+MESH = False
+
+
 def load_pointcloud(path, cam, idx, cache):
     path_depth = os.path.join(path, 'depth/depth{:05d}.png'.format(idx))
     depth = o3d.io.read_image(path_depth)
@@ -209,9 +212,90 @@ def rotation_matrix_from_euler_angles(roll, pitch, yaw):
     return rotation_matrix
 
 
+# TODO: I hate this part. Refactor please!
+A1_S0 = [
+    np.array(
+        [
+            [1.00000000e00, -1.03459615e-21, 0.00000000e00, 0.00000000e00],
+            [-1.03459615e-21, 1.00000000e00, 8.47032947e-22, 0.00000000e00],
+            [-1.35525272e-20, -8.47032947e-22, 1.00000000e00, 0.00000000e00],
+            [0.00000000e00, 0.00000000e00, 0.00000000e00, 1.00000000e00],
+        ]
+    ),
+    np.array(
+        [
+            [9.99916624e-01, 1.28957383e-02, 6.66547295e-04, -4.70369841e-02],
+            [-1.29022617e-02, 9.99856895e-01, 1.09417583e-02, -2.78448444e-03],
+            [-5.25349858e-04, -1.09494459e-02, 9.99939915e-01, 7.94679445e-02],
+            [0.00000000e00, 0.00000000e00, 0.00000000e00, 1.00000000e00],
+        ]
+    ),
+    np.array(
+        [
+            [0.98649811, -0.03075712, 0.16085858, -0.32690532],
+            [0.03765095, 0.99849067, -0.0399848, 0.00724568],
+            [-0.15938598, 0.0455014, 0.98616719, 0.32749762],
+            [0.0, 0.0, 0.0, 1.0],
+        ]
+    ),
+    np.array(
+        [
+            [0.97858678, -0.06511944, 0.19526231, -0.41950537],
+            [0.07997343, 0.99439407, -0.06917138, 0.01705819],
+            [-0.18966328, 0.08330599, 0.97830872, 0.42940934],
+            [0.0, 0.0, 0.0, 1.0],
+        ]
+    ),
+    np.array(
+        [
+            [0.96704779, -0.13024607, 0.21875681, -0.36226442],
+            [0.15761733, 0.9810527, -0.11266044, -0.02076312],
+            [-0.19993838, 0.14342789, 0.96925388, 0.48615835],
+            [0.0, 0.0, 0.0, 1.0],
+        ]
+    ),
+]
+
+A1_S1 = [
+    np.array(
+        [
+            [1.00000000e00, 5.11151574e-23, 0.00000000e00, 0.00000000e00],
+            [-7.95946466e-22, 1.00000000e00, -2.64697796e-23, 2.11758237e-22],
+            [3.38813179e-21, -2.64697796e-23, 1.00000000e00, 0.00000000e00],
+            [0.00000000e00, 0.00000000e00, 0.00000000e00, 1.00000000e00],
+        ]
+    ),
+    np.array(
+        [
+            [0.96234239, -0.07933012, 0.2600074, -0.49241727],
+            [0.0796393, 0.99677978, 0.00936275, 0.01397312],
+            [-0.25991287, 0.01169664, 0.96556123, 0.04237567],
+            [0.0, 0.0, 0.0, 1.0],
+        ]
+    ),
+    np.array(
+        [
+            [0.94058297, -0.10176303, 0.32395673, -0.54400412],
+            [0.11534682, 0.99306, -0.02295511, -0.07126208],
+            [-0.31937249, 0.05895857, 0.94579337, 0.30544206],
+            [0.0, 0.0, 0.0, 1.0],
+        ]
+    ),
+    np.array(
+        [
+            [0.91785645, -0.05935663, 0.39244913, -0.56627694],
+            [0.08673478, 0.99485313, -0.05238628, 0.08786158],
+            [-0.38731978, 0.08212208, 0.91828065, 0.30544401],
+            [0.0, 0.0, 0.0, 1.0],
+        ]
+    ),
+]
+
+
 EXPERIMENT = 'a1'
-SUBJECT = 0
+SUBJECT = 1
 COLOR_SPACE_GRAY = [0.203921569, 0.239215686, 0.274509804]
+
 
 cam24 = 'azure_kinect2_4_calib_snap'
 cam15 = 'azure_kinect1_5_calib_snap'
@@ -224,16 +308,15 @@ if __name__ == "__main__":
     cams = [
         cam24,
         cam15,
-        cam14,
+        # cam14,
         cam34,
         cam35
     ]
 
-    pose = cache['extrinsics_finetuned'][EXPERIMENT]
-
     vis = o3d.visualization.Visualizer()
     vis.create_window()
     vis.get_render_option().background_color = COLOR_SPACE_GRAY
+    vis.get_render_option().show_coordinate_frame = True
 
     geometry = o3d.geometry.PointCloud()
     geometry_mesh = o3d.geometry.TriangleMesh()
@@ -244,31 +327,35 @@ if __name__ == "__main__":
         pcds_down = [subject[cam] for cam in cams]
 
         for point_id in range(len(pcds_down)):
-            pcds_down[point_id].transform(pose[cams[point_id] + '_' + str(SUBJECT)])
+            pcds_down[point_id].transform(A1_S1[point_id])
 
         pc_combines = pcds_down[0]
         for idx in range(1, len(pcds_down)):
             pc_combines += pcds_down[idx]
 
-        alpha = .02
-        voxel_down_pcd = pc_combines.voxel_down_sample(voxel_size=0.02)
-        mesh = o3d.geometry.TriangleMesh.create_from_point_cloud_alpha_shape(voxel_down_pcd, alpha)
-        mesh = mesh.filter_smooth_simple(number_of_iterations=1)
-        mesh.compute_vertex_normals()
-        mesh.compute_triangle_normals()
-
-        # geometry.points = pc_combines.points
-        geometry_mesh.vertices = mesh.vertices
-        geometry_mesh.triangles = mesh.triangles
-        geometry_mesh.vertex_normals = mesh.vertex_normals
-        geometry_mesh.triangle_normals = mesh.triangle_normals
+        geometry.points = pc_combines.points        
         if i == 0:
-            # vis.add_geometry(geometry)
-            vis.add_geometry(geometry_mesh)
-            vis.get_render_option().mesh_show_back_face = True
+            vis.add_geometry(geometry)
         else:
-            # vis.update_geometry(geometry)
-            vis.update_geometry(geometry_mesh)
+            vis.update_geometry(geometry)
+
+        if MESH:
+            alpha = .02
+            voxel_down_pcd = pc_combines.voxel_down_sample(voxel_size=0.02)
+            mesh = o3d.geometry.TriangleMesh.create_from_point_cloud_alpha_shape(voxel_down_pcd, alpha)
+            mesh = mesh.filter_smooth_simple(number_of_iterations=1)
+            mesh.compute_vertex_normals()
+            mesh.compute_triangle_normals()
+
+            geometry_mesh.vertices = mesh.vertices
+            geometry_mesh.triangles = mesh.triangles
+            geometry_mesh.vertex_normals = mesh.vertex_normals
+            geometry_mesh.triangle_normals = mesh.triangle_normals
+            if i == 0:
+                vis.add_geometry(geometry_mesh)
+                vis.get_render_option().mesh_show_back_face = True
+            else:
+                vis.update_geometry(geometry_mesh)
             
         vis.poll_events()
         vis.update_renderer()
