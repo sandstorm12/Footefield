@@ -152,6 +152,7 @@ cam_name_0 = '1_5'
 cam_name_1 = '1_4'
 cam_name_2 = '3_4'
 cam_name_3 = '3_5'
+cam_name_4 = '2_4'
 if __name__ == "__main__":
     cache = diskcache.Cache('../calibration/cache')
     

@@ -45,6 +45,8 @@ For mmpose installation please refer to [https://mmcv.readthedocs.io/en/latest/g
 1. Feature: Regress SMPLX joint to the body, face, and hand keypoints
 1. Feature: Render SMPL the multi-person skeletons in the orignal coordinate system
 1. Feature: Move to a more end-user friendly result storage from diskcache
+1. Feature: Move cache to the root folder of the project
+1. Feature: Add a schematic of camera placements
 
 ## Known issues
 
