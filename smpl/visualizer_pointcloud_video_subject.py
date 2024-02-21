@@ -101,7 +101,7 @@ def remove_outliers(pointcloud):
 def preprocess(pointcloud):
     pointcloud = remove_outliers(pointcloud)
 
-    pointcloud = pointcloud.voxel_down_sample(voxel_size=0.01)
+    pointcloud = pointcloud.voxel_down_sample(voxel_size=0.005)
 
     return pointcloud
 
@@ -115,7 +115,7 @@ def show(pointcloud):
 
 
 def get_subject(experiment, subject, idx, cache):
-    start_pts = np.array([[0, 0, 0], [2e3, 2e3, 2e3]])
+    start_pts = np.array([[0, 0, 0], [1, -1, 3]])
     
     # Cam24
     path = data_loader.EXPERIMENTS[experiment][cam24]
@@ -132,7 +132,7 @@ def get_subject(experiment, subject, idx, cache):
     pc15 = preprocess(pc15)
     pc_np = np.asarray(pc15.points)
     kmeans = KMeans(n_clusters=2, random_state=47, init=start_pts, n_init=1).fit(pc_np)
-    pc15.points = o3d.utility.Vector3dVector(pc_np[kmeans.labels_ == (subject) % 2])
+    pc15.points = o3d.utility.Vector3dVector(pc_np[kmeans.labels_ == (subject + 1) % 2])
 
     # Cam14
     path = data_loader.EXPERIMENTS[experiment][cam14]
@@ -209,6 +209,10 @@ def rotation_matrix_from_euler_angles(roll, pitch, yaw):
     return rotation_matrix
 
 
+EXPERIMENT = 'a1'
+SUBJECT = 0
+COLOR_SPACE_GRAY = [0.203921569, 0.239215686, 0.274509804]
+
 cam24 = 'azure_kinect2_4_calib_snap'
 cam15 = 'azure_kinect1_5_calib_snap'
 cam14 = 'azure_kinect1_4_calib_snap'
@@ -217,30 +221,54 @@ cam35 = 'azure_kinect3_5_calib_snap'
 if __name__ == "__main__":
     cache = diskcache.Cache('../calibration/cache')
 
+    cams = [
+        cam24,
+        cam15,
+        cam14,
+        cam34,
+        cam35
+    ]
+
+    pose = cache['extrinsics_finetuned'][EXPERIMENT]
+
     vis = o3d.visualization.Visualizer()
     vis.create_window()
+    vis.get_render_option().background_color = COLOR_SPACE_GRAY
 
     geometry = o3d.geometry.PointCloud()
     geometry_mesh = o3d.geometry.TriangleMesh()
 
     for i in range(1000):
-        subject_0 = get_subject('a1', 1, i, cache)
+        subject = get_subject(EXPERIMENT, SUBJECT, i, cache)
 
-        transition = [0.09, 0.10999999999999999, 0.02]
-        angle = [0, 0, 0]
-        rm = rotation_matrix_from_euler_angles(np.deg2rad(angle[0]),
-                                            np.deg2rad(angle[1]),
-                                            np.deg2rad(angle[2]))
-        subject_0[cam35].rotate(rm)
-        subject_0[cam35].translate(transition)
+        pcds_down = [subject[cam] for cam in cams]
 
-        pc_s0 = subject_0[cam34] + subject_0[cam35]
+        for point_id in range(len(pcds_down)):
+            pcds_down[point_id].transform(pose[cams[point_id] + '_' + str(SUBJECT)])
 
-        geometry.points = pc_s0.points
+        pc_combines = pcds_down[0]
+        for idx in range(1, len(pcds_down)):
+            pc_combines += pcds_down[idx]
+
+        alpha = .02
+        voxel_down_pcd = pc_combines.voxel_down_sample(voxel_size=0.02)
+        mesh = o3d.geometry.TriangleMesh.create_from_point_cloud_alpha_shape(voxel_down_pcd, alpha)
+        mesh = mesh.filter_smooth_simple(number_of_iterations=1)
+        mesh.compute_vertex_normals()
+        mesh.compute_triangle_normals()
+
+        # geometry.points = pc_combines.points
+        geometry_mesh.vertices = mesh.vertices
+        geometry_mesh.triangles = mesh.triangles
+        geometry_mesh.vertex_normals = mesh.vertex_normals
+        geometry_mesh.triangle_normals = mesh.triangle_normals
         if i == 0:
-            vis.add_geometry(geometry)
+            # vis.add_geometry(geometry)
+            vis.add_geometry(geometry_mesh)
+            vis.get_render_option().mesh_show_back_face = True
         else:
-            vis.update_geometry(geometry)
+            # vis.update_geometry(geometry)
+            vis.update_geometry(geometry_mesh)
             
         vis.poll_events()
         vis.update_renderer()
