@@ -114,7 +114,7 @@ def show(pointcloud):
 
 
 def get_subject(experiment, subject, idx, cache):
-    start_pts = np.array([[0, 0, 0], [3e3, 0, 3e3]])
+    start_pts = np.array([[0, 0, 0], [1, -1, 3]])
 
     # Cam24
     path = data_loader.EXPERIMENTS[experiment][cam24]
@@ -122,6 +122,7 @@ def get_subject(experiment, subject, idx, cache):
     pc24 = preprocess(pc24)
     pc_np = np.asarray(pc24.points)
     kmeans = KMeans(n_clusters=2, random_state=47, init=start_pts, n_init=1).fit(pc_np)
+    print("Centers", kmeans.cluster_centers_)
     # TODO: Explain what (subject + 1 % 2) is
     pc24.points = o3d.utility.Vector3dVector(pc_np[kmeans.labels_ == (subject + 1) % 2])
     
@@ -131,6 +132,7 @@ def get_subject(experiment, subject, idx, cache):
     pc15 = preprocess(pc15)
     pc_np = np.asarray(pc15.points)
     kmeans = KMeans(n_clusters=2, random_state=47, init=start_pts, n_init=1).fit(pc_np)
+    print("Centers", kmeans.cluster_centers_)
     pc15.points = o3d.utility.Vector3dVector(pc_np[kmeans.labels_ == (subject + 1) % 2])
 
     # Cam14
@@ -144,6 +146,7 @@ def get_subject(experiment, subject, idx, cache):
     pc34 = preprocess(pc34)
     pc_np = np.asarray(pc34.points)
     kmeans = KMeans(n_clusters=2, random_state=47, init=start_pts, n_init=1).fit(pc_np)
+    print("Centers", kmeans.cluster_centers_)
     pc34.points = o3d.utility.Vector3dVector(pc_np[kmeans.labels_ == (subject + 1) % 2])
 
     # Cam35
@@ -152,6 +155,7 @@ def get_subject(experiment, subject, idx, cache):
     pc35 = preprocess(pc35)
     pc_np = np.asarray(pc35.points)
     kmeans = KMeans(n_clusters=2, random_state=47, init=start_pts, n_init=1).fit(pc_np)
+    print("Centers", kmeans.cluster_centers_)
     pc35.points = o3d.utility.Vector3dVector(pc_np[kmeans.labels_ == (subject + 1) % 2])
 
     return {
@@ -244,7 +248,7 @@ if __name__ == "__main__":
     cache = diskcache.Cache('../calibration/cache')
 
     for i in range(60):
-        subject_0 = get_subject('a1', 0, i * 100, cache)
+        subject_0 = get_subject('a1', 1, i * 100, cache)
 
         subject_0[cam24].estimate_normals()
         subject_0[cam24].paint_uniform_color([1, 0, 0])
@@ -260,7 +264,7 @@ if __name__ == "__main__":
         pcds_down = [
             subject_0[cam24],
             subject_0[cam15],
-            subject_0[cam14],
+            # subject_0[cam14],
             subject_0[cam34],
             subject_0[cam35],
         ]
