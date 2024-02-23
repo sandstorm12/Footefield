@@ -15,9 +15,31 @@ from mmpose.apis import MMPoseInferencer
 
 
 OVERWRITE = True
-VISUALIZE = False
-REMOVE_PREVIOUS = False
+VISUALIZE = True
+REMOVE_PREVIOUS = True
 EXP_LENGTH = 50
+
+
+def filter_sort(people_keypoints, num_select=2, invert=False):
+    heights = []
+    for person in people_keypoints:
+        person = person['keypoints']
+        heights.append(person[16][1] - person[0][1])
+
+    indecies = np.argsort(heights)[::-1]
+    people_keypoints = [people_keypoints[indecies[idx]] for idx in range(num_select)]
+
+    horizontal_position = []
+    for person in people_keypoints:
+        person = person['keypoints']
+        horizontal_position.append(person[0][0])
+
+    indecies = np.argsort(horizontal_position)
+    if invert:
+        indecies = indecies[::-1]
+    people_keypoints = [people_keypoints[indecies[idx]] for idx in range(num_select)]
+
+    return people_keypoints
 
 
 def _get_skeleton(image, inferencer):
@@ -25,7 +47,8 @@ def _get_skeleton(image, inferencer):
     
     detected_keypoints = []
     for result in result_generator:
-        for predictions in result['predictions'][0]:
+        poeple_keypoints = filter_sort(result['predictions'][0])
+        for predictions in poeple_keypoints:
             keypoints = predictions['keypoints']
             detected_keypoints.append(keypoints)
 
