@@ -10,10 +10,9 @@ from utils import data_loader
 
 
 DISPARITY = -9
-DEPTH_AREA = 10
-MAX_DIST = 5000
+DEPTH_AREA = 20
+MAX_DIST = 3000
 MIN_DIST = 100
-MAX_STD = 30
 
 
 def align_image_rgb(image, camera, cache):
@@ -57,12 +56,8 @@ def points_to_depth(people_keypoints, image_depth):
             if len(roi) > 0:
                 roi = reject_outliers(roi)
 
-            if len(roi) > 0 and np.std(roi) < MAX_STD:
-                depth = np.median(roi)
-                keypoints_3d[-1].append((x, y, depth))
-            else:
-                keypoints_3d[-1].append((x, y, 0))
-
+            depth = np.median(roi)
+            keypoints_3d[-1].append((x, y, depth))
 
     return keypoints_3d
 
