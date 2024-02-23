@@ -40,13 +40,24 @@ def read_bal_data(file_name):
 
     return camera_params, points_3d, camera_indices, point_indices, points_2d
 
-camera_params, points_3d, camera_indices, point_indices, points_2d = read_bal_data(FILE_NAME)
+
+def read_ba_data():
+    import pickle
+    with open('ba_data.pkl', 'rb') as handle:
+        ba_data = pickle.load(handle)
+
+    return ba_data['params'], ba_data['poses_3d'], ba_data['camera_indices'], ba_data['point_indices'], ba_data['points_2d']
+
+
+# camera_params, points_3d, camera_indices, point_indices, points_2d = read_bal_data(FILE_NAME)
+camera_params, points_3d, camera_indices, point_indices, points_2d = read_ba_data()
 
 print("camera_params", camera_params.shape)
 print("points_3d", points_3d.shape)
 print("camera_indices", camera_indices.shape)
 print("point_indices", point_indices.shape)
 print("points_2d", points_2d.shape)
+print(point_indices)
 
 
 n_cameras = camera_params.shape[0]
@@ -135,9 +146,16 @@ from scipy.optimize import least_squares
 t0 = time.time()
 res = least_squares(fun, x0, jac_sparsity=A, verbose=2, x_scale='jac', ftol=1e-4, method='trf',
                     args=(n_cameras, n_points, camera_indices, point_indices, points_2d))
+points_3d = res['x'][18:]
 t1 = time.time()
 
 print("Optimization took {0:.0f} seconds".format(t1 - t0))
+
+print(res)  
+print("points_3d", points_3d.shape)
+import pickle
+with open('points_3d.pkl', 'wb') as handle:
+    pickle.dump(points_3d, handle, protocol=pickle.HIGHEST_PROTOCOL)
 
 plt.plot(res.fun)
 plt.show()
