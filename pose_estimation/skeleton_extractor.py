@@ -3,6 +3,7 @@ sys.path.append('../')
 
 import os
 import cv2
+import pickle
 import diskcache
 import numpy as np
 import matplotlib.animation
@@ -15,7 +16,7 @@ from mmpose.apis import MMPoseInferencer
 
 
 OVERWRITE = True
-VISUALIZE = True
+VISUALIZE = False
 REMOVE_PREVIOUS = True
 EXP_LENGTH = 50
 
@@ -167,7 +168,7 @@ if __name__ == "__main__":
 
     cache_process = cache.get('process', {})
 
-    mmpose = MMPoseInferencer('human')
+    mmpose = MMPoseInferencer('rtmpose-x_8xb256-700e_body8-halpe26-384x288')
 
     for expriment in data_loader.EXPERIMENTS.keys():
         for exp_cam in data_loader.EXPERIMENTS[expriment].keys():
@@ -184,3 +185,9 @@ if __name__ == "__main__":
 
             if VISUALIZE:
                 visualize_poses(poses=poses)
+
+            store_path = './keypoints_3d/keypoints3d_{}_{}.pkl'.format(
+                expriment, exp_cam
+            )
+            with open(store_path, 'wb') as handle:
+                pickle.dump(np.array(poses), handle, protocol=pickle.HIGHEST_PROTOCOL)
