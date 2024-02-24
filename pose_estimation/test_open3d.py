@@ -14,11 +14,12 @@ cache = diskcache.Cache('../calibration/cache')
 
 camera = 'azure_kinect1_4_calib_snap'
 
-img_depth_path = '/home/hamid/Documents/phd/footefield/data/AzureKinectRecord_0729/a1/azure_kinect1_4/depth/depth00000.png'
-img_color_path = '/home/hamid/Documents/phd/footefield/data/AzureKinectRecord_0729/a1/azure_kinect1_4/color/color00000.jpg'
+img_depth_path = '/home/hamid/Documents/phd/footefield/data/AzureKinectRecord_0729/a1/azure_kinect2_4/depth/depth00000.png'
+img_color_path = '/home/hamid/Documents/phd/footefield/data/AzureKinectRecord_0729/a1/azure_kinect2_4/color/color00000.jpg'
 
 img_depth = cv2.imread(img_depth_path, -1)
 img_color = cv2.imread(img_color_path)
+img_color = cv2.cvtColor(img_color, cv2.COLOR_BGR2RGB)
 img_color = data_loader.downsample_keep_aspect_ratio(
     img_color,
     (
@@ -28,14 +29,13 @@ img_color = data_loader.downsample_keep_aspect_ratio(
 )
 
 img_color = rgb_depth_map.align_image_rgb(img_color, camera, cache)
-img_depth = rgb_depth_map.align_image_depth(img_depth, camera, cache)
 
 color0 = o3d.geometry.Image((img_color).astype(np.uint8))
 depth0 = o3d.geometry.Image(img_depth)
 
 mtx0 = cache['extrinsics'][camera + 'infrared']['mtx_l']
 
-rgbd0 = o3d.geometry.RGBDImage.create_from_color_and_depth(color0, depth0)
+rgbd0 = o3d.geometry.RGBDImage.create_from_color_and_depth(color0, depth0, convert_rgb_to_intensity=False)
 
 intrinsic0 = o3d.camera.PinholeCameraIntrinsic(640, 576, mtx0[0, 0], mtx0[1, 1], mtx0[0, 2], mtx0[1, 2])
 
