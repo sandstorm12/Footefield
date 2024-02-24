@@ -6,41 +6,15 @@ import diskcache
 import numpy as np
 import matplotlib.pyplot as plt
 
+import rgb_depth_map
+
 from utils import data_loader
 
 
-DISPARITY = -9
 DEPTH_AREA = 10
 MAX_DIST = 5000
 MIN_DIST = 100
 MAX_STD = 30
-
-
-def align_image_rgb(image, camera, cache):
-    if not cache.__contains__('depth_matching'):
-        raise Exception('Depth matching not cached. '
-                        'Run rgb_depth_calibration script.')
-    
-    map1x = cache['depth_matching'][camera]['map_rgb_x']
-    map1y = cache['depth_matching'][camera]['map_rgb_y']
-
-    image_rgb = cv2.remap(image, map1x, map1y, cv2.INTER_NEAREST)
-
-    return image_rgb
-
-
-def align_image_depth(image, camera, cache):
-    if not cache.__contains__('depth_matching'):
-        raise Exception('Depth matching not cached. '
-                        'Run rgb_depth_calibration script.')
-    
-    map2x = cache['depth_matching'][camera]['map_infrared_x']
-    map2y = cache['depth_matching'][camera]['map_infrared_y']
-
-    image_depth = cv2.remap(image, map2x, map2y, cv2.INTER_NEAREST)
-    image_depth = np.roll(image_depth, DISPARITY, axis=1)
-
-    return image_depth
 
 
 def reject_outliers(data, quantile_lower=.4, quantile_upper=.6):
@@ -67,8 +41,7 @@ if __name__ == "__main__":
          data_loader.IMAGE_INFRARED_HEIGHT))
     img_dpt = cv2.imread(img_dpt_path, -1)
 
-    img_rgb = align_image_rgb(img_rgb, camera, cache)
-    img_dpt = align_image_depth(img_dpt, camera, cache)
+    img_rgb = rgb_depth_map.align_image_rgb(img_rgb, camera, cache)
 
     f, axarr = plt.subplots(1,2)
     implot = axarr[0].imshow(img_rgb)
