@@ -5,27 +5,27 @@ import glob
 
 
 PATH_CALIBS = [
-    "/home/hamid/Documents/phd/footefield/data/AzureKinectRecord_0729/azure_kinect1_4_calib_snap",
-    "/home/hamid/Documents/phd/footefield/data/AzureKinectRecord_0729/azure_kinect1_5_calib_snap",
     "/home/hamid/Documents/phd/footefield/data/AzureKinectRecord_0729/azure_kinect2_4_calib_snap",
     "/home/hamid/Documents/phd/footefield/data/AzureKinectRecord_0729/azure_kinect3_4_calib_snap",
     "/home/hamid/Documents/phd/footefield/data/AzureKinectRecord_0729/azure_kinect3_5_calib_snap",
+    "/home/hamid/Documents/phd/footefield/data/AzureKinectRecord_0729/azure_kinect1_4_calib_snap",
+    "/home/hamid/Documents/phd/footefield/data/AzureKinectRecord_0729/azure_kinect1_5_calib_snap",
 ]
 
 EXPERIMENTS = {
     'a1': {
-        "azure_kinect1_4_calib_snap": "/home/hamid/Documents/phd/footefield/data/AzureKinectRecord_0729/a1/azure_kinect1_4",
-        "azure_kinect1_5_calib_snap": "/home/hamid/Documents/phd/footefield/data/AzureKinectRecord_0729/a1/azure_kinect1_5",
         "azure_kinect2_4_calib_snap": "/home/hamid/Documents/phd/footefield/data/AzureKinectRecord_0729/a1/azure_kinect2_4",
         "azure_kinect3_4_calib_snap": "/home/hamid/Documents/phd/footefield/data/AzureKinectRecord_0729/a1/azure_kinect3_4",
         "azure_kinect3_5_calib_snap": "/home/hamid/Documents/phd/footefield/data/AzureKinectRecord_0729/a1/azure_kinect3_5",
+        "azure_kinect1_4_calib_snap": "/home/hamid/Documents/phd/footefield/data/AzureKinectRecord_0729/a1/azure_kinect1_4",
+        "azure_kinect1_5_calib_snap": "/home/hamid/Documents/phd/footefield/data/AzureKinectRecord_0729/a1/azure_kinect1_5",
     },
     'a2': {
-        "azure_kinect1_4_calib_snap": "/home/hamid/Documents/phd/footefield/data/AzureKinectRecord_0729/a2/azure_kinect1_4",
-        "azure_kinect1_5_calib_snap": "/home/hamid/Documents/phd/footefield/data/AzureKinectRecord_0729/a2/azure_kinect1_5",
         "azure_kinect2_4_calib_snap": "/home/hamid/Documents/phd/footefield/data/AzureKinectRecord_0729/a2/azure_kinect2_4",
         "azure_kinect3_4_calib_snap": "/home/hamid/Documents/phd/footefield/data/AzureKinectRecord_0729/a2/azure_kinect3_4",
         "azure_kinect3_5_calib_snap": "/home/hamid/Documents/phd/footefield/data/AzureKinectRecord_0729/a2/azure_kinect3_5",
+        "azure_kinect1_4_calib_snap": "/home/hamid/Documents/phd/footefield/data/AzureKinectRecord_0729/a2/azure_kinect1_4",
+        "azure_kinect1_5_calib_snap": "/home/hamid/Documents/phd/footefield/data/AzureKinectRecord_0729/a2/azure_kinect1_5",
     }
 }
 
@@ -49,6 +49,14 @@ MMPOSE_EDGES = [
     (12, 14),
     (13, 15),
     (14, 16),
+]
+
+HALPE_EDGES = [
+    (0, 1), (0, 2), (1, 3), (2, 4),  # Head
+    (5, 18), (6, 18), (5, 7), (7, 9), (6, 8), (8, 10), # Body
+    (17, 18), (18, 19), (19, 11), (19, 12),
+    (11, 13), (12, 14), (13, 15), (14, 16),
+    (20, 24), (21, 25), (23, 25), (22, 24), (15, 24), (16, 25), # Feet
 ]
 
 TYPE_RGB = "TYPE_RGB"
