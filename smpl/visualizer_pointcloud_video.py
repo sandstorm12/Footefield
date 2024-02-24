@@ -1,16 +1,22 @@
+import sys
+sys.path.append('../')
+
 import cv2
 import time
 import diskcache
 import numpy as np
 import open3d as o3d
 
+from utils import data_loader
+from calibration import rgb_depth_map
+
 
 def get_cam(cam_name):
     return f'azure_kinect{cam_name}_calib_snap'
 
 def get_images(cam_name, idx):
-    img_depth = '/home/hamid/Documents/footefield/data/AzureKinectRecord_0729/a1/azure_kinect{}/depth/depth{:05d}.png'.format(cam_name, idx)
-    img_color = '/home/hamid/Documents/footefield/data/AzureKinectRecord_0729/a1/azure_kinect{}/color/color{:05d}.jpg'.format(cam_name, idx)
+    img_depth = '/home/hamid/Documents/phd/footefield/data/AzureKinectRecord_0729/a1/azure_kinect{}/depth/depth{:05d}.png'.format(cam_name, idx)
+    img_color = '/home/hamid/Documents/phd/footefield/data/AzureKinectRecord_0729/a1/azure_kinect{}/color/color{:05d}.jpg'.format(cam_name, idx)
 
     return img_color, img_depth
 
@@ -80,11 +86,20 @@ def get_pcd(cam, idx, cache):
         T2 = cache['extrinsics'][cam0 + 'infrared']['transition']
 
     color0 = cv2.imread(img_color_0)
-    color0 = cv2.resize(color0, (640, 576))
+    color0 = cv2.cvtColor(color0, cv2.COLOR_BGR2RGB)
+    color0 = data_loader.downsample_keep_aspect_ratio(
+        color0,
+        (
+            data_loader.IMAGE_INFRARED_WIDTH,
+            data_loader.IMAGE_INFRARED_HEIGHT
+        )
+    )
+    color0 = rgb_depth_map.align_image_rgb(color0, cam0, cache)
+
     color0 = o3d.geometry.Image((color0).astype(np.uint8))
     depth0 = o3d.io.read_image(img_depth_0)
 
-    rgbd0 = o3d.geometry.RGBDImage.create_from_color_and_depth(color0, depth0)
+    rgbd0 = o3d.geometry.RGBDImage.create_from_color_and_depth(color0, depth0, convert_rgb_to_intensity=False)
 
     intrinsic0 = o3d.camera.PinholeCameraIntrinsic(640, 576, mtx0[0, 0], mtx0[1, 1], mtx0[0, 2], mtx0[1, 2])
 
@@ -155,25 +170,26 @@ if __name__ == "__main__":
         pcd = pcd0 + pcd1 + pcd2
         # pcd.estimate_normals()
 
-        alpha = .02
-        voxel_down_pcd = pcd.voxel_down_sample(voxel_size=0.02)
-        mesh = o3d.geometry.TriangleMesh.create_from_point_cloud_alpha_shape(voxel_down_pcd, alpha)
-        mesh = mesh.filter_smooth_simple(number_of_iterations=1)
-        mesh.compute_vertex_normals()
-        mesh.compute_triangle_normals()
+        # alpha = .02
+        # voxel_down_pcd = pcd.voxel_down_sample(voxel_size=0.02)
+        # mesh = o3d.geometry.TriangleMesh.create_from_point_cloud_alpha_shape(voxel_down_pcd, alpha)
+        # mesh = mesh.filter_smooth_simple(number_of_iterations=1)
+        # mesh.compute_vertex_normals()
+        # mesh.compute_triangle_normals()
 
         geometry.points = pcd.points
-        geometry_mesh.vertices = mesh.vertices
-        geometry_mesh.triangles = mesh.triangles
-        geometry_mesh.vertex_normals = mesh.vertex_normals
-        geometry_mesh.triangle_normals = mesh.triangle_normals
+        geometry.colors = pcd.colors
+        # geometry_mesh.vertices = mesh.vertices
+        # geometry_mesh.triangles = mesh.triangles
+        # geometry_mesh.vertex_normals = mesh.vertex_normals
+        # geometry_mesh.triangle_normals = mesh.triangle_normals
         if i == 0:
-            # vis.add_geometry(geometry)
-            vis.add_geometry(geometry_mesh)
-            vis.get_render_option().mesh_show_back_face = True
+            vis.add_geometry(geometry)
+            # vis.add_geometry(geometry_mesh)
+            # vis.get_render_option().mesh_show_back_face = True
         else:
-            # vis.update_geometry(geometry)
-            vis.update_geometry(geometry_mesh)
+            vis.update_geometry(geometry)
+            # vis.update_geometry(geometry_mesh)
         vis.poll_events()
         vis.update_renderer()
 
