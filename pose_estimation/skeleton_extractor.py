@@ -15,9 +15,7 @@ from calibration import rgb_depth_map
 from mmpose.apis import MMPoseInferencer
 
 
-OVERWRITE = True
 VISUALIZE = False
-REMOVE_PREVIOUS = True
 EXP_LENGTH = 50
 
 
@@ -28,7 +26,8 @@ def filter_sort(people_keypoints, num_select=2, invert=False):
         heights.append(person[16][1] - person[0][1])
 
     indecies = np.argsort(heights)[::-1]
-    people_keypoints = [people_keypoints[indecies[idx]] for idx in range(num_select)]
+    people_keypoints = [people_keypoints[indecies[idx]]
+                        for idx in range(num_select)]
 
     horizontal_position = []
     for person in people_keypoints:
@@ -38,17 +37,19 @@ def filter_sort(people_keypoints, num_select=2, invert=False):
     indecies = np.argsort(horizontal_position)
     if invert:
         indecies = indecies[::-1]
-    people_keypoints = [people_keypoints[indecies[idx]] for idx in range(num_select)]
+    people_keypoints = [people_keypoints[indecies[idx]]
+                        for idx in range(num_select)]
 
     return people_keypoints
 
 
-def _get_skeleton(image, inferencer):
+def _get_skeleton(image, inferencer, max_people=2):
     result_generator = inferencer(image)
     
     detected_keypoints = []
     for result in result_generator:
-        poeple_keypoints = filter_sort(result['predictions'][0])
+        poeple_keypoints = filter_sort(result['predictions'][0],
+                                       num_select=max_people)
         for predictions in poeple_keypoints:
             keypoints = predictions['keypoints']
             detected_keypoints.append(keypoints)
@@ -56,7 +57,12 @@ def _get_skeleton(image, inferencer):
     return np.array(detected_keypoints)
 
 
-def extract_poses(dir, camera, model):
+def extract_poses(dir, camera, model, max_people=2):
+    cache = diskcache.Cache('../calibration/cache')
+    intrinsics = cache.get("intrinsics", None)
+    mtx_dpt = intrinsics[camera + '_infrared']['mtx']
+    dist_dpt = intrinsics[camera + '_infrared']['dist']
+
     poses = []
 
     img_rgb_paths = data_loader.list_rgb_images(os.path.join(dir, "color"))
@@ -69,9 +75,18 @@ def extract_poses(dir, camera, model):
         img_dpt = cv2.imread(img_dpt_paths[idx], -1)
 
         img_rgb = rgb_depth_map.align_image_rgb(img_rgb, camera, cache)
-        img_dpt = rgb_depth_map.align_image_depth(img_dpt, camera, cache)
 
-        people_keypoints = _get_skeleton(img_rgb, model)
+        # # Image undistortion but with nearest interpolation
+        # # for more accurate depth value
+        # mapx, mapy = cv2.initUndistortRectifyMap(
+        #     mtx_dpt, dist_dpt, None,
+        #     mtx_dpt,
+        #     (640, 576), cv2.CV_32FC1)
+        # img_dpt = cv2.remap(img_dpt, mapx, mapy, cv2.INTER_NEAREST)
+
+        # img_rgb = cv2.undistort(img_rgb, mtx_dpt, dist_dpt, None, None)
+
+        people_keypoints = _get_skeleton(img_rgb, model, max_people)
 
         people_keypoints_3d = rgb_depth_map.points_to_depth(
             people_keypoints, img_dpt)
@@ -102,15 +117,15 @@ def visualize_poses(poses):
         graph = ax.scatter(x, y, z, c='r', marker='o')
         graphs.append(graph)
         lines.append([])
-        for idx in range(len(data_loader.MMPOSE_EDGES)):
+        for idx in range(len(data_loader.HALPE_EDGES)):
             lines[-1].append(
                 ax.plot(
-                    (x[data_loader.MMPOSE_EDGES[idx][0]],
-                     x[data_loader.MMPOSE_EDGES[idx][1]]),
-                    (y[data_loader.MMPOSE_EDGES[idx][0]],
-                     y[data_loader.MMPOSE_EDGES[idx][1]]),
-                    (z[data_loader.MMPOSE_EDGES[idx][0]],
-                     z[data_loader.MMPOSE_EDGES[idx][1]])
+                    (x[data_loader.HALPE_EDGES[idx][0]],
+                     x[data_loader.HALPE_EDGES[idx][1]]),
+                    (y[data_loader.HALPE_EDGES[idx][0]],
+                     y[data_loader.HALPE_EDGES[idx][1]]),
+                    (z[data_loader.HALPE_EDGES[idx][0]],
+                     z[data_loader.HALPE_EDGES[idx][1]])
                 )[0]
             )
 
@@ -142,13 +157,13 @@ def visualize_poses(poses):
 
             for idx, line in enumerate(lines[person]):
                 line.set_data(
-                    (x[data_loader.MMPOSE_EDGES[idx][0]],
-                     x[data_loader.MMPOSE_EDGES[idx][1]]),
-                    (y[data_loader.MMPOSE_EDGES[idx][0]],
-                     y[data_loader.MMPOSE_EDGES[idx][1]]))
+                    (x[data_loader.HALPE_EDGES[idx][0]],
+                     x[data_loader.HALPE_EDGES[idx][1]]),
+                    (y[data_loader.HALPE_EDGES[idx][0]],
+                     y[data_loader.HALPE_EDGES[idx][1]]))
                 line.set_3d_properties(
-                    (z[data_loader.MMPOSE_EDGES[idx][0]],
-                     z[data_loader.MMPOSE_EDGES[idx][1]])
+                    (z[data_loader.HALPE_EDGES[idx][0]],
+                     z[data_loader.HALPE_EDGES[idx][1]])
                 )
 
     ani = matplotlib.animation.FuncAnimation(
@@ -163,9 +178,6 @@ def visualize_poses(poses):
 if __name__ == "__main__":
     cache = diskcache.Cache('../calibration/cache')
 
-    if REMOVE_PREVIOUS:
-        cache['process'] = {}
-
     cache_process = cache.get('process', {})
 
     mmpose = MMPoseInferencer('rtmpose-x_8xb256-700e_body8-halpe26-384x288')
@@ -175,19 +187,19 @@ if __name__ == "__main__":
             dir = data_loader.EXPERIMENTS[expriment][exp_cam]
             
             id_exp = f'{expriment}_{exp_cam}_skeleton_3D'
-            if not cache_process.__contains__(id_exp) or OVERWRITE:
-                poses = extract_poses(dir, exp_cam, mmpose)
-
-                cache_process[id_exp] = poses
-                cache['process'] = cache_process
-            else:
-                poses = cache_process[id_exp]
+            
+            print(f'Extracting skeletons for {expriment} and {exp_cam}')
+            max_people = 1 if exp_cam == 'azure_kinect1_4_calib_snap' else 2
+            poses = extract_poses(dir, exp_cam, mmpose, max_people)
 
             if VISUALIZE:
                 visualize_poses(poses=poses)
 
-            store_path = './keypoints_3d/keypoints3d_{}_{}.pkl'.format(
-                expriment, exp_cam
-            )
+            # TODO: Move this to a store function
+            STORE_DIR = "./keypoints_3d"
+            if not os.path.exists(STORE_DIR):
+                os.mkdir(STORE_DIR)
+            store_path = os.path.join(STORE_DIR,
+                                      'keypoints3d_{}_{}.pkl'.format(expriment, exp_cam))
             with open(store_path, 'wb') as handle:
                 pickle.dump(np.array(poses), handle, protocol=pickle.HIGHEST_PROTOCOL)
