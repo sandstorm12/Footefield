@@ -30,9 +30,9 @@ def reject_outliers(data, quantile_lower=.4, quantile_upper=.6):
 if __name__ == "__main__":
     cache = diskcache.Cache('cache')
     
-    camera = 'azure_kinect3_4_calib_snap'
-    img_rgb_path = '/home/hamid/Documents/phd/footefield/data/AzureKinectRecord_0729/a1/azure_kinect3_4/color/color00000.jpg'
-    img_dpt_path = '/home/hamid/Documents/phd/footefield/data/AzureKinectRecord_0729/a1/azure_kinect3_4/depth/depth00000.png'
+    camera = 'azure_kinect1_5_calib_snap'
+    img_rgb_path = '/home/hamid/Documents/phd/footefield/data/AzureKinectRecord_0729/a1/azure_kinect1_5/color/color00000.jpg'
+    img_dpt_path = '/home/hamid/Documents/phd/footefield/data/AzureKinectRecord_0729/a1/azure_kinect1_5/depth/depth00000.png'
 
     img_rgb = cv2.imread(img_rgb_path)
     img_rgb = data_loader.downsample_keep_aspect_ratio(
@@ -42,6 +42,17 @@ if __name__ == "__main__":
     img_dpt = cv2.imread(img_dpt_path, -1)
 
     img_rgb = rgb_depth_map.align_image_rgb(img_rgb, camera, cache)
+
+    intrinsics = cache.get("intrinsics", None)
+    mtx_dpt = intrinsics[camera + '_infrared']['mtx']
+    dist_dpt = intrinsics[camera + '_infrared']['dist']
+    mapx, mapy = cv2.initUndistortRectifyMap(
+            mtx_dpt, dist_dpt, None,
+            mtx_dpt,
+            (640, 576), cv2.CV_32FC1)
+    img_dpt = cv2.remap(img_dpt, mapx, mapy, cv2.INTER_NEAREST)
+
+    img_rgb = cv2.undistort(img_rgb, mtx_dpt, dist_dpt, None, None)
 
     f, axarr = plt.subplots(1,2)
     implot = axarr[0].imshow(img_rgb)

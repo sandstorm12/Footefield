@@ -56,6 +56,10 @@ def calc_reprojection_error(cam_1, cache):
         raise Exception('Depth matching not cached. '
                         'Run rgb_depth_calibration script.')
     
+    mtx_inf = cache["intrinsics"][cam_1 + '_infrared']['mtx']
+    dist_inf = cache["intrinsics"][cam_1 + '_infrared']['dist']
+    mtx_rgb = cache["intrinsics"][cam_1]['mtx']
+    dist_rgb = cache["intrinsics"][cam_1]['dist']
     map1x = cache['depth_matching'][cam_1]['map_rgb_x']
     map1y = cache['depth_matching'][cam_1]['map_rgb_y']
     map2x = cache['depth_matching'][cam_1]['map_infrared_x']
@@ -95,6 +99,15 @@ def calc_reprojection_error(cam_1, cache):
 
         # Add the dispartiy between RGB and INFRARED cameras
         img_inf = np.roll(img_inf, DISPARITY, axis=1)
+
+        mapx, mapy = cv2.initUndistortRectifyMap(
+            mtx_inf, dist_inf, None,
+            mtx_inf,
+            (640, 576), cv2.CV_32FC1)
+        img_inf = cv2.remap(img_inf, mapx, mapy, cv2.INTER_NEAREST)
+
+        # img_inf = cv2.undistort(img_inf, mtx_inf, dist_inf, None, mtx_inf)
+        img_rgb = cv2.undistort(img_rgb, mtx_inf, dist_inf, None, mtx_inf)
 
         img_cmb = (img_rgb * .5 + img_inf * .5).astype(np.uint8)
 

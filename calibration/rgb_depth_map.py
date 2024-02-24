@@ -10,8 +10,10 @@ from utils import data_loader
 
 
 DISPARITY = 9
-DEPTH_AREA = 20
-MAX_DIST = 3000
+DEPTH_AREA_MIN = 10
+DEPTH_AREA_MAX = 30
+DEPTH_AREA_STEP = 2
+MAX_DIST = 5000
 MIN_DIST = 100
 
 
@@ -69,14 +71,23 @@ def points_to_depth(people_keypoints, image_depth):
             x, y = keypoints[i]
             x = int(x)
             y = int(y)
-            roi = image_depth[y-DEPTH_AREA:y+DEPTH_AREA,
-                            x-DEPTH_AREA:x+DEPTH_AREA]
-            roi = roi[np.logical_and(roi > MIN_DIST, roi < MAX_DIST)]
-            
-            if len(roi) > 0:
-                roi = reject_outliers(roi)
 
-            depth = np.median(roi)
+            for area in range(DEPTH_AREA_MIN,
+                              DEPTH_AREA_MAX,
+                              DEPTH_AREA_STEP):
+                roi = image_depth[y-area:y+area,
+                                x-area:x+area]
+                roi = roi[np.logical_and(roi > MIN_DIST, roi < MAX_DIST)]
+                
+                if len(roi) > 0:
+                    # roi = reject_outliers(roi)
+                    depth = np.median(roi)
+                    break
+            else:
+                # print('No depth found')
+                depth = 0
+
+            # print('Selected:', depth)
             keypoints_3d[-1].append((x, y, depth))
 
     return keypoints_3d
