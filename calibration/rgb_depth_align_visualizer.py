@@ -73,12 +73,25 @@ def calc_reprojection_error(cam_1, cache):
         )
         img_rgb = cv2.remap(img_rgb, map1x, map1y, cv2.INTER_NEAREST)
 
+        def invert_map(F: np.ndarray):
+            print(F.shape)
+            I = np.zeros_like(F)
+            print(np.indices((576, 640)).shape)
+            I[:,:,1], I[:,:,0] = np.indices((576, 640))
+            P = np.copy(I)
+            for i in range(10):
+                P += I - cv2.remap(F, P, None, interpolation=cv2.INTER_LINEAR)
+            return P
+        
+        map2 = invert_map(np.stack((map2x, map2y), axis=2))
+        img_rgb = cv2.remap(img_rgb, map2[:,:,0], map2[:,:,1], cv2.INTER_NEAREST)
+
         img_inf = cv2.imread(rgb_depth_pairs['image_paths_infrared'][idx], -1)
 
         # Remove magic number .8
         img_inf = np.clip(
             img_inf.astype(np.float32) * .8, 0, 255).astype('uint8')
-        img_inf = cv2.remap(img_inf, map2x, map2y, cv2.INTER_NEAREST)
+        # img_inf = cv2.remap(img_inf, map2x, map2y, cv2.INTER_NEAREST)
 
         # Add the dispartiy between RGB and INFRARED cameras
         img_inf = np.roll(img_inf, DISPARITY, axis=1)
