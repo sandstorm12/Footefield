@@ -74,6 +74,8 @@ IMAGE_INFRARED_HEIGHT = 576
 
 PATTERN_NAME = r"(color|depth|infrared)"
 
+COLOR_SPACE_GRAY = [0.203921569, 0.239215686, 0.274509804]
+
 
 def list_rgb_images(dir):
     file_paths = sorted(glob.glob(os.path.join(dir, "color*")))
