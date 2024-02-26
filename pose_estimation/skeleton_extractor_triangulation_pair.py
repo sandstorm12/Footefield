@@ -79,18 +79,16 @@ def extract_poses(dir0, dir1, cam0, cam1, model, cache):
         R = cache['extrinsics'][cam0]['rotation']
         T = cache['extrinsics'][cam0]['transition']
 
-        R1, R2, P1, P2, Q, roi1, roi2 = cv2.stereoRectify(
-            mtx0, dist0, mtx1, dist1,
-            (data_loader.IMAGE_INFRARED_WIDTH, data_loader.IMAGE_INFRARED_HEIGHT),
-            R, T, flags=cv2.CALIB_FIX_INTRINSIC, alpha=-1)
+        I = np.eye(3)
+        Z = np.zeros(3)
+        RT = np.concatenate((I, Z.reshape(3, 1)), axis=1)
+        P1 = np.dot(mtx0, RT)
 
-
-        # Undistort the image points
-        img_points0_undist = cv2.undistortPoints(people_keypoints0.reshape(-1, 1, 2), mtx0, dist0, P=mtx0)
-        img_points1_undist = cv2.undistortPoints(people_keypoints1.reshape(-1, 1, 2), mtx1, dist1, P=mtx1)
+        RT = np.concatenate((R, T.reshape(3, 1)), axis=1)
+        P2 = np.dot(mtx1, RT)
 
         # Triangulate the 3D point
-        point_3d_01 = cv2.triangulatePoints(P1, P2, img_points0_undist, img_points1_undist)
+        point_3d_01 = cv2.triangulatePoints(P1, P2, people_keypoints0.reshape(-1, 1, 2), people_keypoints1.reshape(-1, 1, 2))
 
         # Convert from homogeneous to Euclidean coordinates
         point_3d_01 = cv2.convertPointsFromHomogeneous(point_3d_01.T)
@@ -149,9 +147,12 @@ def visualize_poses(poses):
     ax.set_ylabel('Y Label')
     ax.set_zlabel('Z Label')
 
-    # ax.axes.set_xlim3d(0, 1920)
-    # ax.axes.set_zlim3d(0, 1080)
-    # ax.axes.set_ylim3d(0, 3000)
+    scale_min = int(np.min(keypoints))
+    scale_max = int(np.max(keypoints))
+
+    ax.axes.set_xlim3d(scale_min, scale_max)
+    ax.axes.set_zlim3d(scale_min, scale_max)
+    ax.axes.set_ylim3d(scale_min, scale_max)
 
     def update_graph(num):            
         people_keypoints = np.array(poses[num])

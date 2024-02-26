@@ -6,41 +6,15 @@ import diskcache
 import numpy as np
 import matplotlib.pyplot as plt
 
+import rgb_depth_map
+
 from utils import data_loader
 
 
-DISPARITY = -9
 DEPTH_AREA = 10
 MAX_DIST = 5000
 MIN_DIST = 100
 MAX_STD = 30
-
-
-def align_image_rgb(image, camera, cache):
-    if not cache.__contains__('depth_matching'):
-        raise Exception('Depth matching not cached. '
-                        'Run rgb_depth_calibration script.')
-    
-    map1x = cache['depth_matching'][camera]['map_rgb_x']
-    map1y = cache['depth_matching'][camera]['map_rgb_y']
-
-    image_rgb = cv2.remap(image, map1x, map1y, cv2.INTER_NEAREST)
-
-    return image_rgb
-
-
-def align_image_depth(image, camera, cache):
-    if not cache.__contains__('depth_matching'):
-        raise Exception('Depth matching not cached. '
-                        'Run rgb_depth_calibration script.')
-    
-    map2x = cache['depth_matching'][camera]['map_infrared_x']
-    map2y = cache['depth_matching'][camera]['map_infrared_y']
-
-    image_depth = cv2.remap(image, map2x, map2y, cv2.INTER_NEAREST)
-    image_depth = np.roll(image_depth, DISPARITY, axis=1)
-
-    return image_depth
 
 
 def reject_outliers(data, quantile_lower=.4, quantile_upper=.6):
@@ -56,9 +30,9 @@ def reject_outliers(data, quantile_lower=.4, quantile_upper=.6):
 if __name__ == "__main__":
     cache = diskcache.Cache('cache')
     
-    camera = 'azure_kinect3_4_calib_snap'
-    img_rgb_path = '/home/hamid/Documents/phd/footefield/data/AzureKinectRecord_0729/a1/azure_kinect3_4/color/color00000.jpg'
-    img_dpt_path = '/home/hamid/Documents/phd/footefield/data/AzureKinectRecord_0729/a1/azure_kinect3_4/depth/depth00000.png'
+    camera = 'azure_kinect1_5_calib_snap'
+    img_rgb_path = '/home/hamid/Documents/phd/footefield/data/AzureKinectRecord_0729/a1/azure_kinect1_5/color/color00000.jpg'
+    img_dpt_path = '/home/hamid/Documents/phd/footefield/data/AzureKinectRecord_0729/a1/azure_kinect1_5/depth/depth00000.png'
 
     img_rgb = cv2.imread(img_rgb_path)
     img_rgb = data_loader.downsample_keep_aspect_ratio(
@@ -67,8 +41,18 @@ if __name__ == "__main__":
          data_loader.IMAGE_INFRARED_HEIGHT))
     img_dpt = cv2.imread(img_dpt_path, -1)
 
-    img_rgb = align_image_rgb(img_rgb, camera, cache)
-    img_dpt = align_image_depth(img_dpt, camera, cache)
+    img_rgb = rgb_depth_map.align_image_rgb(img_rgb, camera, cache)
+
+    intrinsics = cache.get("intrinsics", None)
+    mtx_dpt = intrinsics[camera + '_infrared']['mtx']
+    dist_dpt = intrinsics[camera + '_infrared']['dist']
+    mapx, mapy = cv2.initUndistortRectifyMap(
+            mtx_dpt, dist_dpt, None,
+            mtx_dpt,
+            (640, 576), cv2.CV_32FC1)
+    img_dpt = cv2.remap(img_dpt, mapx, mapy, cv2.INTER_NEAREST)
+
+    img_rgb = cv2.undistort(img_rgb, mtx_dpt, dist_dpt, None, None)
 
     f, axarr = plt.subplots(1,2)
     implot = axarr[0].imshow(img_rgb)

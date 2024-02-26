@@ -1,3 +1,6 @@
+# Temporary IO files
+**/keypoints_3d/
+
 # Pose to SMPL input files
 *.npy
 
@@ -5,6 +8,7 @@
 *.pt
 
 # Videos
+*.avi
 *.mp4
 
 # Mediapipe
