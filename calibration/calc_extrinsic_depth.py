@@ -121,7 +121,7 @@ def calc_extrinsics(cam_1, cam_2, obj_points, cache):
 
 
 def calc_reprojection_error(cam_1, cam_2, obj_points, cache):
-    print(f"Calibrating... {cam_1} vs {cam_2}")
+    print(f"Calculating reprojection error... {cam_1} vs {cam_2}")
 
     matching_pairs = find_matching_images(cache['images_info'], cam_1, cam_2)
 
@@ -161,10 +161,8 @@ def calc_reprojection_error(cam_1, cam_2, obj_points, cache):
         error2 = cv2.norm(
             img_points_2[i], imgpoints2_projected, cv2.NORM_L2) \
                 / len(imgpoints2_projected)
-        print(f"Errors: cam1 {error1} cam2 {error2}")
         total_error += (error1 + error2) / 2
 
-    # Print the average projection error
     print("Average projection error: ", total_error / len(img_points_1))
 
 

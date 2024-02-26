@@ -55,8 +55,6 @@ def calc_depth_rgb_match(camera, obj_points, cache):
 
     print(f"Matching pairs: {len(rgb_depth_pairs['image_points_rgb'])}")
 
-    print(np.max(rgb_depth_pairs['image_points_rgb']), np.max(rgb_depth_pairs['image_points_infrared']))
-
     _, mtx_1, dist_1, mtx_2, dist_2, R, T, _, _ = cv2.stereoCalibrate(
         np.tile(obj_points, (len(rgb_depth_pairs['image_points_rgb']), 1, 1)),
         rgb_depth_pairs['image_points_rgb'],
@@ -89,6 +87,7 @@ def calc_rectification_params(camera, cache):
     R = cache['depth_matching'][camera]['rotation']
     T = cache['depth_matching'][camera]['transition']
     
+    # TODO: Use intrisics from chessboard calibration not the stereo matching
     R1, R2, P1, P2, Q, roi1, roi2 = cv2.stereoRectify(
         mtx_1, dist_1, mtx_2, dist_2,
         (data_loader.IMAGE_INFRARED_WIDTH, data_loader.IMAGE_INFRARED_HEIGHT),
@@ -116,11 +115,9 @@ def calc_rectification_params(camera, cache):
 
 
 def calc_reprojection_error(camera, obj_points, cache):
-    print(f"Calibrating... {camera}")
+    print(f"Calculating reprojection error... {camera}")
 
     rgb_depth_pairs = find_rgb_depth_images(cache['images_info'], camera)
-
-    print(f"Matching pairs: {len(rgb_depth_pairs['image_points_rgb'])}")
 
     if not cache.__contains__('extrinsics'):
         raise Exception('Extrinsics not cached.')
@@ -152,7 +149,6 @@ def calc_reprojection_error(camera, obj_points, cache):
             rgb_depth_pairs['image_points_infrared'][i],
             imgpoints2_projected, cv2.NORM_L2) \
                 / len(imgpoints2_projected)
-        # print(f"Errors: cam1 {error1} cam2 {error2}")
         total_error += (error1 + error2) / 2
 
     # Print the average projection error

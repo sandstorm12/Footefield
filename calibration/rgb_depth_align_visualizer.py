@@ -125,4 +125,5 @@ if __name__ == "__main__":
     for cam1_idx in range(len(cameras)):
         cam_1 = cameras[cam1_idx]
 
-        calc_reprojection_error(cam_1, cache)
+        if 'infrared' not in cam_1:
+            calc_reprojection_error(cam_1, cache)
