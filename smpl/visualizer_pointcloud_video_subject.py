@@ -333,7 +333,9 @@ if __name__ == "__main__":
         for idx in range(1, len(pcds_down)):
             pc_combines += pcds_down[idx]
 
-        geometry.points = pc_combines.points        
+        geometry.points = pc_combines.points
+        # # Add full color points clouds
+        # geometry.colors = pc_combines.colors
         if i == 0:
             vis.add_geometry(geometry)
         else:
