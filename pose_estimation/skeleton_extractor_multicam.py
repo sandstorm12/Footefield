@@ -63,6 +63,8 @@ def _get_skeleton(image, inferencer, max_people=2, invert=False):
 def extract_poses(dir, camera, model, max_people=2, invert=False):
     cache = diskcache.Cache('../calibration/cache')
 
+    # mtx, dist, _ = get_parameters(camera, cache)
+
     poses = []
 
     img_rgb_paths = data_loader.list_rgb_images(os.path.join(dir, "color"))
@@ -74,6 +76,7 @@ def extract_poses(dir, camera, model, max_people=2, invert=False):
             (data_loader.IMAGE_INFRARED_WIDTH, data_loader.IMAGE_INFRARED_HEIGHT))
 
         img_rgb = rgb_depth_map.align_image_rgb(img_rgb, camera, cache)
+        # img_rgb = cv2.undistort(img_rgb, mtx, dist)
 
         people_keypoints = _get_skeleton(img_rgb, model, max_people, invert)
 
@@ -81,104 +84,28 @@ def extract_poses(dir, camera, model, max_people=2, invert=False):
 
     return np.array(poses)
 
-# Its too long
-# Make it also more robust
-def visualize_poses(poses):
-    fig = plt.figure()
-    ax = fig.add_subplot(111, projection='3d')
-    title = ax.set_title('3D Test')
 
-    # Create the scatter plot
-    people_keypoints = np.array(poses[0])
-
-    num_people = len(people_keypoints)
-
-    lines = []
-    graphs = []
-    for keypoints in people_keypoints:
-        # Define the data for the scatter plot
-        x = [point[0] for point in keypoints]
-        y = [point[2] for point in keypoints]
-        z = [point[1] for point in keypoints]
-        x.append(0)
-        y.append(0)
-        z.append(0)
-
-        graph = ax.scatter(x, y, z, c='r', marker='o')
-        graphs.append(graph)
-        lines.append([])
-        for idx in range(len(data_loader.HALPE_EDGES)):
-            lines[-1].append(
-                ax.plot(
-                    (x[data_loader.HALPE_EDGES[idx][0]],
-                     x[data_loader.HALPE_EDGES[idx][1]]),
-                    (y[data_loader.HALPE_EDGES[idx][0]],
-                     y[data_loader.HALPE_EDGES[idx][1]]),
-                    (z[data_loader.HALPE_EDGES[idx][0]],
-                     z[data_loader.HALPE_EDGES[idx][1]])
-                )[0]
-            )
-
-    ax.view_init(elev=1, azim=-89)
-
-    # Remove the grid background
-    ax.grid(False)
-
-    # Set the labels for the axes
-    ax.set_xlabel('X Label')
-    ax.set_ylabel('Y Label')
-    ax.set_zlabel('Z Label')
-
-    # ax.axes.set_xlim3d(0, 2000)
-    # ax.axes.set_zlim3d(min_value, max_value)
-    # ax.axes.set_ylim3d(0, 2000)
-
-    def update_graph(num):            
-        people_keypoints = np.array(poses[num])
-        for person, keypoints in enumerate(people_keypoints[:num_people]):
-            # Define the data for the scatter plot
-            x = [point[0] for point in keypoints]
-            y = [point[2] for point in keypoints]
-            z = [point[1] for point in keypoints]
-            x.append(0)
-            y.append(0)
-            z.append(0)
-
-            graphs[person]._offsets3d = (x, y, z)
-            
-            title.set_text('3D Test, time={}'.format(num))
-
-            for idx, line in enumerate(lines[person]):
-                line.set_data(
-                    (x[data_loader.HALPE_EDGES[idx][0]],
-                     x[data_loader.HALPE_EDGES[idx][1]]),
-                    (y[data_loader.HALPE_EDGES[idx][0]],
-                     y[data_loader.HALPE_EDGES[idx][1]]))
-                line.set_3d_properties(
-                    (z[data_loader.HALPE_EDGES[idx][0]],
-                     z[data_loader.HALPE_EDGES[idx][1]])
-                )
-
-    ani = matplotlib.animation.FuncAnimation(
-        fig, update_graph, len(poses),
-        interval=100, blit=False)
-
-    plt.show()
-
-
-# TODO: Too long
-def get_parameters(cam, cache):
+def get_intrinsics(cam, cache):
     if cam == cam24:
         mtx = cache['extrinsics'][cam24 + 'infrared']['mtx_l']
+        dist = cache['extrinsics'][cam24 + 'infrared']['dist_l']
     elif cam == cam15:
         mtx = cache['extrinsics'][cam24 + 'infrared']['mtx_r']
+        dist = cache['extrinsics'][cam24 + 'infrared']['dist_r']
     elif cam == cam14:
         mtx = cache['extrinsics'][cam15 + 'infrared']['mtx_r']
+        dist = cache['extrinsics'][cam15 + 'infrared']['dist_r']
     elif cam == cam34:
         mtx = cache['extrinsics'][cam14 + 'infrared']['mtx_r']
+        dist = cache['extrinsics'][cam14 + 'infrared']['dist_r']
     elif cam == cam35:
         mtx = cache['extrinsics'][cam34 + 'infrared']['mtx_r']
+        dist = cache['extrinsics'][cam34 + 'infrared']['dist_r']
 
+    return mtx, dist
+
+
+def get_extrinsics(cam, cache):
     R = cache['extrinsics'][cam24 + 'infrared']['rotation']
     T = cache['extrinsics'][cam24 + 'infrared']['transition']
     R2 = cache['extrinsics'][cam15 + 'infrared']['rotation']
@@ -221,7 +148,15 @@ def get_parameters(cam, cache):
         extrinsics[:3, :3] = R4_com
         extrinsics[:3, 3] = T4_com
 
-    return mtx, extrinsics
+    return extrinsics
+
+
+def get_parameters(cam, cache):
+    mtx, dist = get_intrinsics(cam, cache)
+
+    extrinsics = get_extrinsics(cam, cache)
+
+    return mtx, dist, extrinsics
 
 
 def store_poses(poses, name, store_dir):
@@ -231,6 +166,32 @@ def store_poses(poses, name, store_dir):
     store_path = os.path.join(store_dir, name + '.pkl')
     with open(store_path, 'wb') as handle:
         pickle.dump(poses, handle, protocol=pickle.HIGHEST_PROTOCOL)
+
+
+def calc_3d_skeleton(cameras, model_2d, cache):
+    poses_multicam = []
+    p_gt = []
+    for camera in cameras:
+        dir = data_loader.EXPERIMENTS[experiment][camera]
+        
+        max_people = 1 if camera == cam14 else 2
+        invert = True if camera == cam34 or camera == cam35 else False
+        poses = extract_poses(dir, camera, model_2d, max_people, invert)
+
+        poses_multicam.append(poses)
+
+        mtx, _, extrinsics = get_parameters(camera, cache)
+        p_gt.append(mtx @ extrinsics)
+
+    poses_multicam = np.asarray(poses_multicam)
+    p_gt = np.asarray(p_gt)
+
+    poses_global = pycalib.triangulate_Npts(pt2d_CxPx2=poses_multicam.reshape(len(cameras), -1, 2), P_Cx3x4=p_gt)
+
+    # TODO: Refactor the magic numbers
+    poses_global = poses_global.reshape(EXP_LENGTH, 2, 26, 3)
+
+    return poses_global
 
 
 # TODO: Move the cameras somewhere else
@@ -243,9 +204,10 @@ cam35 = 'azure_kinect3_5_calib_snap'
 if __name__ == "__main__":
     cache = diskcache.Cache('../calibration/cache')
 
+    model_2d = MMPoseInferencer('rtmpose-x_8xb256-700e_body8-halpe26-384x288')
+    
     # TODO: It is possible to add the 1_4 camera but it requires
     # some conditioning. make it happen
-    mmpose = MMPoseInferencer('rtmpose-x_8xb256-700e_body8-halpe26-384x288')
     cameras = [
         cam24,
         cam15,
@@ -255,32 +217,8 @@ if __name__ == "__main__":
     ]
 
     poses_global = None
-    for expriment in data_loader.EXPERIMENTS.keys():
-        poses_multicam = []
-        p_gt = []
-        for camera in cameras:
-            dir = data_loader.EXPERIMENTS[expriment][camera]
-            
-            max_people = 1 if camera == cam14 else 2
-            invert = True if camera == cam34 or camera == cam35 else False
-            poses = extract_poses(dir, camera, mmpose, max_people, invert)
-
-            poses_multicam.append(poses)
-
-            mtx, extrinsics = get_parameters(camera, cache)
-            p_gt.append(mtx @ extrinsics)
-
-        poses_multicam = np.asarray(poses_multicam)
-        p_gt = np.asarray(p_gt)
-
-        poses_global = pycalib.triangulate_Npts(pt2d_CxPx2=poses_multicam.reshape(len(cameras), -1, 2), P_Cx3x4=p_gt)
-
-        # TODO: Refactor the magic numbers
-        poses_global = poses_global.reshape(EXP_LENGTH, 2, 26, 3)
-
-        if VISUALIZE:
-            visualize_poses(poses_global)
-
+    for experiment in data_loader.EXPERIMENTS.keys():
+        poses_global = calc_3d_skeleton(cameras, model_2d, cache)
         store_poses(poses_global,
-                    'keypoints3d_{}'.format(expriment),
+                    'keypoints3d_{}'.format(experiment),
                     STORE_DIR)
