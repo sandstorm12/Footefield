@@ -8,6 +8,7 @@
 *.pt
 
 # Videos
+*.avi
 *.mp4
 
 # Mediapipe
