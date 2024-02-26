@@ -9,11 +9,23 @@ import matplotlib.pyplot as plt
 from utils import data_loader
 
 
-DISPARITY = -9
-DEPTH_AREA = 10
+DISPARITY = 9
+DEPTH_AREA_MIN = 10
+DEPTH_AREA_MAX = 30
+DEPTH_AREA_STEP = 2
 MAX_DIST = 5000
 MIN_DIST = 100
-MAX_STD = 30
+
+
+def invert_map(map2x: np.ndarray, map2y: np.ndarray):
+    F = np.stack((map2x, map2y), axis=2)
+    I = np.zeros_like(F)
+    I[:,:,1], I[:,:,0] = np.indices((576, 640))
+    P = np.copy(I)
+    for i in range(10):
+        P += I - cv2.remap(F, P, None, interpolation=cv2.INTER_LINEAR)
+    
+    return P[:,:,0], P[:,:,1]
 
 
 def align_image_rgb(image, camera, cache):
@@ -23,8 +35,14 @@ def align_image_rgb(image, camera, cache):
     
     map1x = cache['depth_matching'][camera]['map_rgb_x']
     map1y = cache['depth_matching'][camera]['map_rgb_y']
+    map2x = cache['depth_matching'][camera]['map_infrared_x']
+    map2y = cache['depth_matching'][camera]['map_infrared_y']
+    map2x, map2y = invert_map(map2x, map2y)
 
     image_rgb = cv2.remap(image, map1x, map1y, cv2.INTER_NEAREST)
+    image_rgb = cv2.remap(image_rgb, map2x, map2y, cv2.INTER_NEAREST)
+
+    image_rgb = np.roll(image_rgb, DISPARITY, axis=1)
 
     return image_rgb
 
@@ -34,11 +52,14 @@ def align_image_depth(image, camera, cache):
         raise Exception('Depth matching not cached. '
                         'Run rgb_depth_calibration script.')
     
+    map1x = cache['depth_matching'][camera]['map_rgb_x']
+    map1y = cache['depth_matching'][camera]['map_rgb_y']
+    map1x, map1y = invert_map(map1x, map1y)
     map2x = cache['depth_matching'][camera]['map_infrared_x']
     map2y = cache['depth_matching'][camera]['map_infrared_y']
 
     image_depth = cv2.remap(image, map2x, map2y, cv2.INTER_NEAREST)
-    image_depth = np.roll(image_depth, DISPARITY, axis=1)
+    image_depth = cv2.remap(image_depth, map1x, map1y, cv2.INTER_NEAREST)
 
     return image_depth
 
@@ -50,19 +71,24 @@ def points_to_depth(people_keypoints, image_depth):
             x, y = keypoints[i]
             x = int(x)
             y = int(y)
-            roi = image_depth[y-DEPTH_AREA:y+DEPTH_AREA,
-                            x-DEPTH_AREA:x+DEPTH_AREA]
-            roi = roi[np.logical_and(roi > MIN_DIST, roi < MAX_DIST)]
-            
-            if len(roi) > 0:
-                roi = reject_outliers(roi)
 
-            if len(roi) > 0 and np.std(roi) < MAX_STD:
-                depth = np.median(roi)
-                keypoints_3d[-1].append((x, y, depth))
+            for area in range(DEPTH_AREA_MIN,
+                              DEPTH_AREA_MAX,
+                              DEPTH_AREA_STEP):
+                roi = image_depth[y-area:y+area,
+                                x-area:x+area]
+                roi = roi[np.logical_and(roi > MIN_DIST, roi < MAX_DIST)]
+                
+                if len(roi) > 0:
+                    # roi = reject_outliers(roi)
+                    depth = np.median(roi)
+                    break
             else:
-                keypoints_3d[-1].append((x, y, 0))
+                # print('No depth found')
+                depth = 0
 
+            # print('Selected:', depth)
+            keypoints_3d[-1].append((x, y, depth))
 
     return keypoints_3d
 
