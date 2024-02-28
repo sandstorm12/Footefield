@@ -2,8 +2,8 @@ import sys
 sys.path.append('../')
 
 import os
+import cv2
 import time
-import copy
 import diskcache
 import numpy as np
 import open3d as o3d
@@ -12,6 +12,7 @@ import matplotlib.pyplot as plt
 from sklearn.cluster import KMeans
 
 from utils import data_loader
+from calibration import rgb_depth_map
 
 
 MESH = False
@@ -19,11 +20,28 @@ MESH = False
 
 def load_pointcloud(path, cam, idx, cache):
     path_depth = os.path.join(path, 'depth/depth{:05d}.png'.format(idx))
+    path_color = os.path.join(path, 'color/color{:05d}.jpg'.format(idx))
+
+    color = cv2.imread(path_color)
+    color = cv2.cvtColor(color, cv2.COLOR_BGR2RGB)
+    color = data_loader.downsample_keep_aspect_ratio(
+        color,
+        (
+            data_loader.IMAGE_INFRARED_WIDTH,
+            data_loader.IMAGE_INFRARED_HEIGHT
+        )
+    )
+    color = rgb_depth_map.align_image_rgb(color, cam, cache)
+    color = o3d.geometry.Image((color).astype(np.uint8))
+
     depth = o3d.io.read_image(path_depth)
 
     intrinsics, extrinsics = get_parameters(cam, cache)
 
-    pc = o3d.geometry.PointCloud.create_from_depth_image(depth, intrinsics, extrinsics)
+    rgbd = o3d.geometry.RGBDImage.create_from_color_and_depth(color, depth, convert_rgb_to_intensity=False)
+    pc = o3d.geometry.PointCloud.create_from_rgbd_image(rgbd, intrinsics, extrinsics)
+
+    # pc = o3d.geometry.PointCloud.create_from_depth_image(depth, intrinsics, extrinsics)
 
     return pc
 
@@ -124,18 +142,22 @@ def get_subject(experiment, subject, idx, cache):
     path = data_loader.EXPERIMENTS[experiment][cam24]
     pc24 = load_pointcloud(path, cam24, idx, cache)
     pc24 = preprocess(pc24)
-    pc_np = np.asarray(pc24.points)
-    kmeans = KMeans(n_clusters=2, random_state=47, init=start_pts, n_init=1).fit(pc_np)
+    pc24_np = np.asarray(pc24.points)
+    pc24c_np = np.asarray(pc24.colors)
+    kmeans = KMeans(n_clusters=2, random_state=47, init=start_pts, n_init=1).fit(pc24_np)
     # TODO: Explain what (subject + 1 % 2) is
-    pc24.points = o3d.utility.Vector3dVector(pc_np[kmeans.labels_ == (subject + 1) % 2])
+    pc24.points = o3d.utility.Vector3dVector(pc24_np[kmeans.labels_ == (subject + 1) % 2])
+    pc24.colors = o3d.utility.Vector3dVector(pc24c_np[kmeans.labels_ == (subject + 1) % 2])
     
     # Cam15
     path = data_loader.EXPERIMENTS[experiment][cam15]
     pc15 = load_pointcloud(path, cam15, idx, cache)
     pc15 = preprocess(pc15)
-    pc_np = np.asarray(pc15.points)
-    kmeans = KMeans(n_clusters=2, random_state=47, init=start_pts, n_init=1).fit(pc_np)
-    pc15.points = o3d.utility.Vector3dVector(pc_np[kmeans.labels_ == (subject + 1) % 2])
+    pc15_np = np.asarray(pc15.points)
+    pc15c_np = np.asarray(pc15.colors)
+    kmeans = KMeans(n_clusters=2, random_state=47, init=start_pts, n_init=1).fit(pc15_np)
+    pc15.points = o3d.utility.Vector3dVector(pc15_np[kmeans.labels_ == (subject + 1) % 2])
+    pc15.colors = o3d.utility.Vector3dVector(pc15c_np[kmeans.labels_ == (subject + 1) % 2])
 
     # Cam14
     path = data_loader.EXPERIMENTS[experiment][cam14]
@@ -146,17 +168,21 @@ def get_subject(experiment, subject, idx, cache):
     path = data_loader.EXPERIMENTS[experiment][cam34]
     pc34 = load_pointcloud(path, cam34, idx, cache)
     pc34 = preprocess(pc34)
-    pc_np = np.asarray(pc34.points)
-    kmeans = KMeans(n_clusters=2, random_state=47, init=start_pts, n_init=1).fit(pc_np)
-    pc34.points = o3d.utility.Vector3dVector(pc_np[kmeans.labels_ == (subject + 1) % 2])
+    pc34_np = np.asarray(pc34.points)
+    pc34c_np = np.asarray(pc34.colors)
+    kmeans = KMeans(n_clusters=2, random_state=47, init=start_pts, n_init=1).fit(pc34_np)
+    pc34.points = o3d.utility.Vector3dVector(pc34_np[kmeans.labels_ == (subject + 1) % 2])
+    pc34.colors = o3d.utility.Vector3dVector(pc34c_np[kmeans.labels_ == (subject + 1) % 2])
 
     # Cam35
     path = data_loader.EXPERIMENTS[experiment][cam35]
     pc35 = load_pointcloud(path, cam35, idx, cache)
     pc35 = preprocess(pc35)
-    pc_np = np.asarray(pc35.points)
-    kmeans = KMeans(n_clusters=2, random_state=47, init=start_pts, n_init=1).fit(pc_np)
-    pc35.points = o3d.utility.Vector3dVector(pc_np[kmeans.labels_ == (subject + 1) % 2])
+    pc35_np = np.asarray(pc35.points)
+    pc35c_np = np.asarray(pc35.colors)
+    kmeans = KMeans(n_clusters=2, random_state=47, init=start_pts, n_init=1).fit(pc35_np)
+    pc35.points = o3d.utility.Vector3dVector(pc35_np[kmeans.labels_ == (subject + 1) % 2])
+    pc35.colors = o3d.utility.Vector3dVector(pc35c_np[kmeans.labels_ == (subject + 1) % 2])
 
     return {
         cam24: pc24,
@@ -212,88 +238,90 @@ def rotation_matrix_from_euler_angles(roll, pitch, yaw):
     return rotation_matrix
 
 
-# TODO: I hate this part. Refactor please!
+# TODO: I hate this part. Refactor please! Move to a file.
 A1_S0 = [
     np.array(
         [
-            [1.00000000e00, -1.03459615e-21, 0.00000000e00, 0.00000000e00],
-            [-1.03459615e-21, 1.00000000e00, 8.47032947e-22, 0.00000000e00],
-            [-1.35525272e-20, -8.47032947e-22, 1.00000000e00, 0.00000000e00],
+            [1.00000000e00, -6.60128903e-24, 0.00000000e00, 0.00000000e00],
+            [-6.61744490e-24, 1.00000000e00, 4.23516474e-22, 4.23516474e-22],
+            [3.38813179e-21, 2.11758237e-22, 1.00000000e00, 0.00000000e00],
             [0.00000000e00, 0.00000000e00, 0.00000000e00, 1.00000000e00],
         ]
     ),
     np.array(
         [
-            [9.99916624e-01, 1.28957383e-02, 6.66547295e-04, -4.70369841e-02],
-            [-1.29022617e-02, 9.99856895e-01, 1.09417583e-02, -2.78448444e-03],
-            [-5.25349858e-04, -1.09494459e-02, 9.99939915e-01, 7.94679445e-02],
-            [0.00000000e00, 0.00000000e00, 0.00000000e00, 1.00000000e00],
-        ]
-    ),
-    np.array(
-        [
-            [0.98649811, -0.03075712, 0.16085858, -0.32690532],
-            [0.03765095, 0.99849067, -0.0399848, 0.00724568],
-            [-0.15938598, 0.0455014, 0.98616719, 0.32749762],
+            [0.99952994, -0.01112429, 0.02856824, -0.10080341],
+            [0.01060807, 0.99977885, 0.01815839, -0.02969474],
+            [-0.02876392, -0.0178468, 0.9994269, 0.11301244],
             [0.0, 0.0, 0.0, 1.0],
         ]
     ),
     np.array(
         [
-            [0.97858678, -0.06511944, 0.19526231, -0.41950537],
-            [0.07997343, 0.99439407, -0.06917138, 0.01705819],
-            [-0.18966328, 0.08330599, 0.97830872, 0.42940934],
+            [0.98304617, -0.03331575, 0.18030609, -0.36168713],
+            [0.04165163, 0.99822173, -0.04264401, 0.02754495],
+            [-0.17856475, 0.04943107, 0.98268571, 0.3484725],
             [0.0, 0.0, 0.0, 1.0],
         ]
     ),
     np.array(
         [
-            [0.96704779, -0.13024607, 0.21875681, -0.36226442],
-            [0.15761733, 0.9810527, -0.11266044, -0.02076312],
-            [-0.19993838, 0.14342789, 0.96925388, 0.48615835],
+            [0.98697537, -0.03752174, 0.15643442, -0.32977598],
+            [0.04923893, 0.99620933, -0.07171119, 0.07267861],
+            [-0.15315071, 0.07847984, 0.98508161, 0.40158207],
+            [0.0, 0.0, 0.0, 1.0],
+        ]
+    ),
+    np.array(
+        [
+            [0.99230664, -0.11847563, 0.03593131, 0.05164638],
+            [0.11909673, 0.99275914, -0.01566076, -0.16954756],
+            [-0.03381572, 0.01981958, 0.99923155, 0.2724472],
             [0.0, 0.0, 0.0, 1.0],
         ]
     ),
 ]
+
 
 A1_S1 = [
     np.array(
         [
-            [1.00000000e00, 5.11151574e-23, 0.00000000e00, 0.00000000e00],
-            [-7.95946466e-22, 1.00000000e00, -2.64697796e-23, 2.11758237e-22],
-            [3.38813179e-21, -2.64697796e-23, 1.00000000e00, 0.00000000e00],
+            [1.00000000e00, 9.58269353e-22, 0.00000000e00, -6.77626358e-21],
+            [1.10667719e-22, 1.00000000e00, 0.00000000e00, -2.11758237e-22],
+            [3.38813179e-21, 0.00000000e00, 1.00000000e00, 0.00000000e00],
             [0.00000000e00, 0.00000000e00, 0.00000000e00, 1.00000000e00],
         ]
     ),
     np.array(
         [
-            [0.96234239, -0.07933012, 0.2600074, -0.49241727],
-            [0.0796393, 0.99677978, 0.00936275, 0.01397312],
-            [-0.25991287, 0.01169664, 0.96556123, 0.04237567],
+            [0.99175747, -0.06157104, 0.11236601, -0.25912419],
+            [0.05717899, 0.9974842, 0.04190276, -0.03833833],
+            [-0.11466331, -0.0351324, 0.99278298, 0.0226211],
             [0.0, 0.0, 0.0, 1.0],
         ]
     ),
     np.array(
         [
-            [0.94058297, -0.10176303, 0.32395673, -0.54400412],
-            [0.11534682, 0.99306, -0.02295511, -0.07126208],
-            [-0.31937249, 0.05895857, 0.94579337, 0.30544206],
+            [0.98776962, -0.04775228, 0.14842806, -0.30381025],
+            [0.04739478, 0.99885853, 0.00594664, -0.07769243],
+            [-0.1485426, 0.0011608, 0.98890533, 0.23097955],
             [0.0, 0.0, 0.0, 1.0],
         ]
     ),
     np.array(
         [
-            [0.91785645, -0.05935663, 0.39244913, -0.56627694],
-            [0.08673478, 0.99485313, -0.05238628, 0.08786158],
-            [-0.38731978, 0.08212208, 0.91828065, 0.30544401],
+            [0.97873009, -0.08813203, 0.18525702, -0.26444784],
+            [0.08553369, 0.99609264, 0.02198713, -0.05627334],
+            [-0.18647092, -0.00567375, 0.9824441, 0.14828827],
             [0.0, 0.0, 0.0, 1.0],
         ]
     ),
 ]
 
 
+
 EXPERIMENT = 'a1'
-SUBJECT = 1
+SUBJECT = 0
 COLOR_SPACE_GRAY = [0.203921569, 0.239215686, 0.274509804]
 
 
@@ -308,7 +336,7 @@ if __name__ == "__main__":
     cams = [
         cam24,
         cam15,
-        # cam14,
+        cam14,
         cam34,
         cam35
     ]
@@ -327,15 +355,15 @@ if __name__ == "__main__":
         pcds_down = [subject[cam] for cam in cams]
 
         for point_id in range(len(pcds_down)):
-            pcds_down[point_id].transform(A1_S1[point_id])
+            pcds_down[point_id].transform(A1_S0[point_id])
 
         pc_combines = pcds_down[0]
         for idx in range(1, len(pcds_down)):
             pc_combines += pcds_down[idx]
 
         geometry.points = pc_combines.points
-        # # Add full color points clouds
-        # geometry.colors = pc_combines.colors
+        # Add full color points clouds
+        geometry.colors = pc_combines.colors
         if i == 0:
             vis.add_geometry(geometry)
         else:
