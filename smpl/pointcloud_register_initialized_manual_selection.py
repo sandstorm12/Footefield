@@ -1,17 +1,17 @@
 # TODO: Needs serious refactor!
 
+from calibration import rgb_depth_map
+from sklearn.cluster import KMeans
+from utils import data_loader
+from tqdm import tqdm
+import open3d as o3d
+import numpy as np
+import diskcache
+import copy
+import cv2
+import os
 import sys
 sys.path.append('../')
-
-import os
-import copy
-import diskcache
-import numpy as np
-import open3d as o3d
-
-from tqdm import tqdm
-from utils import data_loader
-from sklearn.cluster import KMeans
 
 
 COLOR_SPACE_GRAY = [0.203921569, 0.239215686, 0.274509804]
@@ -19,11 +19,28 @@ COLOR_SPACE_GRAY = [0.203921569, 0.239215686, 0.274509804]
 
 def load_pointcloud(path, cam, idx, cache):
     path_depth = os.path.join(path, 'depth/depth{:05d}.png'.format(idx))
+    path_color = os.path.join(path, 'color/color{:05d}.jpg'.format(idx))
+
+    color = cv2.imread(path_color)
+    color = cv2.cvtColor(color, cv2.COLOR_BGR2RGB)
+    color = data_loader.downsample_keep_aspect_ratio(
+        color,
+        (
+            data_loader.IMAGE_INFRARED_WIDTH,
+            data_loader.IMAGE_INFRARED_HEIGHT
+        )
+    )
+    color = rgb_depth_map.align_image_rgb(color, cam, cache)
+    color = o3d.geometry.Image((color).astype(np.uint8))
+
     depth = o3d.io.read_image(path_depth)
 
     intrinsics, extrinsics = get_parameters(cam, cache)
 
-    pc = o3d.geometry.PointCloud.create_from_depth_image(depth, intrinsics, extrinsics)
+    rgbd = o3d.geometry.RGBDImage.create_from_color_and_depth(
+        color, depth, convert_rgb_to_intensity=False)
+    pc = o3d.geometry.PointCloud.create_from_rgbd_image(
+        rgbd, intrinsics, extrinsics)
 
     return pc
 
@@ -103,14 +120,14 @@ def get_extrinsics(cam, R, T, R2, T2, R3, T3, R4, T4):
 
 def get_parameters(cam, cache):
     mtx = get_mtx(cam, cache)
-    
+
     R, T, R2, T2, R3, T3, R4, T4 = get_rotation_transition(cache)
 
     intrinsics = o3d.camera.PinholeCameraIntrinsic(
         data_loader.IMAGE_INFRARED_WIDTH,
         data_loader.IMAGE_INFRARED_HEIGHT,
         mtx[0, 0], mtx[1, 1], mtx[0, 2], mtx[1, 2])
-    
+
     extrinsics = get_extrinsics(cam, R, T, R2, T2, R3, T3, R4, T4)
 
     return intrinsics, extrinsics
@@ -120,7 +137,7 @@ def remove_outliers(pointcloud):
     _, ind = pointcloud.remove_radius_outlier(
         nb_points=16, radius=0.05)
     pointcloud = pointcloud.select_by_index(ind)
-    
+
     return pointcloud
 
 
@@ -135,32 +152,42 @@ def preprocess(pointcloud, voxel_size):
 def show(pointcloud):
     vis = o3d.visualization.Visualizer()
     vis.create_window(visible=True)
-    vis.get_render_option().background_color = [0.203921569, 0.239215686, 0.274509804]
+    vis.get_render_option().background_color = [
+        0.203921569, 0.239215686, 0.274509804]
     vis.get_render_option().show_coordinate_frame = True
     vis.add_geometry(pointcloud)
     vis.run()
 
 
 def get_subject(experiment, subject, idx, voxel_size, cache):
-    start_pts = np.array([[-0.24240173, -0.1135224, 1.48424285],
-                          [0.76507662, -0.2935405, 2.00135939]])
+    start_pts = np.array([[0, 0, 0], [1, -1, 3]])
 
     # Cam24
     path = data_loader.EXPERIMENTS[experiment][cam24]
     pc24 = load_pointcloud(path, cam24, idx, cache)
     pc24 = preprocess(pc24, voxel_size)
-    pc_np = np.asarray(pc24.points)
-    kmeans = KMeans(n_clusters=2, random_state=47, init=start_pts, n_init=1).fit(pc_np)
+    pc24_np = np.asarray(pc24.points)
+    pc24c_np = np.asarray(pc24.colors)
+    kmeans = KMeans(n_clusters=2, random_state=47,
+                    init=start_pts, n_init=1).fit(pc24_np)
     # TODO: Explain what (subject + 1 % 2) is
-    pc24.points = o3d.utility.Vector3dVector(pc_np[kmeans.labels_ == (subject + 1) % 2])
-    
+    pc24.points = o3d.utility.Vector3dVector(
+        pc24_np[kmeans.labels_ == (subject + 1) % 2])
+    pc24.colors = o3d.utility.Vector3dVector(
+        pc24c_np[kmeans.labels_ == (subject + 1) % 2])
+
     # Cam15
     path = data_loader.EXPERIMENTS[experiment][cam15]
     pc15 = load_pointcloud(path, cam15, idx, cache)
     pc15 = preprocess(pc15, voxel_size)
-    pc_np = np.asarray(pc15.points)
-    kmeans = KMeans(n_clusters=2, random_state=47, init=start_pts, n_init=1).fit(pc_np)
-    pc15.points = o3d.utility.Vector3dVector(pc_np[kmeans.labels_ == (subject + 1) % 2])
+    pc15_np = np.asarray(pc15.points)
+    pc15c_np = np.asarray(pc15.colors)
+    kmeans = KMeans(n_clusters=2, random_state=47,
+                    init=start_pts, n_init=1).fit(pc15_np)
+    pc15.points = o3d.utility.Vector3dVector(
+        pc15_np[kmeans.labels_ == (subject + 1) % 2])
+    pc15.colors = o3d.utility.Vector3dVector(
+        pc15c_np[kmeans.labels_ == (subject + 1) % 2])
 
     # Cam14
     path = data_loader.EXPERIMENTS[experiment][cam14]
@@ -171,17 +198,27 @@ def get_subject(experiment, subject, idx, voxel_size, cache):
     path = data_loader.EXPERIMENTS[experiment][cam34]
     pc34 = load_pointcloud(path, cam34, idx, cache)
     pc34 = preprocess(pc34, voxel_size)
-    pc_np = np.asarray(pc34.points)
-    kmeans = KMeans(n_clusters=2, random_state=47, init=start_pts, n_init=1).fit(pc_np)
-    pc34.points = o3d.utility.Vector3dVector(pc_np[kmeans.labels_ == (subject + 1) % 2])
+    pc34_np = np.asarray(pc34.points)
+    pc34c_np = np.asarray(pc34.colors)
+    kmeans = KMeans(n_clusters=2, random_state=47,
+                    init=start_pts, n_init=1).fit(pc34_np)
+    pc34.points = o3d.utility.Vector3dVector(
+        pc34_np[kmeans.labels_ == (subject + 1) % 2])
+    pc34.colors = o3d.utility.Vector3dVector(
+        pc34c_np[kmeans.labels_ == (subject + 1) % 2])
 
     # Cam35
     path = data_loader.EXPERIMENTS[experiment][cam35]
     pc35 = load_pointcloud(path, cam35, idx, cache)
     pc35 = preprocess(pc35, voxel_size)
-    pc_np = np.asarray(pc35.points)
-    kmeans = KMeans(n_clusters=2, random_state=47, init=start_pts, n_init=1).fit(pc_np)
-    pc35.points = o3d.utility.Vector3dVector(pc_np[kmeans.labels_ == (subject + 1) % 2])
+    pc35_np = np.asarray(pc35.points)
+    pc35c_np = np.asarray(pc35.colors)
+    kmeans = KMeans(n_clusters=2, random_state=47,
+                    init=start_pts, n_init=1).fit(pc35_np)
+    pc35.points = o3d.utility.Vector3dVector(
+        pc35_np[kmeans.labels_ == (subject + 1) % 2])
+    pc35.colors = o3d.utility.Vector3dVector(
+        pc35c_np[kmeans.labels_ == (subject + 1) % 2])
 
     return {
         cam24: pc24,
@@ -193,7 +230,7 @@ def get_subject(experiment, subject, idx, voxel_size, cache):
 
 
 def pairwise_registration(source, target, max_correspondence_distance_coarse,
-        max_correspondence_distance_fine):
+                          max_correspondence_distance_fine):
     icp_coarse = o3d.pipelines.registration.registration_icp(
         source, target, max_correspondence_distance_coarse, np.identity(4),
         o3d.pipelines.registration.TransformationEstimationPointToPlane())
@@ -209,7 +246,7 @@ def pairwise_registration(source, target, max_correspondence_distance_coarse,
 
 
 def full_registration(pcds, max_correspondence_distance_coarse,
-        max_correspondence_distance_fine):
+                      max_correspondence_distance_fine):
     pose_graph = o3d.pipelines.registration.PoseGraph()
     odometry = np.identity(4)
     pose_graph.nodes.append(o3d.pipelines.registration.PoseGraphNode(odometry))
@@ -261,7 +298,7 @@ def finetune_extrinsics(cams, experiment, subject, interval, voxel_size, cache):
                 pcds_down,
                 max_correspondence_distance_coarse,
                 max_correspondence_distance_fine)
-            
+
         option = o3d.pipelines.registration.GlobalOptimizationOption(
             max_correspondence_distance=max_correspondence_distance_fine,
             edge_prune_threshold=0.25,
@@ -297,7 +334,7 @@ def finetune_extrinsics(cams, experiment, subject, interval, voxel_size, cache):
 VOXEL_SIZE = .005
 EXPERIMENT = 'a1'
 INTERVAL = 25
-SUBJECT = 1
+SUBJECT = 0
 
 # TODO: Move cameras to dataloader
 cam24 = 'azure_kinect2_4_calib_snap'
@@ -311,7 +348,7 @@ if __name__ == "__main__":
     cams = [
         cam24,
         cam15,
-        # cam14,
+        cam14,
         cam34,
         cam35
     ]
