@@ -333,13 +333,13 @@ if __name__ == "__main__":
         for idx in range(1, len(pcds_down)):
             pc_combines += pcds_down[idx]
 
-        geometry.points = pc_combines.points
-        # # Add full color points clouds
-        # geometry.colors = pc_combines.colors
+        geometry.points = pc_combines.points        
         if i == 0:
             vis.add_geometry(geometry)
         else:
             vis.update_geometry(geometry)
+
+        o3d.io.write_point_cloud(f"./pointclouds/{EXPERIMENT}_{SUBJECT}_{i}.pcd", geometry)
 
         if MESH:
             alpha = .02
