@@ -7,8 +7,6 @@ import pickle
 import pycalib
 import diskcache
 import numpy as np
-import matplotlib.animation
-import matplotlib.pyplot as plt
 
 from tqdm import tqdm
 from utils import data_loader
@@ -18,7 +16,7 @@ from mmpose.apis import MMPoseInferencer
 
 VISUALIZE = True
 EXP_LENGTH = 200
-STORE_DIR = "./keypoints_3d"
+DIR_STORE = "./keypoints_3d"
 
 
 def filter_sort(people_keypoints, num_select=2, invert=False):
@@ -63,8 +61,6 @@ def _get_skeleton(image, inferencer, max_people=2, invert=False):
 def extract_poses(dir, camera, model, max_people=2, invert=False):
     cache = diskcache.Cache('../calibration/cache')
 
-    # mtx, dist, _ = get_parameters(camera, cache)
-
     poses = []
 
     img_rgb_paths = data_loader.list_rgb_images(os.path.join(dir, "color"))
@@ -76,7 +72,6 @@ def extract_poses(dir, camera, model, max_people=2, invert=False):
             (data_loader.IMAGE_INFRARED_WIDTH, data_loader.IMAGE_INFRARED_HEIGHT))
 
         img_rgb = rgb_depth_map.align_image_rgb(img_rgb, camera, cache)
-        # img_rgb = cv2.undistort(img_rgb, mtx, dist)
 
         people_keypoints = _get_skeleton(img_rgb, model, max_people, invert)
 
@@ -168,30 +163,56 @@ def store_poses(poses, name, store_dir):
         pickle.dump(poses, handle, protocol=pickle.HIGHEST_PROTOCOL)
 
 
+# TODO: Too long
 def calc_3d_skeleton(cameras, model_2d, cache):
+    points_2d = []
+    camera_indices = []
+    point_indices = []
+    camera_params = []
+
     poses_multicam = []
     p_gt = []
-    for camera in cameras:
+    for idx_cam, camera in enumerate(cameras):
         dir = data_loader.EXPERIMENTS[experiment][camera]
-        
+
         max_people = 1 if camera == cam14 else 2
         invert = True if camera == cam34 or camera == cam35 else False
         poses = extract_poses(dir, camera, model_2d, max_people, invert)
 
         poses_multicam.append(poses)
 
-        mtx, _, extrinsics = get_parameters(camera, cache)
+        mtx, dist, extrinsics = get_parameters(camera, cache)
         p_gt.append(mtx @ extrinsics)
+
+        # Bundle adjustment parameters
+        points_2d.extend(poses.reshape(-1, 2))
+        camera_indices.extend([idx_cam] * len(poses.reshape(-1, 2)))
+        point_indices.extend([i for i in range(len(poses.reshape(-1, 2)))])
+        params = {
+            'mtx': mtx,
+            'dist': dist,
+            'extrinsics': extrinsics
+        }
+        camera_params.append(params)
 
     poses_multicam = np.asarray(poses_multicam)
     p_gt = np.asarray(p_gt)
 
-    poses_global = pycalib.triangulate_Npts(pt2d_CxPx2=poses_multicam.reshape(len(cameras), -1, 2), P_Cx3x4=p_gt)
+    poses_global = pycalib.triangulate_Npts(
+        pt2d_CxPx2=poses_multicam.reshape(len(cameras), -1, 2), P_Cx3x4=p_gt)
 
     # TODO: Refactor the magic numbers
     poses_global = poses_global.reshape(EXP_LENGTH, 2, 26, 3)
 
-    return poses_global
+    ba_parameters = {
+        "poses_3d": poses_global.reshape(-1, 3),
+        "points_2d": np.array(points_2d),
+        "camera_indices": np.array(camera_indices),
+        "point_indices": np.array(point_indices),
+        "params": camera_params,
+    }
+
+    return poses_global, ba_parameters
 
 
 # TODO: Move the cameras somewhere else
@@ -218,7 +239,16 @@ if __name__ == "__main__":
 
     poses_global = None
     for experiment in data_loader.EXPERIMENTS.keys():
-        poses_global = calc_3d_skeleton(cameras, model_2d, cache)
-        store_poses(poses_global,
-                    'keypoints3d_{}'.format(experiment),
-                    STORE_DIR)
+        poses_global, ba_parameters = calc_3d_skeleton(cameras, model_2d, cache)
+        
+        store_poses(
+            poses_global,
+            'keypoints3d_{}'.format(experiment),
+            DIR_STORE)
+        
+        store_poses(
+            ba_parameters,
+            'keypoints3d_{}_ba'.format(experiment),
+            DIR_STORE)
+        
+        
