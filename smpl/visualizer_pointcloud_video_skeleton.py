@@ -107,8 +107,19 @@ def get_parameters(cam, cache):
     return mtx, dist, extrinsics
 
 
-def get_pcd(cam, experiment, idx, cache):
-    mtx, _, extrinsics = get_parameters(cam, cache)
+def get_pcd(cam, experiment, idx, params):
+    mtx = np.zeros((3, 3), dtype=float)
+    mtx[0, 0] = params[12]
+    mtx[1, 1] = params[13]
+    mtx[0, 2] = params[14]
+    mtx[1, 2] = params[15]
+    dist = params[16:21]
+    rotation = params[:9].reshape(3, 3)
+    translation = params[9:12] / 1000
+    extrinsics = np.identity(4, dtype=float)
+    extrinsics[:3, :3] = rotation
+    extrinsics[:3, 3] = translation.reshape(3)
+    
     intrinsics = o3d.camera.PinholeCameraIntrinsic(
         640, 576, mtx[0, 0], mtx[1, 1], mtx[0, 2], mtx[1, 2])
 
@@ -139,7 +150,7 @@ def preprocess(pointcloud):
     return pointcloud
 
 
-def visualize_poses(poses, experiment):
+def visualize_poses(poses, experiment, params):
     vis = o3d.visualization.VisualizerWithKeyCallback()
     vis.create_window()
     vis.get_render_option().background_color = data_loader.COLOR_SPACE_GRAY
@@ -149,7 +160,7 @@ def visualize_poses(poses, experiment):
     geometry = o3d.geometry.PointCloud()
     lines = o3d.geometry.LineSet()
     for idx in range(len(poses)):
-        pcd24 = get_pcd(cam24, experiment, idx, cache)
+        pcd24 = get_pcd(cam24, experiment, idx, params)
         # pcd15 = get_pcd(cam15, i, cache)
         # pcd14 = get_pcd(cam14, i, cache)
         # pcd34 = get_pcd(cam34, i, cache)
@@ -201,12 +212,16 @@ cam35 = 'azure_kinect3_5_calib_snap'
 if __name__ == "__main__":
     cache = diskcache.Cache('../calibration/cache')
 
-    for file in sorted(os.listdir(STORE_DIR), reverse=False):
-        experiment = file.split('.')[0].split('_')[1]
-        file_path = os.path.join(STORE_DIR, file)
-        print(f"Visualizing {file_path}")
-        
-        with open(file_path, 'rb') as handle:
-            poses = np.array(pickle.load(handle))
+    # for file in sorted(os.listdir(STORE_DIR), reverse=False):
+    #     experiment = file.split('.')[0].split('_')[1]
+    #     file_path = os.path.join(STORE_DIR, file)
+    #     print(f"Visualizing {file_path}")
+    experiment = 'a1'
 
-        visualize_poses(poses, experiment)
+    with open('/home/hamid/Documents/phd/footefield/footefield/pose_estimation/output.pkl', 'rb') as handle:
+        output = pickle.load(handle)
+
+    poses = output['points_3d'].reshape(-1, 52, 3)
+    params = output['params']
+
+    visualize_poses(poses, experiment, params)
