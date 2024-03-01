@@ -13,7 +13,8 @@ from utils import data_loader
 from calibration import rgb_depth_map
 
 
-STORE_DIR = '../pose_estimation/keypoints_3d'
+STORE_DIR = '../pose_estimation/keypoints_3d_ba'
+PARAM_CALIB_SIZE = 16
 HALPE_LINES = np.array(
     [(0, 1), (0, 2), (1, 3), (2, 4), (5, 18), (6, 18), (5, 7),
      (7, 9), (6, 8), (8, 10), (17, 18), (18, 19), (19, 11),
@@ -108,14 +109,15 @@ def get_parameters(cam, cache):
 
 
 def get_pcd(cam, experiment, idx, params):
+    base_index = cameras.index(cam) * PARAM_CALIB_SIZE
     mtx = np.zeros((3, 3), dtype=float)
-    mtx[0, 0] = params[12]
-    mtx[1, 1] = params[13]
-    mtx[0, 2] = params[14]
-    mtx[1, 2] = params[15]
-    dist = params[16:21]
-    rotation = params[:9].reshape(3, 3)
-    translation = params[9:12] / 1000
+    mtx[0, 0] = params[base_index + 12]
+    mtx[1, 1] = params[base_index + 13]
+    mtx[0, 2] = params[base_index + 14]
+    mtx[1, 2] = params[base_index + 15]
+    # dist = params[16:21]
+    rotation = params[base_index:base_index + 9].reshape(3, 3)
+    translation = params[base_index + 9:base_index + 12] / 1000
     extrinsics = np.identity(4, dtype=float)
     extrinsics[:3, :3] = rotation
     extrinsics[:3, 3] = translation.reshape(3)
@@ -160,14 +162,14 @@ def visualize_poses(poses, experiment, params):
     geometry = o3d.geometry.PointCloud()
     lines = o3d.geometry.LineSet()
     for idx in range(len(poses)):
-        pcd24 = get_pcd(cam24, experiment, idx, params)
-        # pcd15 = get_pcd(cam15, i, cache)
-        # pcd14 = get_pcd(cam14, i, cache)
-        # pcd34 = get_pcd(cam34, i, cache)
-        # pcd35 = get_pcd(cam35, i, cache)
+        # pcd24 = get_pcd(cam24, experiment, idx, params)
+        # pcd15 = get_pcd(cam15, experiment, idx, params)
+        # pcd14 = get_pcd(cam14, experiment, idx, params)
+        # pcd34 = get_pcd(cam34, experiment, idx, params)
+        pcd35 = get_pcd(cam35, experiment, idx, params)
 
         # pcd = pcd24 + pcd15 + pcd14 + pcd34 + pcd35
-        pcd_combined = pcd24
+        pcd_combined = pcd35
         pcd_combined = preprocess(pcd_combined)
 
         keypoints = poses[idx].reshape(-1, 3)
@@ -212,16 +214,23 @@ cam35 = 'azure_kinect3_5_calib_snap'
 if __name__ == "__main__":
     cache = diskcache.Cache('../calibration/cache')
 
-    # for file in sorted(os.listdir(STORE_DIR), reverse=False):
-    #     experiment = file.split('.')[0].split('_')[1]
-    #     file_path = os.path.join(STORE_DIR, file)
-    #     print(f"Visualizing {file_path}")
-    experiment = 'a1'
+    cameras = [
+        cam24,
+        cam15,
+        # cam14,
+        cam34,
+        cam35,   
+    ]
 
-    with open('/home/hamid/Documents/phd/footefield/footefield/pose_estimation/output.pkl', 'rb') as handle:
-        output = pickle.load(handle)
+    for file in sorted(os.listdir(STORE_DIR), reverse=False):
+        experiment = file.split('.')[0].split('_')[1]
+        file_path = os.path.join(STORE_DIR, file)
+        print(f"Visualizing {file_path}")
+    
+        with open(file_path, 'rb') as handle:
+            output = pickle.load(handle)
 
-    poses = output['points_3d'].reshape(-1, 52, 3)
-    params = output['params']
+        poses = output['points_3d'].reshape(-1, 52, 3)
+        params = output['params']
 
-    visualize_poses(poses, experiment, params)
+        visualize_poses(poses, experiment, params)
