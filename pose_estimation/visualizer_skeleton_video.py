@@ -16,6 +16,7 @@ DIR_INPUT = "./keypoints_3d_ba"
 DIR_OUTPUT = "./output_videos"
 PARAM_OUTPUT_SIZE = (640, 576)
 PARAM_OUTPUT_FPS = 5.0
+PARAM_CALIB_SIZE = 16
 
 
 def get_intrinsics(cam, cache):
@@ -203,6 +204,8 @@ if __name__ == "__main__":
         for idx_cam, camera in enumerate(tqdm(cameras)):
             dir = data_loader.EXPERIMENTS[experiment][camera]
 
-            poses_2d = poses_3d_2_2d(poses, params.reshape(-1, 21)[idx_cam])
+            poses_2d = poses_3d_2_2d(
+                poses,
+                params.reshape(-1, PARAM_CALIB_SIZE)[idx_cam])
 
             write_video(poses_2d, experiment, camera, cache)
