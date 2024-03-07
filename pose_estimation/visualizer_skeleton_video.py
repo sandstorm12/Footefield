@@ -12,10 +12,11 @@ from utils import data_loader
 from calibration import rgb_depth_map
 
 
-DIR_STORE = "./keypoints_3d"
-DIR_OUTPUT = "./outputs"
+DIR_INPUT = "./keypoints_3d_ba"
+DIR_OUTPUT = "./output_videos"
 PARAM_OUTPUT_SIZE = (640, 576)
 PARAM_OUTPUT_FPS = 5.0
+PARAM_CALIB_SIZE = 16
 
 
 def get_intrinsics(cam, cache):
@@ -93,12 +94,11 @@ def get_parameters(cam, cache):
 
 
 # Implemented by Gemini
-def project_3d_to_2d(camera_matrix, dist_coeffs, rvec, tvec, object_points):    
-    # object_points_undist = cv2.undistortPoints(object_points, camera_matrix, dist_coeffs)
+def project_3d_to_2d(camera_matrix, dist_coeffs, rvec, tvec, object_points):
+    image_points, _ = cv2.projectPoints(object_points, rvec, tvec,
+                                        camera_matrix, dist_coeffs)
 
-    image_points, _ = cv2.projectPoints(object_points, rvec, tvec, camera_matrix, None)
-
-    image_points = image_points.squeeze()[:, :2]
+    image_points = image_points.squeeze()
 
     return image_points
 
@@ -121,8 +121,7 @@ def get_video_writer(experiment, camera):
     return writer
 
 
-def write_video(poses_2d, camera, cache):
-    mtx, dist, _ = get_parameters(camera, cache)
+def write_video(poses_2d, experiment, camera, cache):
     img_rgb_paths = data_loader.list_rgb_images(os.path.join(dir, "color"))
 
     writer = get_video_writer(experiment, camera)
@@ -130,38 +129,44 @@ def write_video(poses_2d, camera, cache):
         image = cv2.imread(img_rgb_paths[idx])
         image = data_loader.downsample_keep_aspect_ratio(
             image,
-            (data_loader.IMAGE_INFRARED_WIDTH, data_loader.IMAGE_INFRARED_HEIGHT))
+            (data_loader.IMAGE_INFRARED_WIDTH,
+             data_loader.IMAGE_INFRARED_HEIGHT))
 
         image = rgb_depth_map.align_image_rgb(image, camera, cache)
-        image = cv2.undistort(image, mtx, dist, None, mtx)
         for point in t:
-            cv2.circle(image, (int(point[0]), int(point[1])), 3, (0, 255, 0), -1)
+            cv2.circle(image, (int(point[0]), int(point[1])),
+                       3, (0, 255, 0), -1)
 
         connections = np.concatenate(
             (np.array(data_loader.HALPE_EDGES),
              np.array(data_loader.HALPE_EDGES) + 26))
         for connection in connections:
             cv2.line(image,
-                        (int(t[connection[0]][0]), int(t[connection[0]][1])),
-                        (int(t[connection[1]][0]), int(t[connection[1]][1])),
-                        (255, 255, 255),
-                        1)
+                    (int(t[connection[0]][0]), int(t[connection[0]][1])),
+                    (int(t[connection[1]][0]), int(t[connection[1]][1])),
+                    (255, 255, 255), 1)
 
         writer.write(image)
 
 
-def poses_3d_2_2d(poses_3d):
+def poses_3d_2_2d(poses_3d, params):
     poses_shape = list(poses_3d.shape)
     poses_shape[-1] = 2
     
-    mtx, dist, extrinsics = get_parameters(camera, cache)
+    mtx = np.zeros((3, 3), dtype=float)
+    mtx[0, 0] = params[12]
+    mtx[1, 1] = params[13]
+    mtx[0, 2] = params[14]
+    mtx[1, 2] = params[15]
+    dist = params[16:]
+    rotation = params[:9].reshape(3, 3)
+    translation = params[9:12]
     poses_2d = project_3d_to_2d(
         mtx, dist,
-        cv2.Rodrigues(
-            extrinsics[:3, :3]
-        )[0],
-        extrinsics[:3, 3],
+        rotation,
+        translation,
         poses_3d.reshape(-1, 3))
+    poses_2d[:, 1] = poses_2d[:, 1]
     poses_2d = poses_2d.reshape(poses_shape)
 
     return poses_2d
@@ -180,22 +185,27 @@ if __name__ == "__main__":
     cameras = [
         cam24,
         cam15,
-        cam14,
+        # cam14,
         cam34,
         cam35
     ]
 
-    for file in os.listdir(DIR_STORE):
-        file_path = os.path.join(DIR_STORE, file)
+    for file in os.listdir(DIR_INPUT):
+        experiment = file.split('.')[-2].split('_')[-2]
+
+        file_path = os.path.join(DIR_INPUT, file)
         print(f"Visualizing {file_path}")
         
         with open(file_path, 'rb') as handle:
-            poses = np.array(pickle.load(handle))
+            output = pickle.load(handle)
 
-        for camera in tqdm(cameras):
-            experiment = file.split('.')[0].split('_')[1]
+        poses = output['points_3d'].reshape(-1, 2, 26, 3)
+        params = output['params']
+        for idx_cam, camera in enumerate(tqdm(cameras)):
             dir = data_loader.EXPERIMENTS[experiment][camera]
 
-            poses_2d = poses_3d_2_2d(poses)
+            poses_2d = poses_3d_2_2d(
+                poses,
+                params.reshape(-1, PARAM_CALIB_SIZE)[idx_cam])
 
-            write_video(poses_2d, camera, cache)
+            write_video(poses_2d, experiment, camera, cache)

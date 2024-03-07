@@ -1,5 +1,9 @@
+# VSCode
+.vscode
+
 # Temporary IO files
 **/keypoints_3d/
+**/keypoints_3d_ba/
 
 # Pose to SMPL input files
 *.npy

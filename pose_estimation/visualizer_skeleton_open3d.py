@@ -13,7 +13,7 @@ from utils import data_loader
 from calibration import rgb_depth_map
 
 
-STORE_DIR = './keypoints_3d'
+STORE_DIR = './keypoints_3d_ba'
 HALPE_LINES = np.array(
     [(0, 1), (0, 2), (1, 3), (2, 4), (5, 18), (6, 18), (5, 7),
      (7, 9), (6, 8), (8, 10), (17, 18), (18, 19), (19, 11),
@@ -59,13 +59,13 @@ def visualize_poses(poses):
             
 
 if __name__ == "__main__":
-    cache = diskcache.Cache('../calibration/cache')
-
     for file in os.listdir(STORE_DIR):
         file_path = os.path.join(STORE_DIR, file)
         print(f"Visualizing {file_path}")
-        
-        with open(file_path, 'rb') as handle:
-            poses = np.array(pickle.load(handle))
 
-        visualize_poses(poses)
+        with open(file_path, 'rb') as handle:
+            output = pickle.load(handle)
+
+        poses = output['points_3d']
+
+        visualize_poses(poses.reshape(-1, 26*2, 3))
