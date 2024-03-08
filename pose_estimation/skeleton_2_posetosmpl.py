@@ -33,7 +33,7 @@ def get_normalize_rotation_matrix(skeleton):
     facing_normal /= np.linalg.norm(facing_normal)
     desired_normal = np.array([math.radians(0),
                                math.radians(0),
-                               math.radians(-90)])
+                               math.radians(90)])
     desired_normal = desired_normal / np.linalg.norm(desired_normal)
     axis = np.cross(facing_normal, desired_normal)
     cos_theta = np.dot(facing_normal, desired_normal)
