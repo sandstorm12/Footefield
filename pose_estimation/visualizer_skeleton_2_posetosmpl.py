@@ -111,7 +111,7 @@ def visualize_poses(poses):
 
 
 if __name__ == "__main__":
-    dir = "./skeleton_numpypkl"
+    dir = "./keypoints_3d_pose2smpl"
     files = glob.glob(os.path.join(dir, "*"))
 
     for file in files:
