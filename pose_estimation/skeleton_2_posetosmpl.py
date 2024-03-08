@@ -1,131 +1,137 @@
 import os
+import math
 import pickle
-import diskcache
 import numpy as np
 
-import math
-from scipy.spatial.transform import Rotation
-from numpy.linalg import norm
+from tqdm import tqdm
 
 
 DIR_INPUT = './keypoints_3d_ba'
 DIR_OUTPUT = './keypoints_3d_pose2smpl'
 
 
-def magnitude (v):
-    return math.sqrt (sum (v [i] ** 2 for i in range (len (v))))
+def rotation_matrix_from_axis_angle(axis, angle):
+    axis_normalized = axis / np.linalg.norm(axis)
+
+    K = np.array([[0, -axis_normalized[2], axis_normalized[1]],
+                  [axis_normalized[2], 0, -axis_normalized[0]],
+                  [-axis_normalized[1], axis_normalized[0], 0]])
+
+    R = np.eye(3) + np.sin(angle) * K + (1 - np.cos(angle)) * np.dot(K, K)
+
+    return R
 
 
-def dot_product (v1, v2):
-    return sum (v1 [i] * v2 [i] for i in range (len (v1)))
+def get_normalize_rotation_matrix(skeleton):
+    skeleton = np.copy(skeleton)
+
+    # Rotation for torso plane
+    p1 = skeleton[19]
+    p2 = skeleton[5]
+    p3 = skeleton[6]
+    facing_normal = np.cross(p2 - p1, p3 - p1)
+    facing_normal /= np.linalg.norm(facing_normal)
+    desired_normal = np.array([math.radians(0),
+                               math.radians(0),
+                               math.radians(-90)])
+    desired_normal = desired_normal / np.linalg.norm(desired_normal)
+    axis = np.cross(facing_normal, desired_normal)
+    cos_theta = np.dot(facing_normal, desired_normal)
+    theta = np.arccos(cos_theta)
+    R1 = rotation_matrix_from_axis_angle(axis, theta)
+    skeleton = skeleton.dot(R1.T)
+
+    # Rotation for standing axis
+    p1 = skeleton[19]
+    p2 = skeleton[18]
+    facing_normal2 = p1 - p2
+    facing_normal2 /= np.linalg.norm(facing_normal2)
+    desired_normal2 = np.array([math.radians(0),
+                                math.radians(90),
+                                math.radians(0)])
+    desired_normal2 = desired_normal2 / np.linalg.norm(desired_normal2)
+    axis2 = np.cross(facing_normal2, desired_normal2)
+    cos_theta2 = np.dot(facing_normal2, desired_normal2)
+    theta2 = np.arccos(cos_theta2)
+    R2 = rotation_matrix_from_axis_angle(axis2, theta2)
+
+    R = R2 @ R1
+
+    return R
 
 
-def angle (v1, v2):
-    cos_theta = dot_product (v1, v2) / (magnitude (v1) * magnitude (v2))
+def rotate_skeleton(skeleton, R):
+    skeleton_rotated = skeleton.dot(R.T)
 
-    return math.degrees (math.acos (cos_theta))
-
-
-def vector_difference (p1, p2):
-    return tuple (p2 [i] - p1 [i] for i in range (len (p1)))
+    return skeleton_rotated
 
 
-def line_angles (p1, p2):
-    # Define the x, y, and z axis as unit vectors
-    x_axis = (1, 0, 0)
-    y_axis = (0, 1, 0)
-    z_axis = (0, 0, 1)
+def facing_angle(point1, point2, point3):
+    facing_direction = np.cross(point2 - point1, point3 - point1)
+    facing_direction = facing_direction / np.linalg.norm(facing_direction)
 
-    # Calculate the line vector as the difference of the two points
-    line = vector_difference (p1, p2)
+    angle_x = _calculate_angle(facing_direction, np.array([1, 0, 0]))
+    angle_y = _calculate_angle(facing_direction, np.array([0, 1, 0]))
+    angle_z = _calculate_angle(facing_direction, np.array([0, 0, 1]))
 
-    # Calculate the angle between the line and the x, y, and z axis
-    angle_x = angle (line, x_axis)
-    angle_y = angle (line, y_axis)
-    angle_z = angle (line, z_axis)
-
-    # Return the angles as a tuple
-    return (angle_x, angle_y, angle_z)
+    return angle_x, angle_y, angle_z
 
 
-def get_plane(a, b, c):
-    u = b - a
-    v = c - a
+def _calculate_angle(point, axis):
+    point_dir = point / np.linalg.norm(point)
+    axis_dir = axis / np.linalg.norm(axis)
 
-    # find the normal vector to the plane by taking the cross product of u and v
-    n = np.cross(u, v)
+    cosine_theta = np.dot(point_dir, axis_dir)
 
-    # normalize the normal vector to have unit length
-    n = n / np.linalg.norm(n)
+    angle = math.degrees(np.arccos(cosine_theta))
 
-    return n
-
-
-def rotate_x(points, angle):
-    rad = math.radians(angle)
-    cos = math.cos(rad)
-    sin = math.sin(rad)
-    rotation_matrix = [[1, 0, 0], [0, cos, -sin], [0, sin, cos]]
-    return [[sum([rotation_matrix[i][j] * point[j] for j in range(3)]) for i in range(3)] for point in points]
-
-
-def rotate_y(points, angle):
-    rad = math.radians(angle)
-    cos = math.cos(rad)
-    sin = math.sin(rad)
-    rotation_matrix = [[cos, 0, sin], [0, 1, 0], [-sin, 0, cos]]
-    return [[sum([rotation_matrix[i][j] * point[j] for j in range(3)]) for i in range(3)] for point in points]
-
-
-def rotate_z(points, angle):
-    rad = math.radians(angle)
-    cos = math.cos(rad)
-    sin = math.sin(rad)
-    rotation_matrix = [[cos, -sin, 0], [sin, cos, 0], [0, 0, 1]]
-    return [[sum([rotation_matrix[i][j] * point[j] for j in range(3)]) for i in range(3)] for point in points]
+    return angle
 
 
 def skeleton_2_numpypkl(path_input, dir_output, name):
     with open(path_input, 'rb') as handle:
         output = pickle.load(handle)
 
-    skeleton = output['points_3d']
-    skeleton = skeleton.reshape(-1, 2, 26, 3)
-    skeleton = skeleton[:, 0]
+    skeleton_all = output['points_3d'].reshape(-1, 2, 26, 3)
+    
+    for idx_person in range(skeleton_all.shape[1]):
+        skeleton = skeleton_all[:, idx_person]
 
-    print(skeleton.shape)
+        rotation = get_normalize_rotation_matrix(skeleton[0])
+        translation = np.copy(skeleton[0, 19])
+        scale = np.max(abs(skeleton - translation))
 
-    x_range = np.max(skeleton[:, :, 0]) - np.min(skeleton[:, :, 0])
-    middle = np.copy(skeleton[:, 19])
-    y_range = np.max(skeleton[:, :, 1]) - np.min(skeleton[:, :, 1])
-    z_range = np.max(skeleton[:, :, 2]) - np.min(skeleton[:, :, 2])
-    g_range = max(x_range, y_range, z_range)
+        for i in range(len(skeleton)):
+            skeleton[i] = (skeleton[i] - translation) / scale
 
-    x_angle, y_angle, z_angle = line_angles(skeleton[0][11], skeleton[0][12])
-    for i in range(len(skeleton)):
-        for j in range(len(skeleton[i])):
-            skeleton[i][j] = (skeleton[i][j] - middle[i]) / g_range
-            skeleton[i][j][1] *= -1
+            # print("Facing_angle before",
+            #       facing_angle(skeleton[i, 19],
+            #                    skeleton[i, 5],
+            #                    skeleton[i, 6]))
 
-        skeleton[i] = np.array(rotate_y(skeleton[i], z_angle - 50))  # facing angle
-        skeleton[i] = np.array(rotate_z(skeleton[i], x_angle - 90))  # facing angle
+            skeleton[i] = rotate_skeleton(skeleton[i], rotation)
 
-        # while True:
-        #     # x_angle, y_angle, z_angle = line_angles(skeleton[i][11], skeleton[i][12])
-        #     if z_angle - 90 < 5:
-        #         break
-        #     skeleton[i] = np.array(rotate_y(skeleton[i], z_angle - 90))  # facing angle
+            # print("Facing_angle after",
+            #       facing_angle(skeleton[i, 19],
+            #                    skeleton[i, 5],
+            #                    skeleton[i, 6]))
+                
 
-        # while True:
-        #     # x_angle, y_angle, z_angle = line_angles(skeleton[i][11], skeleton[i][12])
-        #     if abs(x_angle - 180) < 5:
-        #         break
-        #     skeleton[i] = np.array(rotate_z(skeleton[i], x_angle - 180))  # facing angle
-            
+        output_path_skeleton = os.path.join(
+            dir_output,
+            f'{name}_{idx_person}_normalized.npy')
+        with open(output_path_skeleton, 'wb') as handle:
+            np.save(handle, skeleton)
 
-    output_path = os.path.join(dir_output, f'{name}.npy')
-    with open(output_path, 'wb') as handle:
-        np.save(handle, skeleton)
+        output_path_params = os.path.join(
+            dir_output,
+            f'{name}_{idx_person}_params.pkl')
+        with open(output_path_params, 'wb') as handle:
+            np.save(handle, {
+                'rotation': rotation,
+                'translation': translation,
+                'scale': scale,
+            })
 
 
 if __name__ == "__main__":
