@@ -4,6 +4,7 @@
 # Temporary IO files
 **/keypoints_3d/
 **/keypoints_3d_ba/
+**/keypoints_3d_pose2smpl/
 
 # Pose to SMPL input files
 *.npy
