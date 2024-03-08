@@ -1,16 +1,17 @@
 import sys
 sys.path.append('../')
 
-import cv2
+import os
+import glob
 import time
 import pickle
-import diskcache
 import numpy as np
 import open3d as o3d
 
 from utils import data_loader
-from calibration import rgb_depth_map
 
+
+DIR_STORE = '/home/hamid/Documents/phd/footefield/Pose_to_SMPL/fit/output/HALPE/'
 
 JOINTS_SMPL = np.array([
     (0, 1),
@@ -78,7 +79,7 @@ def visualize_poses(poses, verts, faces):
             vis.update_geometry(lines)
             vis.update_geometry(mesh)
             
-        delay_ms = 100
+        delay_ms = 30
         for _ in range(delay_ms // 10):
             vis.poll_events()
             vis.update_renderer()
@@ -88,16 +89,13 @@ def visualize_poses(poses, verts, faces):
 
 
 if __name__ == "__main__":
-    path = '/home/hamid/Documents/phd/footefield/Pose_to_SMPL/fit/output/HALPE/keypoints3d_a1_ba_params.pkl'
-    with open(path, 'rb') as handle:
-        params = pickle.load(handle)
+    files = glob.glob(os.path.join(DIR_STORE, "*.pkl"))
+    for file in files:
+        with open(file, 'rb') as handle:
+            params = pickle.load(handle)
 
-    print(params.keys())
-    print(np.array(params['Jtr']).shape)
-    print(np.array(params['th_faces']).shape)
+        poses = np.array(params['Jtr'])
+        verts = np.array(params['verts'])
+        faces = np.array(params['th_faces'])
 
-    poses = np.array(params['Jtr'])
-    verts = np.array(params['verts'])
-    faces = np.array(params['th_faces'])
-
-    visualize_poses(poses, verts, faces)
+        visualize_poses(poses, verts, faces)
