@@ -23,7 +23,7 @@ def visualize_poses(poses):
     vis.get_render_option().show_coordinate_frame = True
     vis.get_render_option().background_color = data_loader.COLOR_SPACE_GRAY
     
-    origin = o3d.geometry.TriangleMesh().create_coordinate_frame(1.0)
+    origin = o3d.geometry.TriangleMesh().create_coordinate_frame(.10)
     geometry = o3d.geometry.PointCloud()
     lines = o3d.geometry.LineSet()
     for idx in range(len(poses)):
@@ -31,11 +31,9 @@ def visualize_poses(poses):
         pcd = o3d.geometry.PointCloud()
         pcd.points = o3d.utility.Vector3dVector(keypoints)
         pcd.paint_uniform_color([0, 1, 0]) # Blue points
-
-        connections = np.concatenate((HALPE_LINES, HALPE_LINES + 26))
         
         lines.points = o3d.utility.Vector3dVector(keypoints)
-        lines.lines = o3d.utility.Vector2iVector(connections)
+        lines.lines = o3d.utility.Vector2iVector(HALPE_LINES)
         lines.paint_uniform_color([1, 1, 1]) # White lines
 
         geometry.points = pcd.points
