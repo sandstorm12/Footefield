@@ -1,6 +1,7 @@
 import os
 import math
 import pickle
+from time import sleep
 import numpy as np
 
 from tqdm import tqdm
@@ -47,7 +48,7 @@ def get_normalize_rotation_matrix(skeleton):
     facing_normal2 = p1 - p2
     facing_normal2 /= np.linalg.norm(facing_normal2)
     desired_normal2 = np.array([math.radians(0),
-                                math.radians(90),
+                                math.radians(-90),
                                 math.radians(0)])
     desired_normal2 = desired_normal2 / np.linalg.norm(desired_normal2)
     axis2 = np.cross(facing_normal2, desired_normal2)
@@ -99,10 +100,10 @@ def skeleton_2_numpypkl(path_input, dir_output, name):
 
         rotation = get_normalize_rotation_matrix(skeleton[0])
         translation = np.copy(skeleton[0, 19])
-        scale = np.max(abs(skeleton - translation))
+        
 
         for i in range(len(skeleton)):
-            skeleton[i] = (skeleton[i] - translation) / scale
+            skeleton[i] = skeleton[i] - translation
 
             # print("Facing_angle before",
             #       facing_angle(skeleton[i, 19],
@@ -115,7 +116,10 @@ def skeleton_2_numpypkl(path_input, dir_output, name):
             #       facing_angle(skeleton[i, 19],
             #                    skeleton[i, 5],
             #                    skeleton[i, 6]))
-                
+
+        scale = np.max(abs(skeleton - translation)) / 2
+        for i in range(len(skeleton)):
+            skeleton[i] = skeleton[i] / scale
 
         output_path_skeleton = os.path.join(
             dir_output,
@@ -127,11 +131,12 @@ def skeleton_2_numpypkl(path_input, dir_output, name):
             dir_output,
             f'{name}_{idx_person}_params.pkl')
         with open(output_path_params, 'wb') as handle:
-            np.save(handle, {
+            params = {
                 'rotation': rotation,
                 'translation': translation,
                 'scale': scale,
-            })
+            }
+            pickle.dump(params, handle, protocol=pickle.HIGHEST_PROTOCOL)
 
 
 if __name__ == "__main__":
