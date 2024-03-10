@@ -77,7 +77,8 @@ def visualize_poses(poses_org, poses_smpl, verts, faces):
                 pcd_smpl.paint_uniform_color([1, 0, 0])
                 
                 lines_jtr[idx_jtr].points = pcd_smpl.points
-                lines_jtr[idx_jtr].lines = o3d.utility.Vector2iVector(JOINTS_SMPL)
+                lines_jtr[idx_jtr].lines = o3d.utility.Vector2iVector(
+                    JOINTS_SMPL)
                 lines_jtr[idx_jtr].paint_uniform_color([0, 0, 1]) # White lines
                 geometry_jtr[idx_jtr].points = pcd_smpl.points
                 geometry_jtr[idx_jtr].colors = pcd_smpl.colors
@@ -90,7 +91,8 @@ def visualize_poses(poses_org, poses_smpl, verts, faces):
 
         if VIS_MESH:
             for idx_mesh in range(len(verts)):
-                mesh[idx_mesh].vertices = o3d.utility.Vector3dVector(verts[idx_mesh][idx])
+                mesh[idx_mesh].vertices = o3d.utility.Vector3dVector(
+                    verts[idx_mesh][idx])
                 mesh_line_temp = o3d.geometry.LineSet.create_from_triangle_mesh(
                     mesh[idx_mesh])
                 mesh_line[idx_mesh].points = mesh_line_temp.points
