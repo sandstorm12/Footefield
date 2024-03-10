@@ -33,6 +33,7 @@ HALPE_LINES = np.array(
      (21, 25), (23, 25), (22, 24), (15, 24), (16, 25)])
 
 
+# TODO: Too complicated, refactor please
 def visualize_poses(poses_org, poses_smpl, verts, faces):
     vis = o3d.visualization.VisualizerWithKeyCallback()
     vis.create_window()
@@ -41,11 +42,12 @@ def visualize_poses(poses_org, poses_smpl, verts, faces):
     
     geometry_org = o3d.geometry.PointCloud()
     lines_org = o3d.geometry.LineSet()
-    geometry_jtr = o3d.geometry.PointCloud()
-    lines_jtr = o3d.geometry.LineSet()
-    mesh = o3d.geometry.TriangleMesh()
-    mesh.triangles = o3d.utility.Vector3iVector(faces)
-    mesh_line = o3d.geometry.LineSet()
+    geometry_jtr = [o3d.geometry.PointCloud() for i in range(len(poses_smpl))]
+    lines_jtr = [o3d.geometry.LineSet() for i in range(len(poses_smpl))]
+    mesh = [o3d.geometry.TriangleMesh() for i in range(len(poses_smpl))]
+    for i in range(len(poses_smpl)):
+        mesh[i].triangles = o3d.utility.Vector3iVector(faces[i])
+    mesh_line = [o3d.geometry.LineSet() for i in range(len(poses_smpl))]
     
     for idx in range(len(poses_org)):
         if VIS_ORG:
@@ -54,7 +56,9 @@ def visualize_poses(poses_org, poses_smpl, verts, faces):
             pcd_org.points = o3d.utility.Vector3dVector(keypoints_org)
             pcd_org.paint_uniform_color([0, 1, 0])
             lines_org.points = pcd_org.points
-            lines_org.lines = o3d.utility.Vector2iVector(HALPE_LINES)
+            lines_org.lines = o3d.utility.Vector2iVector(
+                np.concatenate((HALPE_LINES, HALPE_LINES + 26))
+            )
             lines_org.paint_uniform_color([0, 1, 0]) # White lines
             geometry_org.points = pcd_org.points
             geometry_org.colors = pcd_org.colors
@@ -66,34 +70,37 @@ def visualize_poses(poses_org, poses_smpl, verts, faces):
                 vis.update_geometry(lines_org)
 
         if VIS_JTR:
-            keypoints_smpl = poses_smpl[idx].reshape(-1, 3)
-            pcd_smpl = o3d.geometry.PointCloud()
-            pcd_smpl.points = o3d.utility.Vector3dVector(keypoints_smpl)
-            pcd_smpl.paint_uniform_color([1, 0, 0])
-            lines_jtr.points = pcd_smpl.points
-            lines_jtr.lines = o3d.utility.Vector2iVector(JOINTS_SMPL)
-            lines_jtr.paint_uniform_color([0, 0, 1]) # White lines
-            geometry_jtr.points = pcd_smpl.points
-            geometry_jtr.colors = pcd_smpl.colors
-            if idx == 0:
-                vis.add_geometry(geometry_jtr)
-                vis.add_geometry(lines_jtr)
-            else:
-                vis.update_geometry(geometry_jtr)
-                vis.update_geometry(lines_jtr)
+            for idx_jtr in range(len(poses_smpl)):
+                keypoints_smpl = poses_smpl[idx_jtr][idx].reshape(-1, 3)
+                pcd_smpl = o3d.geometry.PointCloud()
+                pcd_smpl.points = o3d.utility.Vector3dVector(keypoints_smpl)
+                pcd_smpl.paint_uniform_color([1, 0, 0])
+                
+                lines_jtr[idx_jtr].points = pcd_smpl.points
+                lines_jtr[idx_jtr].lines = o3d.utility.Vector2iVector(JOINTS_SMPL)
+                lines_jtr[idx_jtr].paint_uniform_color([0, 0, 1]) # White lines
+                geometry_jtr[idx_jtr].points = pcd_smpl.points
+                geometry_jtr[idx_jtr].colors = pcd_smpl.colors
+                if idx == 0:
+                    vis.add_geometry(geometry_jtr[idx_jtr])
+                    vis.add_geometry(lines_jtr[idx_jtr])
+                else:
+                    vis.update_geometry(geometry_jtr[idx_jtr])
+                    vis.update_geometry(lines_jtr[idx_jtr])
 
         if VIS_MESH:
-            mesh.vertices = o3d.utility.Vector3dVector(verts[idx])
-            mesh_line_temp = o3d.geometry.LineSet.create_from_triangle_mesh(
-                mesh)
-            mesh_line.points = mesh_line_temp.points
-            mesh_line.lines = mesh_line_temp.lines
-            if idx == 0:
-                vis.add_geometry(mesh_line)
-            else:
-                vis.update_geometry(mesh_line)
+            for idx_mesh in range(len(verts)):
+                mesh[idx_mesh].vertices = o3d.utility.Vector3dVector(verts[idx_mesh][idx])
+                mesh_line_temp = o3d.geometry.LineSet.create_from_triangle_mesh(
+                    mesh[idx_mesh])
+                mesh_line[idx_mesh].points = mesh_line_temp.points
+                mesh_line[idx_mesh].lines = mesh_line_temp.lines
+                if idx == 0:
+                    vis.add_geometry(mesh_line[idx_mesh])
+                else:
+                    vis.update_geometry(mesh_line[idx_mesh])
             
-        delay_ms = 50
+        delay_ms = 100
         for _ in range(delay_ms // 10):
             vis.poll_events()
             vis.update_renderer()
@@ -122,7 +129,12 @@ if __name__ == "__main__":
         poses_org = output['points_3d'].reshape(-1, 2, 26, 3)
 
         files_smpl = get_corresponding_files(file_org)
-        for idx_smpl, file_smpl in enumerate(files_smpl):
+        
+        poses_smpl_all = []
+        verts_all = []
+        faces_all = []
+        for file_smpl in files_smpl:
+            # Load SMPL data
             path_smpl = os.path.join(DIR_STORE, file_smpl[0])
             with open(path_smpl, 'rb') as handle:
                 smpl = pickle.load(handle)
@@ -132,6 +144,7 @@ if __name__ == "__main__":
             scale_smpl = smpl['scale']
             translation_smpl = smpl['translation']
 
+            # Load alignment params
             path_params = os.path.join(DIR_PARAMS, file_smpl[1])
             with open(path_params, 'rb') as handle:
                 params = pickle.load(handle)
@@ -150,4 +163,9 @@ if __name__ == "__main__":
             verts = verts * scale
             verts = verts + translation
 
-            visualize_poses(poses_org[:, idx_smpl], poses_smpl, verts, faces)
+            poses_smpl_all.append(poses_smpl)
+            verts_all.append(verts)
+            faces_all.append(faces)
+
+        # Visualize
+        visualize_poses(poses_org, poses_smpl_all, verts_all, faces_all)
