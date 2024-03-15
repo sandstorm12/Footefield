@@ -100,8 +100,6 @@ def skeleton_2_numpypkl(path_input, dir_output, name):
 
         rotation = get_normalize_rotation_matrix(skeleton[0])
         translation = np.copy(skeleton[0, 19])
-        
-
         for i in range(len(skeleton)):
             skeleton[i] = skeleton[i] - translation
 
@@ -117,7 +115,7 @@ def skeleton_2_numpypkl(path_input, dir_output, name):
             #                    skeleton[i, 5],
             #                    skeleton[i, 6]))
 
-        scale = np.max(abs(skeleton - translation)) / 2
+        scale = np.max(abs(skeleton))
         for i in range(len(skeleton)):
             skeleton[i] = skeleton[i] / scale
 
