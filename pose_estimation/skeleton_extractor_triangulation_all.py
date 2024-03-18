@@ -61,6 +61,8 @@ def _get_skeleton(image, inferencer, max_people=2, invert=False):
 def extract_poses(dir, camera, model, max_people=2, invert=False):
     cache = diskcache.Cache('../calibration/cache')
 
+    mtx, dist = get_intrinsics(camera, cache)
+
     poses = []
 
     img_rgb_paths = data_loader.list_rgb_images(os.path.join(dir, "color"))
@@ -72,6 +74,8 @@ def extract_poses(dir, camera, model, max_people=2, invert=False):
             (data_loader.IMAGE_INFRARED_WIDTH, data_loader.IMAGE_INFRARED_HEIGHT))
 
         img_rgb = rgb_depth_map.align_image_rgb(img_rgb, camera, cache)
+
+        img_rgb = cv2.undistort(img_rgb, mtx, dist, None, None)
 
         people_keypoints = _get_skeleton(img_rgb, model, max_people, invert)
 
