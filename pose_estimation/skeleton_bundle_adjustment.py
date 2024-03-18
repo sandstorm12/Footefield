@@ -13,7 +13,7 @@ from scipy.optimize import least_squares
 
 DIR_INPUT = './keypoints_3d'
 DIR_STORE = './keypoints_3d_ba'
-PARAM_CALIB_SIZE = 16
+PARAM_CALIB_SIZE = 12
 
 
 def read_ba_data(path):
@@ -27,17 +27,14 @@ def read_ba_data(path):
         ba_data['points_2d']
 
 
-def project(points, params):
-    """Convert 3-D points to 2-D by projecting onto images using
-    cv2 calibration data.
-    """
-
+def project(points, params, params_org):
     camera_matrix = np.zeros((params.shape[0], 3, 3), dtype=float)
-    camera_matrix[:, 0, 0] = params[:, 12]
-    camera_matrix[:, 1, 1] = params[:, 13]
-    camera_matrix[:, 0, 2] = params[:, 14]
-    camera_matrix[:, 1, 2] = params[:, 15]
-    # dist_coeffs = params[:, 16:]
+    camera_matrix[:, 0, 0] = np.array([item['mtx'][0, 0] for item in params_org])
+    camera_matrix[:, 1, 1] = np.array([item['mtx'][1, 1] for item in params_org])
+    camera_matrix[:, 0, 2] = np.array([item['mtx'][0, 2] for item in params_org])
+    camera_matrix[:, 1, 2] = np.array([item['mtx'][1, 2] for item in params_org])
+    camera_matrix[:, 2, 2] = 1.0
+    dist_coeffs = np.array([item['dist'] for item in params_org])
     rotation = params[:, :9].reshape(-1, 3, 3)
     translation = params[:, 9:12]
 
@@ -46,7 +43,7 @@ def project(points, params):
         points_proj.append(
             cv2.projectPoints(
                 point, rotation[idx], translation[idx],
-                camera_matrix[idx], None)[0]
+                camera_matrix[idx], dist_coeffs[idx])[0]
         )
 
     points_proj = np.asarray(points_proj).squeeze()
@@ -60,7 +57,9 @@ def fun(params, n_cameras, n_points, camera_indices, point_indices,
         (n_cameras, PARAM_CALIB_SIZE))
     points_3d = params[n_cameras * PARAM_CALIB_SIZE:].reshape((n_points, 3))
     points_proj = project(
-        points_3d[point_indices], camera_params[camera_indices])
+        points_3d[point_indices],
+        camera_params[camera_indices],
+        [camera_params_org[idx] for idx in camera_indices])
 
     return (points_proj - points_2d).ravel()
 
@@ -84,16 +83,11 @@ def bundle_adjustment_sparsity(n_cameras, n_points, camera_indices,
 
 
 def ravel(camera_params):
-    cp_ravel = np.empty((len(camera_params), PARAM_CALIB_SIZE), dtype=float)
+    cp_ravel = np.zeros((len(camera_params), PARAM_CALIB_SIZE), dtype=float)
 
     for i in range(len(camera_params)):
         cp_ravel[i, :9] = camera_params[i]['extrinsics'][:3, :3].ravel()
         cp_ravel[i, 9:12] = camera_params[i]['extrinsics'][:3, 3].ravel()
-        cp_ravel[i, 12] = camera_params[i]['mtx'][0, 0]
-        cp_ravel[i, 13] = camera_params[i]['mtx'][1, 1]
-        cp_ravel[i, 14] = camera_params[i]['mtx'][0, 2]
-        cp_ravel[i, 15] = camera_params[i]['mtx'][1, 2]
-        # cp_ravel[i, 16:] = camera_params[i]['dist'].ravel()
 
     return cp_ravel.ravel()
 
@@ -120,14 +114,44 @@ def optimize(n_cameras, n_points, camera_indices, point_indices,
     return res
 
 
-def store_results(results, experiment, n_cameras):
+def reconstruct_params(results, n_cameras, camera_params_org):
+    calib_params_size = n_cameras * PARAM_CALIB_SIZE
+    params = results['x'][:calib_params_size].reshape(n_cameras, -1)
+
+    params_reconstructed = []
+    for idx in range(n_cameras):
+        camera_matrix = np.zeros((3, 3), dtype=float)
+        camera_matrix[0, 0] = camera_params_org[idx]['mtx'][0, 0]
+        camera_matrix[1, 1] = camera_params_org[idx]['mtx'][1, 1]
+        camera_matrix[0, 2] = camera_params_org[idx]['mtx'][0, 2]
+        camera_matrix[1, 2] = camera_params_org[idx]['mtx'][1, 2]
+        camera_matrix[2, 2] = 1.0
+        dist_coeffs = camera_params_org[idx]['dist']
+        rotation = params[idx, :9].reshape(3, 3)
+        translation = params[idx, 9:12]
+
+        params_reconstructed.append(
+            {
+                'mtx': camera_matrix,
+                'dist': dist_coeffs,
+                'rotation': rotation,
+                'translation': translation,
+            }
+        )
+
+    return params_reconstructed
+
+
+def store_results(results, experiment, n_cameras, camera_params_org):
     if not os.path.exists(DIR_STORE):
         os.mkdir(DIR_STORE)
 
     calib_params_size = n_cameras * PARAM_CALIB_SIZE
 
+    params = reconstruct_params(results, n_cameras, camera_params_org)
+
     output = {
-        'params': results['x'][:calib_params_size],
+        'params': params,
         'points_3d': results['x'][calib_params_size:]
     }
 
@@ -140,20 +164,20 @@ def store_results(results, experiment, n_cameras):
 if __name__ == '__main__':
     for name in glob.glob(os.path.join(DIR_INPUT, '*_ba.pkl')):
         experiment = name.split('.')[-2].split('_')[-2]
-        camera_params, \
+        camera_params_org, \
             points_3d, \
             camera_indices, \
             point_indices, \
             points_2d = read_ba_data(name)
 
-        n_cameras = len(camera_params)
+        n_cameras = len(camera_params_org)
         n_points = points_3d.shape[0]
 
         n = PARAM_CALIB_SIZE * n_cameras + 3 * n_points
         m = 2 * points_2d.shape[0]
 
-        # Visualizing initial error error
-        x0 = np.hstack((ravel(camera_params), points_3d.ravel()))
+        # Visualizing initial error
+        x0 = np.hstack((ravel(camera_params_org), points_3d.ravel()))
 
         visualize_error(x0, n_cameras, n_points, camera_indices,
                         point_indices, points_2d)
@@ -161,7 +185,7 @@ if __name__ == '__main__':
         results = optimize(n_cameras, n_points, camera_indices,
                        point_indices, points_2d)
         
-        store_results(results, experiment, n_cameras)
+        store_results(results, experiment, n_cameras, camera_params_org)
 
         visualize_error(results['x'], n_cameras, n_points, camera_indices,
                         point_indices, points_2d)
