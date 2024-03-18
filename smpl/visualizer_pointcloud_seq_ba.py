@@ -5,16 +5,11 @@ import os
 import cv2
 import time
 import pickle
-import diskcache
 import numpy as np
 import open3d as o3d
 
-from utils import data_loader
-from calibration import rgb_depth_map
-
 
 DIR_PARAMS = '../pose_estimation/keypoints_3d_ba'
-PARAM_CALIB_SIZE = 16
 
 
 def get_images(cam, idx):
@@ -28,15 +23,38 @@ def get_images(cam, idx):
 def get_pcd(cam, idx, params):
     _, img_depth = get_images(cam, idx)
 
-    mtx, extrinsics = get_params(cam, params)
+    mtx, dist, extrinsics = get_params(cam, params)
+    img_depth = cv2.imread(img_depth, -1)
 
-    depth = o3d.io.read_image(img_depth)
+    mapx, mapy = cv2.initUndistortRectifyMap(mtx, dist, None, None, (640, 576), cv2.CV_32FC2)
+    img_depth = cv2.remap(img_depth, mapx, mapy, cv2.INTER_NEAREST)
+
+    depth = o3d.geometry.Image(img_depth)
 
     intrinsics = o3d.camera.PinholeCameraIntrinsic(640, 576, mtx[0, 0], mtx[1, 1], mtx[0, 2], mtx[1, 2])
 
     pcd = o3d.geometry.PointCloud.create_from_depth_image(depth, intrinsics, extrinsics)
 
     return pcd
+
+def get_intrinsics(cam, cache):
+    if cam == cam24:
+        mtx = cache['extrinsics'][cam24 + 'infrared']['mtx_l']
+        dist = cache['extrinsics'][cam24 + 'infrared']['dist_l']
+    elif cam == cam15:
+        mtx = cache['extrinsics'][cam24 + 'infrared']['mtx_r']
+        dist = cache['extrinsics'][cam24 + 'infrared']['dist_r']
+    elif cam == cam14:
+        mtx = cache['extrinsics'][cam15 + 'infrared']['mtx_r']
+        dist = cache['extrinsics'][cam15 + 'infrared']['dist_r']
+    elif cam == cam34:
+        mtx = cache['extrinsics'][cam14 + 'infrared']['mtx_r']
+        dist = cache['extrinsics'][cam14 + 'infrared']['dist_r']
+    elif cam == cam35:
+        mtx = cache['extrinsics'][cam34 + 'infrared']['mtx_r']
+        dist = cache['extrinsics'][cam34 + 'infrared']['dist_r']
+
+    return mtx, dist
 
 
 def get_params(cam, params):
@@ -52,22 +70,17 @@ def get_params(cam, params):
         idx_cam = 3
     else:
         raise Exception("Unknown camera.")
-    
-    params = params.reshape(-1, PARAM_CALIB_SIZE)[idx_cam]
 
-    mtx = np.zeros((3, 3), dtype=float)
-    mtx[0, 0] = params[12]
-    mtx[1, 1] = params[13]
-    mtx[0, 2] = params[14]
-    mtx[1, 2] = params[15]
-    dist = params[16:]
-    rotation = params[:9].reshape(3, 3)
-    translation = params[9:12]
-    extrinsics = np.eye(4)
+    mtx = params[idx_cam]['mtx']
+    dist = params[idx_cam]['dist']
+    rotation = params[idx_cam]['rotation']
+    translation = params[idx_cam]['translation']
+
+    extrinsics = np.eye(4, dtype=float)
     extrinsics[:3, :3] = rotation
     extrinsics[:3, 3] = translation / 1000
 
-    return mtx, extrinsics
+    return mtx, dist, extrinsics
 
 
 def remove_outliers(pointcloud):
@@ -124,7 +137,7 @@ if __name__ == "__main__":
         cam24,
         cam15,
         cam34,
-        cam35
+        cam35,
     ]
 
     for file in os.listdir(DIR_PARAMS):
