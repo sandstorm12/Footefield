@@ -9,8 +9,6 @@ import cv2
 import diskcache
 import numpy as np
 
-import detect_chessboard
-
 from tqdm import tqdm
 from utils import data_loader
 
@@ -53,14 +51,14 @@ def calculate_intrinsics(cameras_info, cache):
     for key in tqdm(cameras_info.keys()):
         img_points = cameras_info[key]['img_points']
 
-        width = data_loader.IMAGE_INFRARED_WIDTH
-        height = data_loader.IMAGE_INFRARED_HEIGHT
+        width = data_loader.IMAGE_RGB_WIDTH
+        height = data_loader.IMAGE_RGB_HEIGHT
 
         ret, mtx, dist, rvecs, tvecs = \
             cv2.calibrateCamera(
                 np.tile(obj_points, (len(img_points), 1, 1)),
                 img_points,
-                (width, height), None, None, flags=cv2.CALIB_RATIONAL_MODEL)
+                (width, height), None, None, flags=cv2.CALIB_FIX_K3)
 
         intrinsics[key] = {
             "ret": ret,
