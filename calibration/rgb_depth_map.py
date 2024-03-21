@@ -39,8 +39,8 @@ def align_image_rgb(image, camera, cache):
     map2y = cache['depth_matching'][camera]['map_infrared_y']
     map2x, map2y = invert_map(map2x, map2y)
 
-    image_rgb = cv2.remap(image, map1x, map1y, cv2.INTER_NEAREST)
-    image_rgb = cv2.remap(image_rgb, map2x, map2y, cv2.INTER_NEAREST)
+    image_rgb = cv2.remap(image, map1x, map1y, cv2.INTER_CUBIC)
+    image_rgb = cv2.remap(image_rgb, map2x, map2y, cv2.INTER_CUBIC)
 
     image_rgb = np.roll(image_rgb, DISPARITY, axis=1)
 
@@ -134,7 +134,6 @@ if __name__ == "__main__":
     img_dpt = cv2.imread(img_dpt_path, -1)
 
     img_rgb = align_image_rgb(img_rgb, camera, cache)
-    img_dpt = align_image_depth(img_dpt, camera, cache)
 
     people_keypoints = _get_skeleton(img_rgb, mmpose)
 
