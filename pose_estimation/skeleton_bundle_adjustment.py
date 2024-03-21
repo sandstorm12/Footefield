@@ -1,7 +1,6 @@
 from __future__ import print_function
 
 import os
-from unittest import result
 import cv2
 import glob
 import pickle
