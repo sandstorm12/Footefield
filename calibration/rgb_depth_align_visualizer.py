@@ -13,8 +13,6 @@ STEREO_CALIBRATION_CRITERIA = (
     cv2.TERM_CRITERIA_MAX_ITER + cv2.TERM_CRITERIA_EPS,
     1000, 1e-6)
 
-DISPARITY = -9
-
 
 def find_rgb_depth_images(images_info, cam_1):
     images_info = cache['images_info']
@@ -72,6 +70,7 @@ def calc_reprojection_error(cam_1, cache):
         # Remove magic number .8
         img_inf = np.clip(
             img_inf.astype(np.float32) * .8, 0, 255).astype('uint8')
+        img_inf = rgb_depth_map.align_image_depth(img_inf, cam_1, cache)
 
         img_rgb = rgb_depth_map.align_image_rgb(img_rgb, cam_1, cache)
 
