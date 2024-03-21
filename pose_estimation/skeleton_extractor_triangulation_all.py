@@ -10,12 +10,11 @@ import numpy as np
 
 from tqdm import tqdm
 from utils import data_loader
-from calibration import rgb_depth_map
 from mmpose.apis import MMPoseInferencer
 
 
 VISUALIZE = True
-EXP_LENGTH = 200
+EXP_LENGTH = 100
 DIR_STORE = "./keypoints_3d"
 
 
@@ -23,7 +22,8 @@ def filter_sort(people_keypoints, num_select=2, invert=False):
     heights = []
     for person in people_keypoints:
         person = person['keypoints']
-        heights.append(person[16][1] - person[0][1])
+        heights.append((person[25][1] - person[17][1]) \
+                       - np.abs(person[19][0] - 540) / 3)
 
     indecies = np.argsort(heights)[::-1]
     people_keypoints = [people_keypoints[indecies[idx]]
@@ -47,15 +47,18 @@ def _get_skeleton(image, inferencer, max_people=2, invert=False):
     result_generator = inferencer(image)
     
     detected_keypoints = []
+    detected_confidences = []
     for result in result_generator:
         poeple_keypoints = filter_sort(result['predictions'][0],
                                        num_select=max_people,
                                        invert=invert)
         for predictions in poeple_keypoints:
             keypoints = predictions['keypoints']
+            confidences = predictions['keypoint_scores']
             detected_keypoints.append(keypoints)
+            detected_confidences.append(confidences)
 
-    return np.array(detected_keypoints)
+    return np.array(detected_keypoints), np.array(detected_confidences)
 
 
 def extract_poses(dir, camera, model, max_people=2, invert=False):
@@ -64,55 +67,50 @@ def extract_poses(dir, camera, model, max_people=2, invert=False):
     mtx, dist = get_intrinsics(camera, cache)
 
     poses = []
+    poses_confidence = []
 
     img_rgb_paths = data_loader.list_rgb_images(os.path.join(dir, "color"))
-    img_dpt_paths = data_loader.list_depth_images(os.path.join(dir, "depth"))
-    for idx in tqdm(range(len(img_dpt_paths[:EXP_LENGTH]))):
+    for idx in tqdm(range(len(img_rgb_paths[:EXP_LENGTH]))):
         img_rgb = cv2.imread(img_rgb_paths[idx])
-        img_rgb = data_loader.downsample_keep_aspect_ratio(
-            img_rgb,
-            (data_loader.IMAGE_INFRARED_WIDTH, data_loader.IMAGE_INFRARED_HEIGHT))
-
-        img_rgb = rgb_depth_map.align_image_rgb(img_rgb, camera, cache)
 
         img_rgb = cv2.undistort(img_rgb, mtx, dist, None, None)
 
-        people_keypoints = _get_skeleton(img_rgb, model, max_people, invert)
+        people_keypoints, confidences = _get_skeleton(
+            img_rgb, model, max_people, invert)
+        # visualize_keypoints(img_rgb, people_keypoints)
 
         poses.append(people_keypoints)
+        poses_confidence.append(confidences)
 
-    return np.array(poses)
+    return np.array(poses), np.array(poses_confidence)
+
+
+def visualize_keypoints(image, keypoints):
+    for person in keypoints:
+        for point in person:
+            cv2.circle(image, (int(point[0]), int(point[1])),
+                    5, (0, 255, 0), -1)
+        
+    cv2.imshow("Detected", image)
+    cv2.waitKey(1)
 
 
 def get_intrinsics(cam, cache):
-    if cam == cam24:
-        mtx = cache['extrinsics'][cam24 + 'infrared']['mtx_l']
-        dist = cache['extrinsics'][cam24 + 'infrared']['dist_l']
-    elif cam == cam15:
-        mtx = cache['extrinsics'][cam24 + 'infrared']['mtx_r']
-        dist = cache['extrinsics'][cam24 + 'infrared']['dist_r']
-    elif cam == cam14:
-        mtx = cache['extrinsics'][cam15 + 'infrared']['mtx_r']
-        dist = cache['extrinsics'][cam15 + 'infrared']['dist_r']
-    elif cam == cam34:
-        mtx = cache['extrinsics'][cam14 + 'infrared']['mtx_r']
-        dist = cache['extrinsics'][cam14 + 'infrared']['dist_r']
-    elif cam == cam35:
-        mtx = cache['extrinsics'][cam34 + 'infrared']['mtx_r']
-        dist = cache['extrinsics'][cam34 + 'infrared']['dist_r']
+    mtx = cache['intrinsics'][cam]['mtx']
+    dist = cache['intrinsics'][cam]['dist']
 
     return mtx, dist
 
 
 def get_extrinsics(cam, cache):
-    R = cache['extrinsics'][cam24 + 'infrared']['rotation']
-    T = cache['extrinsics'][cam24 + 'infrared']['transition']
-    R2 = cache['extrinsics'][cam15 + 'infrared']['rotation']
-    T2 = cache['extrinsics'][cam15 + 'infrared']['transition']
-    R3 = cache['extrinsics'][cam14 + 'infrared']['rotation']
-    T3 = cache['extrinsics'][cam14 + 'infrared']['transition']
-    R4 = cache['extrinsics'][cam34 + 'infrared']['rotation']
-    T4 = cache['extrinsics'][cam34 + 'infrared']['transition']
+    R = cache['extrinsics'][cam24]['rotation']
+    T = cache['extrinsics'][cam24]['transition']
+    R2 = cache['extrinsics'][cam15]['rotation']
+    T2 = cache['extrinsics'][cam15]['transition']
+    R3 = cache['extrinsics'][cam14]['rotation']
+    T3 = cache['extrinsics'][cam14]['transition']
+    R4 = cache['extrinsics'][cam34]['rotation']
+    T4 = cache['extrinsics'][cam34]['transition']
     
     extrinsics = np.zeros((3, 4), dtype=float)
     if cam == cam24:
@@ -150,14 +148,6 @@ def get_extrinsics(cam, cache):
     return extrinsics
 
 
-def get_parameters(cam, cache):
-    mtx, dist = get_intrinsics(cam, cache)
-
-    extrinsics = get_extrinsics(cam, cache)
-
-    return mtx, dist, extrinsics
-
-
 def store_poses(poses, name, store_dir):
     if not os.path.exists(store_dir):
         os.mkdir(store_dir)
@@ -170,6 +160,7 @@ def store_poses(poses, name, store_dir):
 # TODO: Too long
 def calc_3d_skeleton(cameras, model_2d, cache):
     points_2d = []
+    points_2d_confidence = []
     camera_indices = []
     point_indices = []
     camera_params = []
@@ -181,15 +172,18 @@ def calc_3d_skeleton(cameras, model_2d, cache):
 
         max_people = 1 if camera == cam14 else 2
         invert = True if camera == cam34 or camera == cam35 else False
-        poses = extract_poses(dir, camera, model_2d, max_people, invert)
+        poses, poses_confidence = extract_poses(
+            dir, camera, model_2d, max_people, invert)
 
         poses_multicam.append(poses)
 
-        mtx, dist, extrinsics = get_parameters(camera, cache)
+        mtx, dist = get_intrinsics(camera, cache)
+        extrinsics = get_extrinsics(camera, cache)
         p_gt.append(mtx @ extrinsics)
 
         # Bundle adjustment parameters
         points_2d.extend(poses.reshape(-1, 2))
+        points_2d_confidence.extend(poses_confidence.reshape(-1))
         camera_indices.extend([idx_cam] * len(poses.reshape(-1, 2)))
         point_indices.extend([i for i in range(len(poses.reshape(-1, 2)))])
         params = {
@@ -211,6 +205,7 @@ def calc_3d_skeleton(cameras, model_2d, cache):
     ba_parameters = {
         "poses_3d": poses_global.reshape(-1, 3),
         "points_2d": np.array(points_2d),
+        "points_2d_confidence": np.array(points_2d_confidence),
         "camera_indices": np.array(camera_indices),
         "point_indices": np.array(point_indices),
         "params": camera_params,
@@ -243,6 +238,8 @@ if __name__ == "__main__":
 
     poses_global = None
     for experiment in data_loader.EXPERIMENTS.keys():
+        print(f"Processing experiment {experiment}...")
+        
         poses_global, ba_parameters = calc_3d_skeleton(cameras, model_2d, cache)
         
         store_poses(
@@ -254,5 +251,3 @@ if __name__ == "__main__":
             ba_parameters,
             'keypoints3d_{}_ba'.format(experiment),
             DIR_STORE)
-        
-        

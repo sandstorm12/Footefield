@@ -1,6 +1,7 @@
 from __future__ import print_function
 
 import os
+from unittest import result
 import cv2
 import glob
 import pickle
@@ -13,7 +14,8 @@ from scipy.optimize import least_squares
 
 DIR_INPUT = './keypoints_3d'
 DIR_STORE = './keypoints_3d_ba'
-PARAM_CALIB_SIZE = 12
+PARAM_CALIB_SIZE = 21
+PARAM_CORRECT_DISTORTION = False
 
 
 def read_ba_data(path):
@@ -24,7 +26,8 @@ def read_ba_data(path):
         ba_data['poses_3d'], \
         ba_data['camera_indices'], \
         ba_data['point_indices'], \
-        ba_data['points_2d']
+        ba_data['points_2d'], \
+        ba_data['points_2d_confidence']
 
 
 def project(points, params, params_org):
@@ -33,9 +36,16 @@ def project(points, params, params_org):
     camera_matrix[:, 1, 1] = np.array([item['mtx'][1, 1] for item in params_org])
     camera_matrix[:, 0, 2] = np.array([item['mtx'][0, 2] for item in params_org])
     camera_matrix[:, 1, 2] = np.array([item['mtx'][1, 2] for item in params_org])
+    # camera_matrix[:, 0, 0] = params[:, 12]
+    # camera_matrix[:, 1, 1] = params[:, 13]
+    # camera_matrix[:, 0, 2] = params[:, 14]
+    # camera_matrix[:, 1, 2] = params[:, 15]
     camera_matrix[:, 2, 2] = 1.0
     dist_coeffs = np.array([item['dist'] for item in params_org])
+    # dist_coeffs = params[:, 16:]
+    # rotation = np.array([item['extrinsics'][:3, :3] for item in params_org])
     rotation = params[:, :9].reshape(-1, 3, 3)
+    # translation = np.array([item['extrinsics'][:3, 3] for item in params_org])
     translation = params[:, 9:12]
 
     points_proj = []
@@ -43,7 +53,8 @@ def project(points, params, params_org):
         points_proj.append(
             cv2.projectPoints(
                 point, rotation[idx], translation[idx],
-                camera_matrix[idx], dist_coeffs[idx])[0]
+                camera_matrix[idx],
+                dist_coeffs[idx] if PARAM_CORRECT_DISTORTION else None)[0]
         )
 
     points_proj = np.asarray(points_proj).squeeze()
@@ -52,7 +63,7 @@ def project(points, params, params_org):
 
 
 def fun(params, n_cameras, n_points, camera_indices, point_indices,
-        points_2d):
+        points_2d, points_2d_confidence):
     camera_params = params[:n_cameras * PARAM_CALIB_SIZE].reshape(
         (n_cameras, PARAM_CALIB_SIZE))
     points_3d = params[n_cameras * PARAM_CALIB_SIZE:].reshape((n_points, 3))
@@ -60,8 +71,15 @@ def fun(params, n_cameras, n_points, camera_indices, point_indices,
         points_3d[point_indices],
         camera_params[camera_indices],
         [camera_params_org[idx] for idx in camera_indices])
+    
+    # print(points_2d.shape)
+    # print(points_2d_confidence.shape)
+    # print(points_proj.shape)
+    # print(((points_proj - points_2d) * points_2d_confidence[:, None]).ravel().shape)
 
-    return (points_proj - points_2d).ravel()
+    # points_2d_confidence[points_2d_confidence < .9] = 0
+
+    return ((points_proj - points_2d) * points_2d_confidence[:, None]).ravel()
 
 
 def bundle_adjustment_sparsity(n_cameras, n_points, camera_indices,
@@ -88,20 +106,25 @@ def ravel(camera_params):
     for i in range(len(camera_params)):
         cp_ravel[i, :9] = camera_params[i]['extrinsics'][:3, :3].ravel()
         cp_ravel[i, 9:12] = camera_params[i]['extrinsics'][:3, 3].ravel()
+        cp_ravel[i, 12] = camera_params[i]['mtx'][0, 0]
+        cp_ravel[i, 13] = camera_params[i]['mtx'][1, 1]
+        cp_ravel[i, 14] = camera_params[i]['mtx'][0, 2]
+        cp_ravel[i, 15] = camera_params[i]['mtx'][1, 2]
+        cp_ravel[i, 16:] = camera_params[i]['dist'].ravel()
 
     return cp_ravel.ravel()
 
 
 def visualize_error(x0, n_cameras, n_points, camera_indices, point_indices,
-                    points_2d):
+                    points_2d, points_2d_confidence):
     f0 = fun(x0, n_cameras, n_points, camera_indices, point_indices,
-             points_2d)
+             points_2d, points_2d_confidence)
     plt.plot(f0)
     plt.show()
 
 
 def optimize(n_cameras, n_points, camera_indices, point_indices,
-             points_2d):
+             points_2d, points_2d_confidence):
     jac_sparsity = bundle_adjustment_sparsity(
         n_cameras, n_points, camera_indices, point_indices)
 
@@ -109,7 +132,7 @@ def optimize(n_cameras, n_points, camera_indices, point_indices,
         fun, x0, jac_sparsity=jac_sparsity, verbose=2,
         x_scale='jac', ftol=1e-4, method='trf',
         args=(n_cameras, n_points, camera_indices,
-              point_indices, points_2d))
+              point_indices, points_2d, points_2d_confidence))
 
     return res
 
@@ -125,9 +148,16 @@ def reconstruct_params(results, n_cameras, camera_params_org):
         camera_matrix[1, 1] = camera_params_org[idx]['mtx'][1, 1]
         camera_matrix[0, 2] = camera_params_org[idx]['mtx'][0, 2]
         camera_matrix[1, 2] = camera_params_org[idx]['mtx'][1, 2]
+        # camera_matrix[0, 0] = params[idx, 12]
+        # camera_matrix[1, 1] = params[idx, 13]
+        # camera_matrix[0, 2] = params[idx, 14]
+        # camera_matrix[1, 2] = params[idx, 15]
         camera_matrix[2, 2] = 1.0
         dist_coeffs = camera_params_org[idx]['dist']
+        # dist_coeffs = params[idx, 16:]
+        # rotation = camera_params_org[idx]['extrinsics'][:3, :3]
         rotation = params[idx, :9].reshape(3, 3)
+        # translation = camera_params_org[idx]['extrinsics'][:3, 3]
         translation = params[idx, 9:12]
 
         params_reconstructed.append(
@@ -168,7 +198,8 @@ if __name__ == '__main__':
             points_3d, \
             camera_indices, \
             point_indices, \
-            points_2d = read_ba_data(name)
+            points_2d, \
+            points_2d_confidence = read_ba_data(name)
 
         n_cameras = len(camera_params_org)
         n_points = points_3d.shape[0]
@@ -178,14 +209,16 @@ if __name__ == '__main__':
 
         # Visualizing initial error
         x0 = np.hstack((ravel(camera_params_org), points_3d.ravel()))
+        # x0 = np.hstack((points_3d.ravel(),))
 
         visualize_error(x0, n_cameras, n_points, camera_indices,
-                        point_indices, points_2d)
+                        point_indices, points_2d, points_2d_confidence)
 
+        # results = {'x': x0}
         results = optimize(n_cameras, n_points, camera_indices,
-                       point_indices, points_2d)
+                       point_indices, points_2d, points_2d_confidence)
         
         store_results(results, experiment, n_cameras, camera_params_org)
 
         visualize_error(results['x'], n_cameras, n_points, camera_indices,
-                        point_indices, points_2d)
+                        point_indices, points_2d, points_2d_confidence)

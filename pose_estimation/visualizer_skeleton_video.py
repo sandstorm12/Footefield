@@ -9,12 +9,12 @@ import numpy as np
 
 from tqdm import tqdm
 from utils import data_loader
-from calibration import rgb_depth_map
 
 
 DIR_INPUT = "./keypoints_3d_ba"
 DIR_OUTPUT = "./output_videos"
-PARAM_OUTPUT_SIZE = (640, 576)
+# PARAM_OUTPUT_SIZE = (640, 576)
+PARAM_OUTPUT_SIZE = (1920, 1080)
 PARAM_OUTPUT_FPS = 5.0
 
 
@@ -24,7 +24,7 @@ def get_parameters(params):
     rotation = params['rotation']
     translation = params['translation']
 
-    extrinsics = np.zeros((3, 4), dtype=float)
+    extrinsics = np.identity(4, dtype=float)
     extrinsics[:3, :3] = rotation
     extrinsics[:3, 3] = translation
 
@@ -67,12 +67,7 @@ def write_video(poses_2d, experiment, camera, params, cache):
     writer = get_video_writer(experiment, camera)
     for idx, t in enumerate(poses_2d.reshape(poses_2d.shape[0], -1, 2)):
         img_rgb = cv2.imread(img_rgb_paths[idx])
-        img_rgb = data_loader.downsample_keep_aspect_ratio(
-            img_rgb,
-            (data_loader.IMAGE_INFRARED_WIDTH,
-             data_loader.IMAGE_INFRARED_HEIGHT))
 
-        img_rgb = rgb_depth_map.align_image_rgb(img_rgb, camera, cache)
         img_rgb = cv2.undistort(img_rgb, mtx, dist, None, None)
         for point in t:
             cv2.circle(img_rgb, (int(point[0]), int(point[1])),
@@ -99,7 +94,7 @@ def poses_3d_2_2d(poses_3d, params):
     rotation = params['rotation']
     translation = params['translation']
     poses_2d = project_3d_to_2d(
-        mtx, dist,
+        mtx, None,
         rotation,
         translation,
         poses_3d.reshape(-1, 3))
