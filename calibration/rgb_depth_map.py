@@ -17,7 +17,21 @@ MAX_DIST = 5000
 MIN_DIST = 100
 
 
-def align_image_rgb(image, camera, cache):
+def invert_map(map2x: np.ndarray, map2y: np.ndarray):
+    F = np.stack((map2x, map2y), axis=2)
+    # shape is (h, w, 2), an "xymap"
+    (h, w) = F.shape[:2]
+    I = np.zeros_like(F)
+    I[:,:,1], I[:,:,0] = np.indices((h, w)) # identity map
+    P = np.copy(I)
+    for i in range(10):
+        correction = I - cv2.remap(F, P, None, interpolation=cv2.INTER_LINEAR)
+        P += correction * 0.5
+    
+    return P[:,:,0], P[:,:,1]
+
+
+def align_image_rgb_to_unified(image, camera, cache):
     if not cache.__contains__('depth_matching'):
         raise Exception('Depth matching not cached. '
                         'Run rgb_depth_calibration script.')
@@ -25,24 +39,93 @@ def align_image_rgb(image, camera, cache):
     map1x = cache['depth_matching'][camera]['map_rgb_x']
     map1y = cache['depth_matching'][camera]['map_rgb_y']
 
-    image_rgb = cv2.remap(image, map1x, map1y, cv2.INTER_CUBIC)
+    image = cv2.remap(image, map1x, map1y, cv2.INTER_CUBIC)
 
-    image_rgb = np.roll(image_rgb, DISPARITY, axis=1)
+    image = np.roll(image, DISPARITY, axis=1)
 
-    return image_rgb
+    return image
 
 
-def align_image_depth(image, camera, cache):
+def align_image_unified_to_depth(image, camera, cache):
+    if not cache.__contains__('depth_matching'):
+        raise Exception('Depth matching not cached. '
+                        'Run rgb_depth_calibration script.')
+
+    map2x = cache['depth_matching'][camera]['map_infrared_x']
+    map2y = cache['depth_matching'][camera]['map_infrared_y']
+    map2x, map2y = invert_map(map2x, map2y)
+
+    image = cv2.remap(image, map2x, map2y, cv2.INTER_CUBIC)
+
+    image = np.roll(image, DISPARITY, axis=1)
+
+    return image
+
+
+def align_image_rgb_to_depth(image, camera, cache):
+    if not cache.__contains__('depth_matching'):
+        raise Exception('Depth matching not cached. '
+                        'Run rgb_depth_calibration script.')
+
+    map1x = cache['depth_matching'][camera]['map_rgb_x']
+    map1y = cache['depth_matching'][camera]['map_rgb_y']
+    map2x = cache['depth_matching'][camera]['map_infrared_x']
+    map2y = cache['depth_matching'][camera]['map_infrared_y']
+    map2x, map2y = invert_map(map2x, map2y)
+
+    image = cv2.remap(image, map1x, map1y, cv2.INTER_CUBIC)
+    image = cv2.remap(image, map2x, map2y, cv2.INTER_CUBIC)
+
+    image = np.roll(image, DISPARITY, axis=1)
+
+    return image
+
+
+def align_image_depth_to_unified(image, camera, cache):
+    if not cache.__contains__('depth_matching'):
+        raise Exception('Depth matching not cached. '
+                        'Run rgb_depth_calibration script.')
+
+    map2x = cache['depth_matching'][camera]['map_infrared_x']
+    map2y = cache['depth_matching'][camera]['map_infrared_y']
+
+    image = cv2.remap(image, map2x, map2y, cv2.INTER_NEAREST)
+
+    image = np.roll(image, -1 * DISPARITY, axis=1)
+
+    return image
+
+
+def align_image_unified_to_rgb(image, camera, cache):
     if not cache.__contains__('depth_matching'):
         raise Exception('Depth matching not cached. '
                         'Run rgb_depth_calibration script.')
     
+    map1x = cache['depth_matching'][camera]['map_rgb_x']
+    map1y = cache['depth_matching'][camera]['map_rgb_y']
+    map1x, map1y = invert_map(map1x, map1y)
+
+    image = cv2.remap(image, map1x, map1y, cv2.INTER_NEAREST)
+
+    image = np.roll(image, -1 * DISPARITY, axis=1)
+
+    return image
+
+
+def align_image_depth_to_rgb(image, camera, cache):
+    map1x = cache['depth_matching'][camera]['map_rgb_x']
+    map1y = cache['depth_matching'][camera]['map_rgb_y']
+    map1x, map1y = invert_map(map1x, map1y)
     map2x = cache['depth_matching'][camera]['map_infrared_x']
     map2y = cache['depth_matching'][camera]['map_infrared_y']
 
-    image_depth = cv2.remap(image, map2x, map2y, cv2.INTER_NEAREST)
+    image = cv2.remap(image, map2x, map2y, cv2.INTER_NEAREST)
+    image = cv2.remap(image, map1x, map1y, cv2.INTER_NEAREST)
 
-    return image_depth
+    image = np.roll(image, -1 * DISPARITY, axis=1)
+
+    return image
+
 
 def points_to_depth(people_keypoints, image_depth):
     keypoints_3d = []
@@ -61,11 +144,14 @@ def points_to_depth(people_keypoints, image_depth):
                 roi = roi[np.logical_and(roi > MIN_DIST, roi < MAX_DIST)]
                 
                 if len(roi) > 0:
+                    # roi = reject_outliers(roi)
                     depth = np.median(roi)
                     break
             else:
+                # print('No depth found')
                 depth = 0
 
+            # print('Selected:', depth)
             keypoints_3d[-1].append((x, y, depth))
 
     return keypoints_3d
@@ -111,8 +197,8 @@ if __name__ == "__main__":
     )
     img_dpt = cv2.imread(img_dpt_path, -1)
 
-    img_rgb = align_image_rgb(img_rgb, camera, cache)
-    img_dpt = align_image_depth(img_dpt, camera, cache)
+    img_rgb = align_image_rgb_to_unified(img_rgb, camera, cache)
+    img_depth = align_image_depth_to_unified(img_dpt, camera, cache)
 
     people_keypoints = _get_skeleton(img_rgb, mmpose)
 
