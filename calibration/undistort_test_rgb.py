@@ -29,11 +29,6 @@ if __name__ == "__main__":
         for file_path in file_paths:
             img = cv2.imread(file_path)
 
-            img = data_loader.downsample_keep_aspect_ratio(
-                img,
-                (data_loader.IMAGE_INFRARED_WIDTH,
-                 data_loader.IMAGE_INFRARED_HEIGHT))
-
             undistorted_img = cv2.undistort(img, mtx, dist, None, mtx)
 
             cv2.imshow("Undistorted Image", undistorted_img)

@@ -5,7 +5,6 @@ import cv2
 import diskcache
 import numpy as np
 
-from tqdm import tqdm
 from utils import data_loader
 
 
@@ -60,8 +59,8 @@ def calc_depth_rgb_match(camera, obj_points, cache):
         rgb_depth_pairs['image_points_rgb'],
         rgb_depth_pairs['image_points_infrared'],
         None, None, None, None,
-        (data_loader.IMAGE_INFRARED_WIDTH,
-         data_loader.IMAGE_INFRARED_HEIGHT),
+        (data_loader.IMAGE_RGB_WIDTH,
+         data_loader.IMAGE_RGB_HEIGHT),
         criteria=STEREO_CALIBRATION_CRITERIA, flags=0)
     
     if not cache.__contains__('extrinsics'):
@@ -77,41 +76,6 @@ def calc_depth_rgb_match(camera, obj_points, cache):
         'transition': T,
     }
     cache['depth_matching'] = depth_matching
-
-
-def calc_rectification_params(camera, cache):
-    mtx_1 = cache['depth_matching'][camera]['mtx_l']
-    dist_1 = cache['depth_matching'][camera]['dist_l']
-    mtx_2 = cache['depth_matching'][camera]['mtx_r']
-    dist_2 = cache['depth_matching'][camera]['dist_r']
-    R = cache['depth_matching'][camera]['rotation']
-    T = cache['depth_matching'][camera]['transition']
-    
-    # TODO: Use intrisics from chessboard calibration not the stereo matching
-    R1, R2, P1, P2, Q, roi1, roi2 = cv2.stereoRectify(
-        mtx_1, dist_1, mtx_2, dist_2,
-        (data_loader.IMAGE_INFRARED_WIDTH, data_loader.IMAGE_INFRARED_HEIGHT),
-        R, T, flags=cv2.CALIB_ZERO_DISPARITY, alpha=-1)
-    
-    map1x, map1y = cv2.initUndistortRectifyMap(
-        mtx_1, dist_1, R1, P1,
-        (data_loader.IMAGE_INFRARED_WIDTH, data_loader.IMAGE_INFRARED_HEIGHT),
-        cv2.CV_32FC1)
-    map2x, map2y = cv2.initUndistortRectifyMap(
-        mtx_2, dist_2, R2, P2,
-        (data_loader.IMAGE_INFRARED_WIDTH, data_loader.IMAGE_INFRARED_HEIGHT),
-        cv2.CV_32FC1)
-
-    depth_matching = cache['depth_matching']
-    depth_matching[camera]['map_rgb_x'] = map1x
-    depth_matching[camera]['map_rgb_y'] = map1y
-    depth_matching[camera]['map_infrared_x'] = map2x
-    depth_matching[camera]['map_infrared_y'] = map2y
-    cache['depth_matching'] = depth_matching
-
-    print('Stored RGB/INFRARED mapping matrices for cam {}.'.format(
-        camera
-    ))
 
 
 def calc_reprojection_error(camera, obj_points, cache):
@@ -167,5 +131,4 @@ if __name__ == "__main__":
                if '_infrared' not in camera]
     for camera in cameras:
         calc_depth_rgb_match(camera, obj_points, cache)
-        calc_rectification_params(camera, cache)
         calc_reprojection_error(camera, obj_points, cache)

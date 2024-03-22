@@ -5,7 +5,6 @@ cache `images_info` key: camera_folder value: findChessboardCorners_output
 import sys
 sys.path.append('../')
 
-import re
 import cv2
 import diskcache
 from utils import data_loader
@@ -30,10 +29,6 @@ def extract_chessboardcorners(image_paths, images_info, display=False):
     for image_path in bar:
         image_name = data_loader.image_name_from_fullpath(image_path)
         image = cv2.imread(image_path)
-        image = data_loader.downsample_keep_aspect_ratio(
-            image,
-            (data_loader.IMAGE_INFRARED_WIDTH,
-             data_loader.IMAGE_INFRARED_HEIGHT))
         gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
 
         ret, corners = cv2.findChessboardCorners(

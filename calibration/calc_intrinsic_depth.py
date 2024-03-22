@@ -60,7 +60,7 @@ def calculate_intrinsics(cameras_info, cache):
             cv2.calibrateCamera(
                 np.tile(obj_points, (len(img_points), 1, 1)),
                 img_points,
-                (width, height), None, None, flags=cv2.CALIB_RATIONAL_MODEL)
+                (width, height), None, None, flags=cv2.CALIB_FIX_K3)
 
         intrinsics[key + '_infrared'] = {
             "ret": ret,

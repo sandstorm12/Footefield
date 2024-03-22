@@ -97,8 +97,8 @@ def calc_extrinsics(cam_1, cam_2, obj_points, cache):
         np.tile(obj_points, (len(img_points_1), 1, 1)),
         img_points_1, img_points_2,
         None, None, None, None,
-        (data_loader.IMAGE_INFRARED_WIDTH,
-         data_loader.IMAGE_INFRARED_HEIGHT),
+        (data_loader.IMAGE_RGB_WIDTH,
+         data_loader.IMAGE_RGB_HEIGHT),
         criteria=STEREO_CALIBRATION_CRITERIA, flags=0)
     
     if not cache.__contains__('extrinsics'):
