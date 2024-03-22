@@ -21,8 +21,8 @@ def load_pointcloud(path, cam, idx, params, cache):
     path_depth = os.path.join(path, 'depth/depth{:05d}.png'.format(idx))
 
     _, _, extrinsics_rgb = get_params(cam, params)
-    mtx, dist, extrinsics = get_params_depth(cam, cache)
-    extrinsics = np.matmul(extrinsics, extrinsics_rgb)
+    mtx, dist, extrinsics_depth = get_params_depth(cam, cache)
+    extrinsics = np.dot(extrinsics_depth, extrinsics_rgb)
     intrinsics = o3d.camera.PinholeCameraIntrinsic(
         data_loader.IMAGE_INFRARED_WIDTH,
         data_loader.IMAGE_INFRARED_HEIGHT,
@@ -225,9 +225,15 @@ def finetune_extrinsics(cams, experiment, interval, voxel_size,
 
         def store_extrinsics():
             extrinsics = []
-            for pose in pose_graph.nodes:
-                extrinsics.append(np.array(pose.pose))
-            extrinsics = np.array(extrinsics)
+            for idx, cam in enumerate(cams):
+                _, _, extrinsics_rgb = get_params(cam, params)
+                _, _, extrinsics_depth = get_params_depth(cam, cache)
+                extrinsics_base = np.dot(extrinsics_depth, extrinsics_rgb)
+                extrinsics_offset = pose_graph.nodes[idx].pose
+                extrinsics.append({
+                    'base': extrinsics_base,
+                    'offset': extrinsics_offset,
+                })
 
             if not os.path.exists(DIR_OUTPUT):
                 os.mkdir(DIR_OUTPUT)
@@ -256,7 +262,7 @@ def finetune_extrinsics(cams, experiment, interval, voxel_size,
 
 # TODO: Move to config file
 VOXEL_SIZE = .005
-EXPERIMENT = 'a2'
+EXPERIMENT = 'a1'
 INTERVAL = 25
 
 # TODO: Move cameras to dataloader
