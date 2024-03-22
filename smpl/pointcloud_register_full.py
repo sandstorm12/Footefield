@@ -1,8 +1,5 @@
-# TODO: Needs serious refactor!
-
 import sys
 sys.path.append('../')
-
 
 import os
 import cv2
@@ -12,13 +9,12 @@ import diskcache
 import numpy as np
 import open3d as o3d
 
-from tqdm import tqdm
 from utils import data_loader
 
 
-
 COLOR_SPACE_GRAY = [0.203921569, 0.239215686, 0.274509804]
-STORE_DIR = '../pose_estimation/keypoints_3d_ba'
+DIR_INPUT = '../pose_estimation/keypoints_3d_ba'
+DIR_OUTPUT = './extrinsics_finetuned'
 
 
 def load_pointcloud(path, cam, idx, params, cache):
@@ -117,39 +113,16 @@ def show(pointcloud):
     vis.run()
 
 
-def get_subject(experiment, idx, voxel_size, params, cache):
-    # Cam24
-    path = data_loader.EXPERIMENTS[experiment][cam24]
-    pc24 = load_pointcloud(path, cam24, idx, params, cache)
-    pc24 = preprocess(pc24, voxel_size)
+def get_subject(cams, experiment, idx, voxel_size, params, cache):
+    pcds = []
+    for cam in cams:
+        path = data_loader.EXPERIMENTS[experiment][cam]
+        pcd = load_pointcloud(path, cam, idx, params, cache)
+        pcd = preprocess(pcd, voxel_size)
 
-    # Cam15
-    path = data_loader.EXPERIMENTS[experiment][cam15]
-    pc15 = load_pointcloud(path, cam15, idx, params, cache)
-    pc15 = preprocess(pc15, voxel_size)
-    
-    # # Cam14
-    # path = data_loader.EXPERIMENTS[experiment][cam14]
-    # pc14 = load_pointcloud(path, cam14, idx, params, cache)
-    # pc14 = preprocess(pc14, voxel_size)
+        pcds.append(pcd)
 
-    # Cam34
-    path = data_loader.EXPERIMENTS[experiment][cam34]
-    pc34 = load_pointcloud(path, cam34, idx, params, cache)
-    pc34 = preprocess(pc34, voxel_size)
-
-    # Cam35
-    path = data_loader.EXPERIMENTS[experiment][cam35]
-    pc35 = load_pointcloud(path, cam35, idx, params, cache)
-    pc35 = preprocess(pc35, voxel_size)
-
-    return {
-        cam24: pc24,
-        cam15: pc15,
-        # cam14: pc14,
-        cam34: pc34,
-        cam35: pc35,
-    }
+    return pcds
 
 
 def pairwise_registration(source, target, max_correspondence_distance_coarse,
@@ -161,10 +134,12 @@ def pairwise_registration(source, target, max_correspondence_distance_coarse,
         source, target, max_correspondence_distance_fine,
         icp_coarse.transformation,
         o3d.pipelines.registration.TransformationEstimationPointToPlane())
+    
     transformation_icp = icp_fine.transformation
     information_icp = o3d.pipelines.registration.get_information_matrix_from_point_clouds(
         source, target, max_correspondence_distance_fine,
         icp_fine.transformation)
+    
     return transformation_icp, information_icp
 
 
@@ -172,7 +147,8 @@ def full_registration(pcds, max_correspondence_distance_coarse,
                       max_correspondence_distance_fine):
     pose_graph = o3d.pipelines.registration.PoseGraph()
     odometry = np.identity(4)
-    pose_graph.nodes.append(o3d.pipelines.registration.PoseGraphNode(odometry))
+    pose_graph.nodes.append(o3d.pipelines.registration.PoseGraphNode(
+        odometry))
     n_pcds = len(pcds)
     for source_id in range(n_pcds):
         for target_id in range(source_id + 1, n_pcds):
@@ -180,74 +156,99 @@ def full_registration(pcds, max_correspondence_distance_coarse,
                 pcds[source_id], pcds[target_id],
                 max_correspondence_distance_coarse,
                 max_correspondence_distance_fine)
+            
             if target_id == source_id + 1:  # odometry case
                 odometry = np.dot(transformation_icp, odometry)
                 pose_graph.nodes.append(
                     o3d.pipelines.registration.PoseGraphNode(
                         np.linalg.inv(odometry)))
                 pose_graph.edges.append(
-                    o3d.pipelines.registration.PoseGraphEdge(source_id,
-                                                             target_id,
-                                                             transformation_icp,
-                                                             information_icp,
-                                                             uncertain=False))
+                    o3d.pipelines.registration.PoseGraphEdge(
+                        source_id,
+                        target_id,
+                        transformation_icp,
+                        information_icp,
+                        uncertain=False))
             else:  # loop closure case
                 pose_graph.edges.append(
-                    o3d.pipelines.registration.PoseGraphEdge(source_id,
-                                                             target_id,
-                                                             transformation_icp,
-                                                             information_icp,
-                                                             uncertain=True))
+                    o3d.pipelines.registration.PoseGraphEdge(
+                        source_id,
+                        target_id,
+                        transformation_icp,
+                        information_icp,
+                        uncertain=True))
     return pose_graph
 
 
-def finetune_extrinsics(cams, experiment, interval, voxel_size, params, cache):
+def register(pcds, voxel_size):
+    for pcd in pcds:
+        pcd.estimate_normals()
+
+    max_correspondence_distance_coarse = voxel_size * 15
+    max_correspondence_distance_fine = voxel_size * 1.5
+    with o3d.utility.VerbosityContextManager(
+            o3d.utility.VerbosityLevel.Info) as cm:
+        pose_graph = full_registration(
+            pcds,
+            max_correspondence_distance_coarse,
+            max_correspondence_distance_fine)
+
+    option = o3d.pipelines.registration.GlobalOptimizationOption(
+        max_correspondence_distance=max_correspondence_distance_fine,
+        edge_prune_threshold=0.25,
+        reference_node=0)
+    with o3d.utility.VerbosityContextManager(
+            o3d.utility.VerbosityLevel.Info) as cm:
+        o3d.pipelines.registration.global_optimization(
+            pose_graph,
+            o3d.pipelines.registration.GlobalOptimizationLevenbergMarquardt(),
+            o3d.pipelines.registration.GlobalOptimizationConvergenceCriteria(),
+            option)
+        
+    return pose_graph
+
+
+def finetune_extrinsics(cams, experiment, interval, voxel_size,
+                        params, cache):
     file_count = count_depth_images(experiment)
 
     pose_avg = [None] * 5
-    for i in tqdm(range(0, file_count, interval)):
-        pcs_subject = get_subject('a1', i, voxel_size, params, cache)
+    for i in range(0, file_count, interval):
+        pcds = get_subject(cams, experiment, i, voxel_size, params, cache)
 
-        for cam in cams:
-            pcs_subject[cam].estimate_normals()
+        pose_graph = register(pcds, voxel_size)
 
-        pcds_down = [pcs_subject[cam] for cam in cams]
+        def key_callback(vis):
+            store_extrinsics()
+            print('Saved extrinsics...')
+            sys.exit()
 
-        max_correspondence_distance_coarse = voxel_size * 15
-        max_correspondence_distance_fine = voxel_size * 1.5
-        with o3d.utility.VerbosityContextManager(
-                o3d.utility.VerbosityLevel.Info) as cm:
-            pose_graph = full_registration(
-                pcds_down,
-                max_correspondence_distance_coarse,
-                max_correspondence_distance_fine)
+        def store_extrinsics():
+            extrinsics = []
+            for pose in pose_graph.nodes:
+                extrinsics.append(np.array(pose.pose))
+            extrinsics = np.array(extrinsics)
 
-        option = o3d.pipelines.registration.GlobalOptimizationOption(
-            max_correspondence_distance=max_correspondence_distance_fine,
-            edge_prune_threshold=0.25,
-            reference_node=0)
-        with o3d.utility.VerbosityContextManager(
-                o3d.utility.VerbosityLevel.Info) as cm:
-            o3d.pipelines.registration.global_optimization(
-                pose_graph,
-                o3d.pipelines.registration.GlobalOptimizationLevenbergMarquardt(),
-                o3d.pipelines.registration.GlobalOptimizationConvergenceCriteria(),
-                option)
+            if not os.path.exists(DIR_OUTPUT):
+                os.mkdir(DIR_OUTPUT)
 
-        vis = o3d.visualization.Visualizer()
-        vis.create_window(visible=True)
+            path = os.path.join(DIR_OUTPUT,
+                                f'extinsics_finetuned_{experiment}.pkl')
+
+            with open(path, 'wb') as handle:
+                pickle.dump(extrinsics, handle,
+                            protocol=pickle.HIGHEST_PROTOCOL)
+
+        vis = o3d.visualization.VisualizerWithKeyCallback()
+        vis.create_window(visible=True)    
+        vis.register_key_callback(83, key_callback)
         # Call only after creating visualizer window.
         vis.get_render_option().background_color = COLOR_SPACE_GRAY
         vis.get_render_option().show_coordinate_frame = True
-        pose = []
-        for point_id, pcd_down in enumerate(pcds_down):
+        for point_id, pcd_down in enumerate(pcds):
             pcd_down_copy = copy.deepcopy(pcd_down)
             pcd_down_copy.transform(pose_graph.nodes[point_id].pose)
-            pose.append(np.array(pose_graph.nodes[point_id].pose))
             vis.add_geometry(pcd_down_copy)
-
-        print(pose, '\n')
-
         vis.run()
 
     return pose_avg
@@ -255,7 +256,7 @@ def finetune_extrinsics(cams, experiment, interval, voxel_size, params, cache):
 
 # TODO: Move to config file
 VOXEL_SIZE = .005
-EXPERIMENT = 'a1'
+EXPERIMENT = 'a2'
 INTERVAL = 25
 
 # TODO: Move cameras to dataloader
@@ -275,9 +276,11 @@ if __name__ == "__main__":
         cam35
     ]
     
-    for file in sorted(os.listdir(STORE_DIR), reverse=False):
+    for file in sorted(os.listdir(DIR_INPUT), reverse=False):
+        DIR_OUTPUT = './extrinsics_finetuned'
         experiment = file.split('.')[0].split('_')[1]
-        file_path = os.path.join(STORE_DIR, file)
+        file_path = os.path.join(DIR_INPUT, file)
+        DIR_OUTPUT = './extrinsics_finetuned'
         print(f"Visualizing {file_path}")
     
         with open(file_path, 'rb') as handle:
