@@ -10,7 +10,6 @@ import numpy as np
 import open3d as o3d
 
 from utils import data_loader
-from calibration import rgb_depth_map
 
 
 STORE_DIR = '../pose_estimation/keypoints_3d_ba'
@@ -34,24 +33,30 @@ def get_depth_image(cam_name, experiment, idx):
     return img_depth
 
 
-def get_intrinsics(cam, cache):
+def get_params(cam, params):
     if cam == cam24:
-        mtx = cache['extrinsics'][cam24 + 'infrared']['mtx_l']
-        dist = cache['extrinsics'][cam24 + 'infrared']['dist_l']
+        idx_cam = 0
     elif cam == cam15:
-        mtx = cache['extrinsics'][cam24 + 'infrared']['mtx_r']
-        dist = cache['extrinsics'][cam24 + 'infrared']['dist_r']
+        idx_cam = 1
     elif cam == cam14:
-        mtx = cache['extrinsics'][cam15 + 'infrared']['mtx_r']
-        dist = cache['extrinsics'][cam15 + 'infrared']['dist_r']
+        raise Exception("Unknown camera.")
     elif cam == cam34:
-        mtx = cache['extrinsics'][cam14 + 'infrared']['mtx_r']
-        dist = cache['extrinsics'][cam14 + 'infrared']['dist_r']
+        idx_cam = 2
     elif cam == cam35:
-        mtx = cache['extrinsics'][cam34 + 'infrared']['mtx_r']
-        dist = cache['extrinsics'][cam34 + 'infrared']['dist_r']
+        idx_cam = 3
+    else:
+        raise Exception("Unknown camera.")
 
-    return mtx, dist
+    mtx = params[idx_cam]['mtx']
+    dist = params[idx_cam]['dist']
+    rotation = params[idx_cam]['rotation']
+    translation = params[idx_cam]['translation']
+
+    extrinsics = np.identity(4, dtype=float)
+    extrinsics[:3, :3] = rotation
+    extrinsics[:3, 3] = translation / 1000
+
+    return mtx, dist, extrinsics
 
 
 def get_extrinsics(cam, cache):
@@ -74,19 +79,19 @@ def get_extrinsics(cam, cache):
         extrinsics[:3, 3] = t.reshape(3)
     elif cam == cam15:
         extrinsics[:3, :3] = R
-        extrinsics[:3, 3] = T.reshape(3) / 1000
+        extrinsics[:3, 3] = T.reshape(3)
     elif cam == cam14:
         R2_com = np.dot(R2, R)
         T2_com = (np.dot(R2, T).reshape(3, 1) + T2).reshape(3,)
         extrinsics[:3, :3] = R2_com
-        extrinsics[:3, 3] = T2_com / 1000
+        extrinsics[:3, 3] = T2_com
     elif cam == cam34:
         R2_com = np.dot(R2, R)
         T2_com = (np.dot(R2, T).reshape(3, 1) + T2).reshape(3,)
         R3_com = np.dot(R3, R2_com)
         T3_com = (np.dot(R3, T2_com).reshape(3, 1) + T3).reshape(3,)
         extrinsics[:3, :3] = R3_com
-        extrinsics[:3, 3] = T3_com / 1000
+        extrinsics[:3, 3] = T3_com
     elif cam == cam35:
         R2_com = np.dot(R2, R)
         T2_com = (np.dot(R2, T).reshape(3, 1) + T2).reshape(3,)
@@ -95,42 +100,42 @@ def get_extrinsics(cam, cache):
         R4_com = np.dot(R4, R3_com)
         T4_com = (np.dot(R4, T3_com).reshape(3, 1) + T4).reshape(3,)
         extrinsics[:3, :3] = R4_com
-        extrinsics[:3, 3] = T4_com / 1000
+        extrinsics[:3, 3] = T4_com
 
     return extrinsics
 
 
-def get_parameters(cam, cache):
-    mtx, dist = get_intrinsics(cam, cache)
+def get_params_depth(cam, cache):
+    mtx = cache['depth_matching'][cam]['mtx_r']
+    dist = cache['depth_matching'][cam]['dist_r']
+    R = cache['depth_matching'][cam]['rotation']
+    T = cache['depth_matching'][cam]['transition']
 
-    extrinsics = get_extrinsics(cam, cache)
+    extrinsics = np.identity(4, dtype=float)
+    extrinsics[:3, :3] = R
+    extrinsics[:3, 3] = T.ravel() / 1000
 
     return mtx, dist, extrinsics
 
 
 def get_pcd(cam, experiment, idx, params):
-    base_index = cameras.index(cam) * PARAM_CALIB_SIZE
-    mtx = np.zeros((3, 3), dtype=float)
-    mtx[0, 0] = params[base_index + 12]
-    mtx[1, 1] = params[base_index + 13]
-    mtx[0, 2] = params[base_index + 14]
-    mtx[1, 2] = params[base_index + 15]
-    # dist = params[16:21]
-    rotation = params[base_index:base_index + 9].reshape(3, 3)
-    translation = params[base_index + 9:base_index + 12] / 1000
-    extrinsics = np.identity(4, dtype=float)
-    extrinsics[:3, :3] = rotation
-    extrinsics[:3, 3] = translation.reshape(3)
+    _, _, extrinsics_rgb = get_params(cam, params)
+    mtx, dist, extrinsics = get_params_depth(cam, cache)
+    extrinsics = np.matmul(extrinsics, extrinsics_rgb)
     
+    img_depth = get_depth_image(cam, experiment, idx)
+    img_depth = cv2.imread(img_depth, -1)
+
+    mapx, mapy = cv2.initUndistortRectifyMap(mtx, dist, None, mtx, (640, 576), 5)
+    img_depth = cv2.remap(img_depth, mapx, mapy, cv2.INTER_NEAREST)
+
     intrinsics = o3d.camera.PinholeCameraIntrinsic(
         640, 576, mtx[0, 0], mtx[1, 1], mtx[0, 2], mtx[1, 2])
 
-    img_depth = get_depth_image(cam, experiment, idx)
-
-    depth = o3d.io.read_image(img_depth)
+    img_depth = o3d.geometry.Image(img_depth)
 
     pcd = o3d.geometry.PointCloud.create_from_depth_image(
-        depth, intrinsics, extrinsics)
+        img_depth, intrinsics, extrinsics)
 
     return pcd
 
@@ -162,19 +167,20 @@ def visualize_poses(poses, experiment, params):
     geometry = o3d.geometry.PointCloud()
     lines = o3d.geometry.LineSet()
     for idx in range(len(poses)):
-        # pcd24 = get_pcd(cam24, experiment, idx, params)
-        # pcd15 = get_pcd(cam15, experiment, idx, params)
+        pcd24 = get_pcd(cam24, experiment, idx, params)
+        pcd15 = get_pcd(cam15, experiment, idx, params)
         # pcd14 = get_pcd(cam14, experiment, idx, params)
-        # pcd34 = get_pcd(cam34, experiment, idx, params)
+        pcd34 = get_pcd(cam34, experiment, idx, params)
         pcd35 = get_pcd(cam35, experiment, idx, params)
 
         # pcd = pcd24 + pcd15 + pcd14 + pcd34 + pcd35
-        pcd_combined = pcd35
+        pcd_combined = pcd24 + pcd15 + pcd34 + pcd35
         pcd_combined = preprocess(pcd_combined)
 
         keypoints = poses[idx].reshape(-1, 3)
         pcd = o3d.geometry.PointCloud()
         keypoints /= 1000
+
         pcd.points = o3d.utility.Vector3dVector(keypoints)
         pcd.paint_uniform_color([0, 1, 0]) # Blue points
 
