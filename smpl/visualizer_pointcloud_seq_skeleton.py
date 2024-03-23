@@ -4,6 +4,7 @@ sys.path.append('../')
 
 import cv2
 import time
+import glob
 import pickle
 import diskcache
 import numpy as np
@@ -12,8 +13,14 @@ import open3d as o3d
 from utils import data_loader
 
 
+VIS_MESH = True
+
 STORE_DIR = '../pose_estimation/keypoints_3d_ba'
 PARAM_CALIB_SIZE = 16
+DIR_PARMAS_FINETUNED = "./extrinsics_finetuned"
+DIR_STORE = '/home/hamid/Documents/phd/footefield/Pose_to_SMPL/fit/output/HALPE/'
+DIR_PARAMS = '../pose_estimation/keypoints_3d_pose2smpl/'
+
 HALPE_LINES = np.array(
     [(0, 1), (0, 2), (1, 3), (2, 4), (5, 18), (6, 18), (5, 7),
      (7, 9), (6, 8), (8, 10), (17, 18), (18, 19), (19, 11),
@@ -118,24 +125,21 @@ def get_params_depth(cam, cache):
     return mtx, dist, extrinsics
 
 
-def get_pcd(cam, experiment, idx, params):
-    _, _, extrinsics_rgb = get_params(cam, params)
-    mtx, dist, extrinsics = get_params_depth(cam, cache)
-    extrinsics = np.matmul(extrinsics, extrinsics_rgb)
-    
+def get_pcd(cam, experiment, idx, extrinsics, cache):
     img_depth = get_depth_image(cam, experiment, idx)
-    img_depth = cv2.imread(img_depth, -1)
+    mtx, dist, _ = get_params_depth(cam, cache)
 
-    mapx, mapy = cv2.initUndistortRectifyMap(mtx, dist, None, mtx, (640, 576), 5)
+    img_depth = cv2.imread(img_depth, -1)
+    mapx, mapy = cv2.initUndistortRectifyMap(
+        mtx, dist, None, mtx, (640, 576), cv2.CV_32FC2)
     img_depth = cv2.remap(img_depth, mapx, mapy, cv2.INTER_NEAREST)
+    depth = o3d.geometry.Image(img_depth)
 
     intrinsics = o3d.camera.PinholeCameraIntrinsic(
         640, 576, mtx[0, 0], mtx[1, 1], mtx[0, 2], mtx[1, 2])
-
-    img_depth = o3d.geometry.Image(img_depth)
-
     pcd = o3d.geometry.PointCloud.create_from_depth_image(
-        img_depth, intrinsics, extrinsics)
+        depth, intrinsics, extrinsics['base'])
+    pcd = pcd.transform(extrinsics['offset'])
 
     return pcd
 
@@ -143,7 +147,7 @@ def get_pcd(cam, experiment, idx, params):
 def remove_outliers(pointcloud):
     _, ind = pointcloud.remove_statistical_outlier(
         nb_neighbors=20,
-        std_ratio=.1)
+        std_ratio=.03)
     pointcloud = pointcloud.select_by_index(ind)
     
     return pointcloud
@@ -157,7 +161,7 @@ def preprocess(pointcloud):
     return pointcloud
 
 
-def visualize_poses(poses, experiment, params):
+def visualize_poses(poses, verts, faces, experiment, extrinsics, cache):
     vis = o3d.visualization.VisualizerWithKeyCallback()
     vis.create_window()
     vis.get_render_option().background_color = data_loader.COLOR_SPACE_GRAY
@@ -166,16 +170,18 @@ def visualize_poses(poses, experiment, params):
     geometry_combined = o3d.geometry.PointCloud()
     geometry = o3d.geometry.PointCloud()
     lines = o3d.geometry.LineSet()
+    mesh = [o3d.geometry.TriangleMesh() for i in range(len(verts))]
+    for i in range(len(verts)):
+        mesh[i].triangles = o3d.utility.Vector3iVector(faces[i])
+    mesh_line = [o3d.geometry.LineSet() for i in range(len(verts))]
     for idx in range(len(poses)):
-        pcd24 = get_pcd(cam24, experiment, idx, params)
-        pcd15 = get_pcd(cam15, experiment, idx, params)
-        # pcd14 = get_pcd(cam14, experiment, idx, params)
-        pcd34 = get_pcd(cam34, experiment, idx, params)
-        pcd35 = get_pcd(cam35, experiment, idx, params)
+        pcd = get_pcd(cam24, experiment, idx, extrinsics[cam24], cache)
+        pcd += get_pcd(cam15, experiment, idx, extrinsics[cam15], cache)
+        # # pcd14 = get_pcd(cam14, experiment, idx, extrinsics[?], params)
+        pcd += get_pcd(cam34, experiment, idx, extrinsics[cam34], cache)
+        pcd += get_pcd(cam35, experiment, idx, extrinsics[cam35], cache)
 
-        # pcd = pcd24 + pcd15 + pcd14 + pcd34 + pcd35
-        pcd_combined = pcd24 + pcd15 + pcd34 + pcd35
-        pcd_combined = preprocess(pcd_combined)
+        pcd_combined = preprocess(pcd)
 
         keypoints = poses[idx].reshape(-1, 3)
         pcd = o3d.geometry.PointCloud()
@@ -201,6 +207,19 @@ def visualize_poses(poses, experiment, params):
             vis.update_geometry(geometry_combined)
             vis.update_geometry(geometry)
             vis.update_geometry(lines)
+
+        if VIS_MESH:
+            for idx_mesh in range(len(verts)):
+                mesh[idx_mesh].vertices = o3d.utility.Vector3dVector(
+                    verts[idx_mesh][idx])
+                mesh_line_temp = o3d.geometry.LineSet.create_from_triangle_mesh(
+                    mesh[idx_mesh])
+                mesh_line[idx_mesh].points = mesh_line_temp.points
+                mesh_line[idx_mesh].lines = mesh_line_temp.lines
+                if idx == 0:
+                    vis.add_geometry(mesh_line[idx_mesh])
+                else:
+                    vis.update_geometry(mesh_line[idx_mesh])
             
         delay_ms = 100
         for _ in range(delay_ms // 10):
@@ -209,6 +228,65 @@ def visualize_poses(poses, experiment, params):
             time.sleep(.01)
 
         print(f"Update {idx}: {time.time()}")
+
+
+def load_finetuned_extrinsics():
+    extrinsics_finetuned = {}
+    for path in glob.glob(os.path.join(DIR_PARMAS_FINETUNED, '*')):
+        experiment = path.split('.')[-2].split('_')[-1]
+        with open(path, 'rb') as handle:
+            params = pickle.load(handle)
+
+        extrinsics_finetuned[experiment] = params
+
+    return extrinsics_finetuned
+
+
+def get_corresponding_files(path):
+    file_name = path.split('/')[-1].split('.')[0]
+
+    files = [
+        (file_name + '_0_normalized_params.pkl', file_name + '_0_params.pkl'),
+        (file_name + '_1_normalized_params.pkl', file_name + '_1_params.pkl'),
+    ]
+
+    return files
+
+
+def load_smpl(file_org):
+    files_smpl = get_corresponding_files(file_org)
+
+    verts_all = []
+    faces_all = []
+    for file_smpl in files_smpl:
+        # Load SMPL data
+        path_smpl = os.path.join(DIR_STORE, file_smpl[0])
+        with open(path_smpl, 'rb') as handle:
+            smpl = pickle.load(handle)
+        verts = np.array(smpl['verts'])
+        faces = np.array(smpl['th_faces'])
+        scale_smpl = smpl['scale']
+        translation_smpl = smpl['translation']
+
+        # Load alignment params
+        path_params = os.path.join(DIR_PARAMS, file_smpl[1])
+        with open(path_params, 'rb') as handle:
+            params = pickle.load(handle)
+        rotation = params['rotation']
+        scale = params['scale'] * scale_smpl
+        translation = params['translation']
+
+        rotation_inverted = np.linalg.inv(rotation)
+        verts = verts + translation_smpl
+        verts = verts.dot(rotation_inverted.T)
+        verts = verts * scale
+        verts = verts + translation
+        verts = verts / 1000
+
+        verts_all.append(verts)
+        faces_all.append(faces)
+
+    return verts_all, faces_all
 
 
 # TODO: Move the cameras somewhere else
@@ -228,6 +306,8 @@ if __name__ == "__main__":
         cam35,   
     ]
 
+    finetuned_extrinsics = load_finetuned_extrinsics()
+
     for file in sorted(os.listdir(STORE_DIR), reverse=False):
         experiment = file.split('.')[0].split('_')[1]
         file_path = os.path.join(STORE_DIR, file)
@@ -239,4 +319,8 @@ if __name__ == "__main__":
         poses = output['points_3d'].reshape(-1, 52, 3)
         params = output['params']
 
-        visualize_poses(poses, experiment, params)
+        verts_all, faces_all = load_smpl(file_path)
+
+        visualize_poses(
+            poses, verts_all, faces_all,
+            experiment, finetuned_extrinsics[experiment], cache)
