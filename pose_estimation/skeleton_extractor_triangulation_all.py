@@ -14,7 +14,7 @@ from mmpose.apis import MMPoseInferencer
 
 
 VISUALIZE = True
-EXP_LENGTH = 100
+EXP_LENGTH = 500
 DIR_STORE = "./keypoints_3d"
 
 
