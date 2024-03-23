@@ -89,7 +89,7 @@ def get_params_depth(cam, cache):
 
 def remove_outliers(pointcloud):
     _, ind = pointcloud.remove_radius_outlier(
-        nb_points=16, radius=0.05)
+        nb_points=5, radius=0.02)
     pointcloud = pointcloud.select_by_index(ind)
 
     return pointcloud
@@ -224,16 +224,16 @@ def finetune_extrinsics(cams, experiment, interval, voxel_size,
             sys.exit()
 
         def store_extrinsics():
-            extrinsics = []
+            extrinsics = {}
             for idx, cam in enumerate(cams):
                 _, _, extrinsics_rgb = get_params(cam, params)
                 _, _, extrinsics_depth = get_params_depth(cam, cache)
                 extrinsics_base = np.dot(extrinsics_depth, extrinsics_rgb)
                 extrinsics_offset = pose_graph.nodes[idx].pose
-                extrinsics.append({
+                extrinsics[cam] = {
                     'base': extrinsics_base,
                     'offset': extrinsics_offset,
-                })
+                }
 
             if not os.path.exists(DIR_OUTPUT):
                 os.mkdir(DIR_OUTPUT)
@@ -277,16 +277,16 @@ if __name__ == "__main__":
     cams = [
         cam24,
         cam15,
-        # cam14,
         cam34,
-        cam35
+        cam35,
     ]
     
-    for file in sorted(os.listdir(DIR_INPUT), reverse=False):
-        DIR_OUTPUT = './extrinsics_finetuned'
+    for file in sorted(os.listdir(DIR_INPUT)):
         experiment = file.split('.')[0].split('_')[1]
+        if experiment != EXPERIMENT:
+            continue
+        
         file_path = os.path.join(DIR_INPUT, file)
-        DIR_OUTPUT = './extrinsics_finetuned'
         print(f"Visualizing {file_path}")
     
         with open(file_path, 'rb') as handle:
