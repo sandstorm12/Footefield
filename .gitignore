@@ -5,6 +5,8 @@
 **/keypoints_3d/
 **/keypoints_3d_ba/
 **/keypoints_3d_pose2smpl/
+**/extrinsics_finetuned/
+**/extrinsics_global/
 
 # Pose to SMPL input files
 *.npy
