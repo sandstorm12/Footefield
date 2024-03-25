@@ -3,7 +3,6 @@ import sys
 sys.path.append('../')
 
 import cv2
-import copy
 import glob
 import pickle
 import diskcache
@@ -62,17 +61,17 @@ def get_pcd(cam, experiment, idx, extrinsics, cache):
 
 def remove_outliers(pointcloud):
     _, ind = pointcloud.remove_statistical_outlier(
-        nb_neighbors=5,
-        std_ratio=.02)
+        nb_neighbors=16,
+        std_ratio=.05)
     pointcloud = pointcloud.select_by_index(ind)
     
     return pointcloud
 
 
-def preprocess(pointcloud):
+def preprocess(pointcloud, voxel_size):
+    pointcloud = pointcloud.voxel_down_sample(voxel_size=voxel_size)
+    
     pointcloud = remove_outliers(pointcloud)
-
-    pointcloud = pointcloud.voxel_down_sample(voxel_size=0.005)
 
     return pointcloud
 
@@ -97,7 +96,7 @@ def pairwise_registration(source, target, voxel_size):
     return transformation_icp
 
 
-def visualize_poses(verts, experiment, extrinsics, cache):
+def visualize_poses(verts, experiment, extrinsics, voxel_size, cache):
     pcd_mesh = o3d.geometry.PointCloud()
     for idx in range(0, len(verts[0]), 25):
         pcd = get_pcd(cam24, experiment, idx, extrinsics[cam24], cache)
@@ -105,15 +104,15 @@ def visualize_poses(verts, experiment, extrinsics, cache):
         # pcd14 = get_pcd(cam14, experiment, idx, extrinsics[?], params)
         pcd += get_pcd(cam34, experiment, idx, extrinsics[cam34], cache)
         pcd += get_pcd(cam35, experiment, idx, extrinsics[cam35], cache)
-        pcd_combined = preprocess(pcd)
-        pcd_combined.paint_uniform_color([1, 0, 0])
+        pcd_combined = preprocess(pcd, voxel_size=voxel_size)
+        pcd_combined.paint_uniform_color([1, 1, 1])
         
         pcd_mesh.points = o3d.utility.Vector3dVector(
             np.concatenate((verts[0][idx], verts[1][idx])))
-        pcd_mesh.paint_uniform_color([0, 1, 0])
+        pcd_mesh.paint_uniform_color([0, 0, 1])
 
         transformation_icp = pairwise_registration(
-            pcd_mesh, pcd_combined, voxel_size=0.005)
+            pcd_mesh, pcd_combined, voxel_size=voxel_size)
         
         def key_callback(vis):
             store_extrinsics()
@@ -204,7 +203,8 @@ def load_smpl(file_org):
     return verts_all
 
 
-EXPERIMENT = 'a2'
+EXPERIMENT = 'a1'
+VOXEL_SIZE = .025
 
 
 # TODO: Move the cameras somewhere else
@@ -240,4 +240,5 @@ if __name__ == "__main__":
             verts_all,
             experiment,
             finetuned_extrinsics[experiment],
+            VOXEL_SIZE,
             cache)
