@@ -88,8 +88,9 @@ def get_params_depth(cam, cache):
 
 
 def remove_outliers(pointcloud):
-    _, ind = pointcloud.remove_radius_outlier(
-        nb_points=5, radius=0.02)
+    _, ind = pointcloud.remove_statistical_outlier(
+        nb_neighbors=16,
+        std_ratio=.05)
     pointcloud = pointcloud.select_by_index(ind)
 
     return pointcloud
@@ -261,7 +262,7 @@ def finetune_extrinsics(cams, experiment, interval, voxel_size,
 
 
 # TODO: Move to config file
-VOXEL_SIZE = .005
+VOXEL_SIZE = .02
 EXPERIMENT = 'a1'
 INTERVAL = 25
 
