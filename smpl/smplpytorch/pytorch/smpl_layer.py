@@ -38,25 +38,24 @@ class SMPL_Layer(Module):
         self.smpl_data = smpl_data
 
         self.register_buffer('th_betas',
-                             torch.Tensor(smpl_data['betas'].r).unsqueeze(0))
+                             torch.Tensor(np.copy(smpl_data['betas'].r)).unsqueeze(0))
         self.register_buffer('th_shapedirs',
-                             torch.Tensor(smpl_data['shapedirs'].r))
+                             torch.Tensor(np.copy(smpl_data['shapedirs'].r)))
         self.register_buffer('th_posedirs',
-                             torch.Tensor(smpl_data['posedirs'].r))
+                             torch.Tensor(np.copy(smpl_data['posedirs'].r)))
         self.register_buffer(
             'th_v_template',
-            torch.Tensor(smpl_data['v_template'].r).unsqueeze(0))
+            torch.Tensor(np.copy(smpl_data['v_template'].r)).unsqueeze(0))
         self.register_buffer(
             'th_J_regressor',
-            torch.Tensor(np.array(smpl_data['J_regressor'].toarray())))
+            torch.Tensor(np.array(np.copy(smpl_data['J_regressor'].toarray()))))
         self.register_buffer('th_weights',
-                             torch.Tensor(smpl_data['weights'].r))
+                             torch.Tensor(np.copy(smpl_data['weights'].r)))
         self.register_buffer('th_faces',
-                             torch.Tensor(smpl_data['f'].astype(np.int32)).long())
+                             torch.Tensor(np.copy(smpl_data['f'].astype(np.int32))).long())
 
         # Kinematic chain params
         self.kintree_table = smpl_data['kintree_table']
-        print(self.kintree_table)
         parents = list(self.kintree_table[0].tolist())
         self.kintree_parents = parents
         self.num_joints = len(parents)  # 24
