@@ -17,7 +17,7 @@ VIS_MESH = True
 
 STORE_DIR = '../pose_estimation/keypoints_3d_ba'
 PARAM_CALIB_SIZE = 16
-DIR_PARMAS_FINETUNED = "./extrinsics_finetuned"
+DIR_PARMAS_GLOBAL = "./extrinsics_global"
 DIR_STORE = '/home/hamid/Documents/phd/footefield/Pose_to_SMPL/fit/output/HALPE/'
 DIR_PARAMS = '../pose_estimation/keypoints_3d_pose2smpl/'
 
@@ -138,16 +138,16 @@ def get_pcd(cam, experiment, idx, extrinsics, cache):
     intrinsics = o3d.camera.PinholeCameraIntrinsic(
         640, 576, mtx[0, 0], mtx[1, 1], mtx[0, 2], mtx[1, 2])
     pcd = o3d.geometry.PointCloud.create_from_depth_image(
-        depth, intrinsics, extrinsics['base'])
-    pcd = pcd.transform(extrinsics['offset'])
+        depth, intrinsics, extrinsics['extrinsics'][cam]['base'])
+    pcd = pcd.transform(extrinsics['extrinsics'][cam]['offset'])
 
     return pcd
 
 
 def remove_outliers(pointcloud):
     _, ind = pointcloud.remove_statistical_outlier(
-        nb_neighbors=20,
-        std_ratio=.03)
+        nb_neighbors=16,
+        std_ratio=.05)
     pointcloud = pointcloud.select_by_index(ind)
     
     return pointcloud
@@ -156,7 +156,7 @@ def remove_outliers(pointcloud):
 def preprocess(pointcloud):
     pointcloud = remove_outliers(pointcloud)
 
-    pointcloud = pointcloud.voxel_down_sample(voxel_size=0.005)
+    # pointcloud = pointcloud.voxel_down_sample(voxel_size=0.005)
 
     return pointcloud
 
@@ -175,11 +175,13 @@ def visualize_poses(poses, verts, faces, experiment, extrinsics, cache):
         mesh[i].triangles = o3d.utility.Vector3iVector(faces[i])
     mesh_line = [o3d.geometry.LineSet() for i in range(len(verts))]
     for idx in range(len(poses)):
-        pcd = get_pcd(cam24, experiment, idx, extrinsics[cam24], cache)
-        pcd += get_pcd(cam15, experiment, idx, extrinsics[cam15], cache)
-        # # pcd14 = get_pcd(cam14, experiment, idx, extrinsics[?], params)
-        pcd += get_pcd(cam34, experiment, idx, extrinsics[cam34], cache)
-        pcd += get_pcd(cam35, experiment, idx, extrinsics[cam35], cache)
+        pcd = get_pcd(cam24, experiment, idx, extrinsics, cache)
+        pcd += get_pcd(cam15, experiment, idx, extrinsics, cache)
+        # pcd14 = get_pcd(cam14, experiment, idx, extrinsics, cache) 
+        pcd += get_pcd(cam34, experiment, idx, extrinsics, cache)
+        pcd += get_pcd(cam35, experiment, idx, extrinsics, cache)
+
+        pcd = pcd.transform(np.linalg.inv(extrinsics['global']))
 
         pcd_combined = preprocess(pcd)
 
@@ -230,16 +232,16 @@ def visualize_poses(poses, verts, faces, experiment, extrinsics, cache):
         print(f"Update {idx}: {time.time()}")
 
 
-def load_finetuned_extrinsics():
-    extrinsics_finetuned = {}
-    for path in glob.glob(os.path.join(DIR_PARMAS_FINETUNED, '*')):
+def load_global_extrinsics():
+    extrinsics_global = {}
+    for path in glob.glob(os.path.join(DIR_PARMAS_GLOBAL, '*')):
         experiment = path.split('.')[-2].split('_')[-1]
         with open(path, 'rb') as handle:
             params = pickle.load(handle)
 
-        extrinsics_finetuned[experiment] = params
+        extrinsics_global[experiment] = params
 
-    return extrinsics_finetuned
+    return extrinsics_global
 
 
 def get_corresponding_files(path):
@@ -306,7 +308,7 @@ if __name__ == "__main__":
         cam35,   
     ]
 
-    finetuned_extrinsics = load_finetuned_extrinsics()
+    extrinsics_global = load_global_extrinsics()
 
     for file in sorted(os.listdir(STORE_DIR), reverse=False):
         experiment = file.split('.')[0].split('_')[1]
@@ -323,4 +325,4 @@ if __name__ == "__main__":
 
         visualize_poses(
             poses, verts_all, faces_all,
-            experiment, finetuned_extrinsics[experiment], cache)
+            experiment, extrinsics_global[experiment], cache)
