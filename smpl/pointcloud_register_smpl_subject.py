@@ -57,7 +57,7 @@ def get_pcd(cam, subject, experiment, idx, extrinsics, cache):
         depth, intrinsics, extrinsics['base'])
     pcd = pcd.transform(extrinsics['offset'])
 
-    start_pts = np.array([[0, 0, 0], [1, -1, 3]])
+    start_pts = np.array([[-.2, .1, 1.5], [.7, -.05, 1.9]])
     pcd_np = np.asarray(pcd.points)
     kmeans = KMeans(n_clusters=2, random_state=47,
                     init=start_pts, n_init=1).fit(pcd_np)
@@ -215,13 +215,15 @@ def load_smpl(file_org):
         verts = verts + translation
         verts = verts / 1000
 
+        print(translation / 1000)
+
         verts_all.append(verts)
 
     return verts_all
 
 
-EXPERIMENT = 'a1'
-SUBJECT = 1
+EXPERIMENT = 'a2'
+SUBJECT = 0
 VOXEL_SIZE = .025
 
 
@@ -246,8 +248,11 @@ if __name__ == "__main__":
 
     for file in sorted(os.listdir(DIR_ORG), reverse=False):
         experiment = file.split('.')[0].split('_')[1]
+        
         if experiment != EXPERIMENT:
             continue
+
+        print(experiment)
 
         file_path = os.path.join(DIR_ORG, file)
         print(f"Visualizing {file_path}")
@@ -257,7 +262,7 @@ if __name__ == "__main__":
         visualize_poses(
             SUBJECT,
             verts_all,
-            experiment,
+            EXPERIMENT,
             finetuned_extrinsics[experiment + '_' + str(SUBJECT)],
             VOXEL_SIZE,
             cache)

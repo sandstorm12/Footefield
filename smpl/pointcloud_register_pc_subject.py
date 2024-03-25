@@ -100,7 +100,7 @@ def remove_outliers(pointcloud):
 def preprocess(pointcloud, voxel_size):
     pointcloud = remove_outliers(pointcloud)
 
-    pointcloud = pointcloud.voxel_down_sample(voxel_size=voxel_size)
+    # pointcloud = pointcloud.voxel_down_sample(voxel_size=voxel_size)
 
     return pointcloud
 
@@ -275,8 +275,8 @@ def finetune_extrinsics(subject, cams, experiment, interval, voxel_size,
 # TODO: Move to config file
 VOXEL_SIZE = .005
 EXPERIMENT = 'a1'
-SUBJECT = 1
-INTERVAL = 25
+SUBJECT = 0
+INTERVAL = 10
 
 # TODO: Move cameras to dataloader
 cam24 = 'azure_kinect2_4_calib_snap'
