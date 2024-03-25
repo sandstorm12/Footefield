@@ -330,8 +330,7 @@ def store_smpl_pointcloud(pcds_normalized, experiment, subject):
                     protocol=pickle.HIGHEST_PROTOCOL)
 
 
-SUBJECT = 0
-
+SUBJECTS = [0, 1]
 
 # TODO: Move the cameras somewhere else
 cam24 = 'azure_kinect2_4_calib_snap'
@@ -354,34 +353,35 @@ if __name__ == "__main__":
     extrinsics_global = load_global_extrinsics()
 
     for file in sorted(os.listdir(STORE_DIR), reverse=False):
-        experiment = file.split('.')[0].split('_')[1]
-        file_path = os.path.join(STORE_DIR, file)
-        print(f"Visualizing {file_path}")
-    
-        with open(file_path, 'rb') as handle:
-            output = pickle.load(handle)
-
-        poses = output['points_3d'].reshape(-1, 52, 3)
-        params = output['params']
-
-        translation_1, \
-            rotation_1, \
-            scale_1, \
-            translation_2, \
-            scale_2 = load_smpl_params(file_path, SUBJECT)
-
-        pcd_np = load_pointcloud(
-            poses, SUBJECT, experiment,
-            extrinsics_global[experiment + '_' + str(SUBJECT)], cache)
+        for subject in SUBJECTS:
+            experiment = file.split('.')[0].split('_')[1]
+            file_path = os.path.join(STORE_DIR, file)
+            print(f"Visualizing {file_path} subject {subject}")
         
-        pcds_normalized = normalizer_pcs(
-            pcd_np, translation_1, rotation_1, scale_1,
-            translation_2, scale_2)
+            with open(file_path, 'rb') as handle:
+                output = pickle.load(handle)
 
-        verts_all, faces_all = load_smpl(file_path)
+            poses = output['points_3d'].reshape(-1, 52, 3)
+            params = output['params']
 
-        visualize_poses(
-            poses, verts_all, faces_all, SUBJECT, 
-            pcds_normalized)
+            translation_1, \
+                rotation_1, \
+                scale_1, \
+                translation_2, \
+                scale_2 = load_smpl_params(file_path, subject)
 
-        store_smpl_pointcloud(pcds_normalized, experiment, SUBJECT)
+            pcd_np = load_pointcloud(
+                poses, subject, experiment,
+                extrinsics_global[experiment + '_' + str(subject)], cache)
+            
+            pcds_normalized = normalizer_pcs(
+                pcd_np, translation_1, rotation_1, scale_1,
+                translation_2, scale_2)
+
+            verts_all, faces_all = load_smpl(file_path)
+
+            visualize_poses(
+                poses, verts_all, faces_all, subject, 
+                pcds_normalized)
+
+            store_smpl_pointcloud(pcds_normalized, experiment, subject)
