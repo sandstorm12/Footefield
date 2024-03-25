@@ -16,16 +16,15 @@ from smplpytorch.pytorch.smpl_layer import SMPL_Layer
 
 DIR_SMPL = '/home/hamid/Documents/phd/footefield/Pose_to_SMPL/fit/output/HALPE/'
 DIR_POINTCLOUD = './pointcloud_normalized'
+DIR_OUTPUT = './params_smpl'
 
 
-def optimize_beta(smpl_layer, pose_params, shape_params, pcds):
+def optimize_beta(smpl_layer, pose_params, shape_params, pcds, epochs):
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
 
     pose_torch = torch.from_numpy(
         pose_params).float().to(device)
     shape_torch = (torch.rand(10) * 0.03).to(device)
-    
-    print(pose_params.shape, shape_params.shape)
     
     pose_torch.requires_grad = False
     shape_torch.requires_grad = True
@@ -36,8 +35,9 @@ def optimize_beta(smpl_layer, pose_params, shape_params, pcds):
 
     smpl_layer.to(device)
 
-    # Is it actually optimizing the shape parameter?
-    for epoch in tqdm(range(10)):
+    loss_init = None
+    bar = tqdm(range(epochs))
+    for _ in bar:
         loss = 0
         for idx in range(pose_params.shape[0]):
             pcd_torch = torch.from_numpy(
@@ -51,16 +51,27 @@ def optimize_beta(smpl_layer, pose_params, shape_params, pcds):
         loss.backward()
         optimizer.step()
 
-        print("Epoch: {} Loss: {}".format(epoch, loss.detach().cpu().item()))
+        loss = loss.detach().cpu().item()
+        if loss_init is None:
+            loss_init = loss
 
-    print(shape_torch.shape, shape_torch.repeat(pose_torch.shape[0], 1).shape)
+        bar.set_description('Loss: {:.4f}'.format(loss))
 
-    verts = smpl_layer(pose_torch, th_betas=shape_torch.repeat(pose_torch.shape[0], 1))[0].detach().cpu().numpy()
+    print('Loss went from {:.4f} to {:.4f}'.format(loss_init, loss))
 
-    return verts
+    return pose_torch.detach().cpu().numpy(), \
+        shape_torch.detach().cpu().numpy()
 
 
-def visualize_poses(verts, faces, pcds):
+def visualize_poses(alpha, beta, faces, pcds):
+    device = 'cuda' if torch.cuda.is_available() else 'cpu'
+    pose_torch = torch.from_numpy(alpha).to(device)
+    shape_torch = torch.from_numpy(beta).to(device)
+    verts = smpl_layer(
+        pose_torch,
+        th_betas=shape_torch.repeat(pose_torch.shape[0], 1)
+        )[0].detach().cpu().numpy()
+
     vis = o3d.visualization.VisualizerWithKeyCallback()
     vis.create_window()
     vis.get_render_option().background_color = data_loader.COLOR_SPACE_GRAY
@@ -96,8 +107,6 @@ def visualize_poses(verts, faces, pcds):
             vis.update_renderer()
             time.sleep(.01)
 
-        print(f"Update {idx}: {time.time()}")
-
 
 def get_corresponding_files(path, subject):
     file_name = path.split('/')[-1].split('.')[0]
@@ -110,8 +119,9 @@ def get_corresponding_files(path, subject):
     return files
 
 
-def load_smpl(file_org, subject):
-    file_smpl = get_corresponding_files(file_org, subject)
+def load_smpl(experiment, subject):
+    path = f'keypoints3d_{experiment}_ba'
+    file_smpl = get_corresponding_files(path, subject)
     
     # Load SMPL data
     path_smpl = os.path.join(DIR_SMPL, file_smpl[0])
@@ -133,8 +143,31 @@ def load_pointcloud(experiment, subject):
     return pcds
 
 
-SUBJECT = 0
-EXPERIMENT = 'a1'
+def store_smpl_parameters(alpha, beta, faces, experiment, subject):
+    if not os.path.exists(DIR_OUTPUT):
+        os.mkdir(DIR_OUTPUT)
+
+    path = os.path.join(
+        DIR_OUTPUT,
+        f'params_smpl_{experiment}_{subject}.pkl')
+    
+    params = {
+        'alpha': alpha,
+        'beta': beta,
+        'faces': faces,
+    }
+
+    with open(path, 'wb') as handle:
+        pickle.dump(params, handle,
+                    protocol=pickle.HIGHEST_PROTOCOL)
+        
+    print(f'Stored results: {path}')
+
+
+EXPERIMENTS = ['a1', 'a2']
+SUBJECTS = [0, 1]
+EPOCHS = 20
+VISUALIZE = False
 
 if __name__ == '__main__':
     smpl_layer = SMPL_Layer(
@@ -142,11 +175,18 @@ if __name__ == '__main__':
         gender="neutral",
         model_root='smplpytorch/native/models')
 
-    pose_params, shape_params, faces = \
-        load_smpl('keypoints3d_a1_ba', SUBJECT)
+    for experiment in EXPERIMENTS:
+        for subject in SUBJECTS:
+            pose_params, shape_params, faces = \
+                load_smpl(experiment, subject)
 
-    pcds = load_pointcloud(EXPERIMENT, SUBJECT)
+            pcds = load_pointcloud(experiment, subject)
 
-    verts = optimize_beta(smpl_layer, pose_params, shape_params, pcds)
+            print(f'Optimizing {experiment} {subject}')
+            alpha, beta = optimize_beta(
+                smpl_layer, pose_params, shape_params, pcds, EPOCHS)
 
-    visualize_poses(verts, faces, pcds)
+            if VISUALIZE:
+                visualize_poses(alpha, beta, faces, pcds)
+
+            store_smpl_parameters(alpha, beta, faces, experiment, subject)

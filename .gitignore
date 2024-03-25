@@ -11,6 +11,7 @@ smpl/smplpytorch/native/models/basicModel_neutral_lbs_10_207_0_v1.0.0.pkl
 **/extrinsics_finetuned/
 **/extrinsics_global/
 **/pointcloud_normalized/
+**/smpl/params_smpl/
 
 # Pose to SMPL input files
 *.npy
