@@ -23,13 +23,11 @@ def optimize_beta(smpl_layer, pose_params, shape_params, pcds):
 
     pose_torch = torch.from_numpy(
         pose_params).float().to(device)
-    # shape_torch = torch.from_numpy(
-    #     shape_params).float().to(device)
     shape_torch = (torch.rand(10) * 0.03).to(device)
     
     print(pose_params.shape, shape_params.shape)
     
-    pose_torch.requires_grad = True
+    pose_torch.requires_grad = False
     shape_torch.requires_grad = True
 
     optim_params = [{'params': shape_torch, 'lr': 2e-2},
