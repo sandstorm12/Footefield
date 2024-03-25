@@ -15,6 +15,7 @@ from smplpytorch.pytorch.smpl_layer import SMPL_Layer
 
 DIR_SMPL = '/home/hamid/Documents/phd/footefield/Pose_to_SMPL/fit/output/HALPE/'
 DIR_POINTCLOUD = './pointcloud_normalized'
+DIR_OPTIMIZED = './params_smpl'
 
 
 def visualize_poses(verts, faces, pcds):
@@ -90,8 +91,40 @@ def load_pointcloud(experiment, subject):
     return pcds
 
 
+def preprocess(pcds, volume=1):
+    pcds_processed = []
+    for pcd in pcds:
+        center = np.mean(pcd, axis=0)
+        pcd = pcd[pcd[:, 0] < center[0] + volume]
+        pcd = pcd[pcd[:, 1] < center[1] + volume]
+        pcd = pcd[pcd[:, 2] < center[2] + volume]
+        pcd = pcd[pcd[:, 0] > center[0] - volume]
+        pcd = pcd[pcd[:, 1] > center[1] - volume]
+        pcd = pcd[pcd[:, 2] > center[2] - volume]
+
+        pcds_processed.append(pcd)
+
+    return pcds_processed
+
+
+def load_smpl_optimized(experiment, subject):
+    path = f'params_smpl_{experiment}_{subject}.pkl'
+    
+    # Load SMPL data
+    path_smpl = os.path.join(DIR_OPTIMIZED, path)
+    with open(path_smpl, 'rb') as handle:
+        smpl_params = pickle.load(handle)
+    
+    pose_params = smpl_params['alpha']
+    shape_params = np.tile(smpl_params['beta'], (pose_params.shape[0], 1))
+    faces = smpl_params['faces']
+
+    return pose_params, shape_params, faces
+
+
 SUBJECT = 0
 EXPERIMENT = 'a1'
+OPTIMIZED = True
 
 if __name__ == '__main__':
     smpl_layer = SMPL_Layer(
@@ -99,8 +132,12 @@ if __name__ == '__main__':
         gender="neutral",
         model_root='smplpytorch/native/models')
 
-    pose_params, shape_params, faces = \
-        load_smpl('keypoints3d_a1_ba', SUBJECT)
+    if OPTIMIZED:
+        pose_params, shape_params, faces = \
+            load_smpl_optimized(EXPERIMENT, SUBJECT)
+    else:
+        pose_params, shape_params, faces = \
+            load_smpl('keypoints3d_a1_ba', SUBJECT)
     
     verts_all = []
     for idx in tqdm(range(pose_params.shape[0])):
@@ -113,6 +150,6 @@ if __name__ == '__main__':
 
         verts_all.append(verts.detach().cpu().numpy().astype(float))
 
-    pcds = load_pointcloud(EXPERIMENT, SUBJECT)
+    pcds = preprocess(load_pointcloud(EXPERIMENT, SUBJECT))
 
     visualize_poses(verts_all, faces, pcds)
