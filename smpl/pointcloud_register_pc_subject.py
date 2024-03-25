@@ -1,10 +1,7 @@
-# TODO: Needs serious refactor!
-
+import os
 import sys
 sys.path.append('../')
 
-
-import os
 import cv2
 import copy
 import pickle
@@ -12,21 +9,21 @@ import diskcache
 import numpy as np
 import open3d as o3d
 
-from tqdm import tqdm
 from utils import data_loader
-
+from sklearn.cluster import KMeans
 
 
 COLOR_SPACE_GRAY = [0.203921569, 0.239215686, 0.274509804]
-STORE_DIR = '../pose_estimation/keypoints_3d_ba'
+DIR_INPUT = '../pose_estimation/keypoints_3d_ba'
+DIR_OUTPUT = './extrinsics_finetuned'
 
 
 def load_pointcloud(path, cam, idx, params, cache):
     path_depth = os.path.join(path, 'depth/depth{:05d}.png'.format(idx))
 
     _, _, extrinsics_rgb = get_params(cam, params)
-    mtx, dist, extrinsics = get_params_depth(cam, cache)
-    extrinsics = np.matmul(extrinsics, extrinsics_rgb)
+    mtx, dist, extrinsics_depth = get_params_depth(cam, cache)
+    extrinsics = np.dot(extrinsics_depth, extrinsics_rgb)
     intrinsics = o3d.camera.PinholeCameraIntrinsic(
         data_loader.IMAGE_INFRARED_WIDTH,
         data_loader.IMAGE_INFRARED_HEIGHT,
@@ -92,8 +89,9 @@ def get_params_depth(cam, cache):
 
 
 def remove_outliers(pointcloud):
-    _, ind = pointcloud.remove_radius_outlier(
-        nb_points=16, radius=0.05)
+    _, ind = pointcloud.remove_statistical_outlier(
+        nb_neighbors=16,
+        std_ratio=.05)
     pointcloud = pointcloud.select_by_index(ind)
 
     return pointcloud
@@ -102,7 +100,7 @@ def remove_outliers(pointcloud):
 def preprocess(pointcloud, voxel_size):
     pointcloud = remove_outliers(pointcloud)
 
-    pointcloud = pointcloud.voxel_down_sample(voxel_size=voxel_size)
+    # pointcloud = pointcloud.voxel_down_sample(voxel_size=voxel_size)
 
     return pointcloud
 
@@ -117,39 +115,24 @@ def show(pointcloud):
     vis.run()
 
 
-def get_subject(experiment, idx, voxel_size, params, cache):
-    # Cam24
-    path = data_loader.EXPERIMENTS[experiment][cam24]
-    pc24 = load_pointcloud(path, cam24, idx, params, cache)
-    pc24 = preprocess(pc24, voxel_size)
+def get_subject(subject, cams, experiment, idx, voxel_size, params, cache):
+    start_pts = np.array([[0, 0, 0], [1, -1, 3]])
 
-    # Cam15
-    path = data_loader.EXPERIMENTS[experiment][cam15]
-    pc15 = load_pointcloud(path, cam15, idx, params, cache)
-    pc15 = preprocess(pc15, voxel_size)
-    
-    # # Cam14
-    # path = data_loader.EXPERIMENTS[experiment][cam14]
-    # pc14 = load_pointcloud(path, cam14, idx, params, cache)
-    # pc14 = preprocess(pc14, voxel_size)
+    pcds = []
+    for cam in cams:
+        path = data_loader.EXPERIMENTS[experiment][cam]
+        pcd = load_pointcloud(path, cam, idx, params, cache)
+        pcd = preprocess(pcd, voxel_size)
+        pcd_np = np.asarray(pcd.points)
+        kmeans = KMeans(n_clusters=2, random_state=47,
+                        init=start_pts, n_init=1).fit(pcd_np)
+        # TODO: Explain what (subject + 1 % 2) is
+        pcd.points = o3d.utility.Vector3dVector(
+            pcd_np[kmeans.labels_ == (subject + 1) % 2])
 
-    # Cam34
-    path = data_loader.EXPERIMENTS[experiment][cam34]
-    pc34 = load_pointcloud(path, cam34, idx, params, cache)
-    pc34 = preprocess(pc34, voxel_size)
+        pcds.append(pcd)
 
-    # Cam35
-    path = data_loader.EXPERIMENTS[experiment][cam35]
-    pc35 = load_pointcloud(path, cam35, idx, params, cache)
-    pc35 = preprocess(pc35, voxel_size)
-
-    return {
-        cam24: pc24,
-        cam15: pc15,
-        # cam14: pc14,
-        cam34: pc34,
-        cam35: pc35,
-    }
+    return pcds
 
 
 def pairwise_registration(source, target, max_correspondence_distance_coarse,
@@ -161,10 +144,12 @@ def pairwise_registration(source, target, max_correspondence_distance_coarse,
         source, target, max_correspondence_distance_fine,
         icp_coarse.transformation,
         o3d.pipelines.registration.TransformationEstimationPointToPlane())
+    
     transformation_icp = icp_fine.transformation
     information_icp = o3d.pipelines.registration.get_information_matrix_from_point_clouds(
         source, target, max_correspondence_distance_fine,
         icp_fine.transformation)
+    
     return transformation_icp, information_icp
 
 
@@ -172,7 +157,8 @@ def full_registration(pcds, max_correspondence_distance_coarse,
                       max_correspondence_distance_fine):
     pose_graph = o3d.pipelines.registration.PoseGraph()
     odometry = np.identity(4)
-    pose_graph.nodes.append(o3d.pipelines.registration.PoseGraphNode(odometry))
+    pose_graph.nodes.append(o3d.pipelines.registration.PoseGraphNode(
+        odometry))
     n_pcds = len(pcds)
     for source_id in range(n_pcds):
         for target_id in range(source_id + 1, n_pcds):
@@ -180,74 +166,107 @@ def full_registration(pcds, max_correspondence_distance_coarse,
                 pcds[source_id], pcds[target_id],
                 max_correspondence_distance_coarse,
                 max_correspondence_distance_fine)
+            
             if target_id == source_id + 1:  # odometry case
                 odometry = np.dot(transformation_icp, odometry)
                 pose_graph.nodes.append(
                     o3d.pipelines.registration.PoseGraphNode(
                         np.linalg.inv(odometry)))
                 pose_graph.edges.append(
-                    o3d.pipelines.registration.PoseGraphEdge(source_id,
-                                                             target_id,
-                                                             transformation_icp,
-                                                             information_icp,
-                                                             uncertain=False))
+                    o3d.pipelines.registration.PoseGraphEdge(
+                        source_id,
+                        target_id,
+                        transformation_icp,
+                        information_icp,
+                        uncertain=False))
             else:  # loop closure case
                 pose_graph.edges.append(
-                    o3d.pipelines.registration.PoseGraphEdge(source_id,
-                                                             target_id,
-                                                             transformation_icp,
-                                                             information_icp,
-                                                             uncertain=True))
+                    o3d.pipelines.registration.PoseGraphEdge(
+                        source_id,
+                        target_id,
+                        transformation_icp,
+                        information_icp,
+                        uncertain=True))
     return pose_graph
 
 
-def finetune_extrinsics(cams, experiment, interval, voxel_size, params, cache):
+def register(pcds, voxel_size):
+    for pcd in pcds:
+        pcd.estimate_normals()
+
+    max_correspondence_distance_coarse = voxel_size * 15
+    max_correspondence_distance_fine = voxel_size * 1.5
+    with o3d.utility.VerbosityContextManager(
+            o3d.utility.VerbosityLevel.Info) as cm:
+        pose_graph = full_registration(
+            pcds,
+            max_correspondence_distance_coarse,
+            max_correspondence_distance_fine)
+
+    option = o3d.pipelines.registration.GlobalOptimizationOption(
+        max_correspondence_distance=max_correspondence_distance_fine,
+        edge_prune_threshold=0.25,
+        reference_node=0)
+    with o3d.utility.VerbosityContextManager(
+            o3d.utility.VerbosityLevel.Info) as cm:
+        o3d.pipelines.registration.global_optimization(
+            pose_graph,
+            o3d.pipelines.registration.GlobalOptimizationLevenbergMarquardt(),
+            o3d.pipelines.registration.GlobalOptimizationConvergenceCriteria(),
+            option)
+        
+    return pose_graph
+
+
+def finetune_extrinsics(subject, cams, experiment, interval, voxel_size,
+                        params, cache):
     file_count = count_depth_images(experiment)
 
     pose_avg = [None] * 5
-    for i in tqdm(range(0, file_count, interval)):
-        pcs_subject = get_subject('a1', i, voxel_size, params, cache)
+    for i in range(0, file_count, interval):
+        pcds = get_subject(subject, cams, experiment, i,
+                           voxel_size, params, cache)
 
-        for cam in cams:
-            pcs_subject[cam].estimate_normals()
+        pose_graph = register(pcds, voxel_size)
 
-        pcds_down = [pcs_subject[cam] for cam in cams]
+        def key_callback(vis):
+            store_extrinsics()
+            print('Saved extrinsics...')
+            sys.exit()
 
-        max_correspondence_distance_coarse = voxel_size * 15
-        max_correspondence_distance_fine = voxel_size * 1.5
-        with o3d.utility.VerbosityContextManager(
-                o3d.utility.VerbosityLevel.Info) as cm:
-            pose_graph = full_registration(
-                pcds_down,
-                max_correspondence_distance_coarse,
-                max_correspondence_distance_fine)
+        def store_extrinsics():
+            extrinsics = {}
+            for idx, cam in enumerate(cams):
+                _, _, extrinsics_rgb = get_params(cam, params)
+                _, _, extrinsics_depth = get_params_depth(cam, cache)
+                extrinsics_base = np.dot(extrinsics_depth, extrinsics_rgb)
+                extrinsics_offset = pose_graph.nodes[idx].pose
+                extrinsics[cam] = {
+                    'base': extrinsics_base,
+                    'offset': extrinsics_offset,
+                }
 
-        option = o3d.pipelines.registration.GlobalOptimizationOption(
-            max_correspondence_distance=max_correspondence_distance_fine,
-            edge_prune_threshold=0.25,
-            reference_node=0)
-        with o3d.utility.VerbosityContextManager(
-                o3d.utility.VerbosityLevel.Info) as cm:
-            o3d.pipelines.registration.global_optimization(
-                pose_graph,
-                o3d.pipelines.registration.GlobalOptimizationLevenbergMarquardt(),
-                o3d.pipelines.registration.GlobalOptimizationConvergenceCriteria(),
-                option)
+            if not os.path.exists(DIR_OUTPUT):
+                os.mkdir(DIR_OUTPUT)
 
-        vis = o3d.visualization.Visualizer()
-        vis.create_window(visible=True)
+            path = os.path.join(
+                DIR_OUTPUT,
+                f'extinsics_finetuned_{experiment}_{subject}.pkl')
+
+            with open(path, 'wb') as handle:
+                pickle.dump(extrinsics, handle,
+                            protocol=pickle.HIGHEST_PROTOCOL)
+
+        vis = o3d.visualization.VisualizerWithKeyCallback()
+        vis.create_window(visible=True)    
+        vis.register_key_callback(83, key_callback)
         # Call only after creating visualizer window.
         vis.get_render_option().background_color = COLOR_SPACE_GRAY
         vis.get_render_option().show_coordinate_frame = True
-        pose = []
-        for point_id, pcd_down in enumerate(pcds_down):
+        for point_id, pcd_down in enumerate(pcds):
             pcd_down_copy = copy.deepcopy(pcd_down)
             pcd_down_copy.transform(pose_graph.nodes[point_id].pose)
-            pose.append(np.array(pose_graph.nodes[point_id].pose))
             vis.add_geometry(pcd_down_copy)
-
-        print(pose, '\n')
-
         vis.run()
 
     return pose_avg
@@ -256,7 +275,8 @@ def finetune_extrinsics(cams, experiment, interval, voxel_size, params, cache):
 # TODO: Move to config file
 VOXEL_SIZE = .005
 EXPERIMENT = 'a1'
-INTERVAL = 25
+SUBJECT = 0
+INTERVAL = 10
 
 # TODO: Move cameras to dataloader
 cam24 = 'azure_kinect2_4_calib_snap'
@@ -272,12 +292,15 @@ if __name__ == "__main__":
         cam15,
         # cam14,
         cam34,
-        cam35
+        cam35,
     ]
     
-    for file in sorted(os.listdir(STORE_DIR), reverse=False):
+    for file in sorted(os.listdir(DIR_INPUT)):
         experiment = file.split('.')[0].split('_')[1]
-        file_path = os.path.join(STORE_DIR, file)
+        if experiment != EXPERIMENT:
+            continue
+        
+        file_path = os.path.join(DIR_INPUT, file)
         print(f"Visualizing {file_path}")
     
         with open(file_path, 'rb') as handle:
@@ -287,4 +310,4 @@ if __name__ == "__main__":
         params = output['params']
 
         finetune_extrinsics(
-            cams, EXPERIMENT, INTERVAL, VOXEL_SIZE, params, cache)
+            SUBJECT, cams, EXPERIMENT, INTERVAL, VOXEL_SIZE, params, cache)

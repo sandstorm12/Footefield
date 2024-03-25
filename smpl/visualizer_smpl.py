@@ -74,12 +74,12 @@ def visualize_poses(poses_org, poses_smpl, verts, faces):
                 keypoints_smpl = poses_smpl[idx_jtr][idx].reshape(-1, 3)
                 pcd_smpl = o3d.geometry.PointCloud()
                 pcd_smpl.points = o3d.utility.Vector3dVector(keypoints_smpl)
-                pcd_smpl.paint_uniform_color([1, 0, 0])
+                pcd_smpl.paint_uniform_color([1, 1, 1])
                 
                 lines_jtr[idx_jtr].points = pcd_smpl.points
                 lines_jtr[idx_jtr].lines = o3d.utility.Vector2iVector(
                     JOINTS_SMPL)
-                lines_jtr[idx_jtr].paint_uniform_color([0, 0, 1]) # White lines
+                lines_jtr[idx_jtr].paint_uniform_color([1, 1, 1]) # White lines
                 geometry_jtr[idx_jtr].points = pcd_smpl.points
                 geometry_jtr[idx_jtr].colors = pcd_smpl.colors
                 if idx == 0:
