@@ -77,10 +77,26 @@ def remove_outliers(pointcloud):
     return pointcloud
 
 
+def filter_area(pcd, volume=1):
+    points = np.asarray(pcd.points)
+    center = np.mean(points, axis=0)
+    points = points[points[:, 0] < center[0] + volume]
+    points = points[points[:, 1] < center[1] + volume]
+    points = points[points[:, 2] < center[2] + volume]
+    points = points[points[:, 0] > center[0] - volume]
+    points = points[points[:, 1] > center[1] - volume]
+    points = points[points[:, 2] > center[2] - volume]
+
+    pcd.points = o3d.utility.Vector3dVector(points)
+
+    return pcd
+
+
 def preprocess(pointcloud, voxel_size):
+    # pointcloud = remove_outliers(pointcloud)
+    pointcloud = filter_area(pointcloud)
+
     pointcloud = pointcloud.voxel_down_sample(voxel_size=voxel_size)
-    
-    pointcloud = remove_outliers(pointcloud)
 
     return pointcloud
 
@@ -107,7 +123,7 @@ def pairwise_registration(source, target, voxel_size):
 
 def visualize_poses(subject, verts, experiment, extrinsics, voxel_size, cache):
     pcd_mesh = o3d.geometry.PointCloud()
-    for idx in range(0, len(verts[0]), 25):
+    for idx in range(0, len(verts[0]), 10):
         pcd = get_pcd(cam24, subject, experiment,
                       idx, extrinsics[cam24], cache)
         pcd += get_pcd(cam15, subject, experiment,
@@ -119,6 +135,7 @@ def visualize_poses(subject, verts, experiment, extrinsics, voxel_size, cache):
         pcd += get_pcd(cam35, subject, experiment,
                        idx, extrinsics[cam35], cache)
         pcd_combined = preprocess(pcd, voxel_size=voxel_size)
+        # pcd_combined = preprocess(pcd)
         pcd_combined.paint_uniform_color([1, 1, 1])
         
         pcd_mesh.points = o3d.utility.Vector3dVector(
@@ -127,6 +144,7 @@ def visualize_poses(subject, verts, experiment, extrinsics, voxel_size, cache):
 
         transformation_icp = pairwise_registration(
             pcd_mesh, pcd_combined, voxel_size=voxel_size)
+        transformation_icp = np.linalg.inv(transformation_icp)
         
         def key_callback(vis):
             store_extrinsics()
@@ -157,7 +175,7 @@ def visualize_poses(subject, verts, experiment, extrinsics, voxel_size, cache):
         vis.get_render_option().show_coordinate_frame = True
         vis.get_render_option().background_color = \
             data_loader.COLOR_SPACE_GRAY
-        pcd_mesh.transform(transformation_icp)
+        pcd_combined.transform(transformation_icp)
         vis.add_geometry(pcd_mesh)
         vis.add_geometry(pcd_combined)
         vis.run()
@@ -198,7 +216,7 @@ def load_smpl(file_org):
             smpl = pickle.load(handle)
         verts = np.array(smpl['verts'])
         scale_smpl = smpl['scale']
-        translation_smpl = smpl['translation']
+        transformation = smpl['transformation']
 
         # Load alignment params
         path_params = os.path.join(DIR_PARAMS_TRANSFORM, file_smpl[1])
@@ -209,13 +227,16 @@ def load_smpl(file_org):
         translation = params['translation']
 
         rotation_inverted = np.linalg.inv(rotation)
-        verts = verts + translation_smpl
+        verts = np.concatenate(
+            (verts,
+                np.ones((verts.shape[0], verts.shape[1], 1))
+            ), axis=2)
+        verts = np.matmul(verts, transformation)
+        verts = verts[:, :, :3] / verts[:, :, -1:]
         verts = verts.dot(rotation_inverted.T)
         verts = verts * scale
         verts = verts + translation
         verts = verts / 1000
-
-        print(translation / 1000)
 
         verts_all.append(verts)
 
@@ -224,7 +245,7 @@ def load_smpl(file_org):
 
 EXPERIMENT = 'a2'
 SUBJECT = 0
-VOXEL_SIZE = .025
+VOXEL_SIZE = .005
 
 
 # TODO: Move the cameras somewhere else

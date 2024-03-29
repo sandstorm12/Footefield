@@ -18,7 +18,6 @@ from sklearn.cluster import KMeans
 VIS_MESH = True
 
 STORE_DIR = '../pose_estimation/keypoints_3d_ba'
-PARAM_CALIB_SIZE = 16
 DIR_PARMAS_GLOBAL = "./extrinsics_global"
 DIR_STORE = '/home/hamid/Documents/phd/footefield/Pose_to_SMPL/fit/output/HALPE/'
 DIR_PARAMS = '../pose_estimation/keypoints_3d_pose2smpl/'
@@ -155,6 +154,21 @@ def get_pcd(subject, cam, experiment, idx, extrinsics, cache):
     return pcd
 
 
+def filter_area(pcd, volume=1):
+    points = np.asarray(pcd.points)
+    center = np.mean(points, axis=0)
+    points = points[points[:, 0] < center[0] + volume]
+    points = points[points[:, 1] < center[1] + volume]
+    points = points[points[:, 2] < center[2] + volume]
+    points = points[points[:, 0] > center[0] - volume]
+    points = points[points[:, 1] > center[1] - volume]
+    points = points[points[:, 2] > center[2] - volume]
+
+    pcd.points = o3d.utility.Vector3dVector(points)
+
+    return pcd
+
+
 def remove_outliers(pointcloud):
     _, ind = pointcloud.remove_statistical_outlier(
         nb_neighbors=16,
@@ -165,9 +179,11 @@ def remove_outliers(pointcloud):
 
 
 def preprocess(pointcloud):
-    pointcloud = remove_outliers(pointcloud)
+    # pointcloud = remove_outliers(pointcloud)
 
     # pointcloud = pointcloud.voxel_down_sample(voxel_size=0.005)
+
+    pointcloud = filter_area(pointcloud)
 
     return pointcloud
 
@@ -181,7 +197,7 @@ def load_pointcloud(poses, subject, experiment, extrinsics, cache):
         pcd += get_pcd(subject, cam34, experiment, idx, extrinsics, cache)
         pcd += get_pcd(subject, cam35, experiment, idx, extrinsics, cache)
 
-        pcd = pcd.transform(np.linalg.inv(extrinsics['global']))
+        pcd = pcd.transform(extrinsics['global'])
 
         pcd_combined = preprocess(pcd)
 
@@ -255,8 +271,6 @@ def visualize_poses(poses, verts, faces, subject, pcds):
             vis.update_renderer()
             time.sleep(.01)
 
-        print(f"Update {idx}: {time.time()}")
-
 
 def load_smpl(file_org):
     files_smpl = get_corresponding_files(file_org)
@@ -286,7 +300,7 @@ def load_smpl_params(file_org, subject):
     with open(path_smpl, 'rb') as handle:
         smpl = pickle.load(handle)
     scale_smpl = smpl['scale']
-    translation_1 = smpl['translation']
+    transformation_1 = smpl['transformation']
 
     # Load alignment params
     path_params = os.path.join(DIR_PARAMS, files_smpl[idx_smpl][1])
@@ -300,10 +314,10 @@ def load_smpl_params(file_org, subject):
 
     scale_2 = 1000
 
-    return translation_1, rotation_1, scale_1, translation_2, scale_2
+    return transformation_1, rotation_1, scale_1, translation_2, scale_2
 
 
-def normalizer_pcs(pcd_np, translation_1, rotation_1,
+def normalizer_pcs(pcd_np, transformation_1, rotation_1,
                    scale_1, translation_2, scale_2):
     pcds_normalized = []
     for pcd in pcd_np:
@@ -311,7 +325,12 @@ def normalizer_pcs(pcd_np, translation_1, rotation_1,
         pcd = pcd - translation_2
         pcd = pcd / scale_1
         pcd = pcd.dot(np.linalg.inv(rotation_1).T)
-        pcd = pcd - translation_1
+        pcd = np.concatenate(
+            (pcd,
+                np.ones((pcd.shape[0], 1))
+            ), axis=1)
+        pcd = np.matmul(pcd, np.linalg.inv(transformation_1))
+        pcd = pcd[:, :3] / pcd[:, -1:]
 
         pcds_normalized.append(pcd)
 
@@ -331,6 +350,7 @@ def store_smpl_pointcloud(pcds_normalized, experiment, subject):
 
 
 SUBJECTS = [0, 1]
+VISUALIZE = True
 
 # TODO: Move the cameras somewhere else
 cam24 = 'azure_kinect2_4_calib_snap'
@@ -380,8 +400,9 @@ if __name__ == "__main__":
 
             verts_all, faces_all = load_smpl(file_path)
 
-            visualize_poses(
-                poses, verts_all, faces_all, subject, 
-                pcds_normalized)
+            if VISUALIZE:
+                visualize_poses(
+                    poses, verts_all, faces_all, subject, 
+                    pcds_normalized)
 
             store_smpl_pointcloud(pcds_normalized, experiment, subject)

@@ -88,6 +88,21 @@ def get_params_depth(cam, cache):
     return mtx, dist, extrinsics
 
 
+def filter_area(pcd, volume=1):
+    points = np.asarray(pcd.points)
+    center = np.mean(points, axis=0)
+    points = points[points[:, 0] < center[0] + volume]
+    points = points[points[:, 1] < center[1] + volume]
+    points = points[points[:, 2] < center[2] + volume]
+    points = points[points[:, 0] > center[0] - volume]
+    points = points[points[:, 1] > center[1] - volume]
+    points = points[points[:, 2] > center[2] - volume]
+
+    pcd.points = o3d.utility.Vector3dVector(points)
+
+    return pcd
+
+
 def remove_outliers(pointcloud):
     _, ind = pointcloud.remove_statistical_outlier(
         nb_neighbors=16,
@@ -98,7 +113,8 @@ def remove_outliers(pointcloud):
 
 
 def preprocess(pointcloud, voxel_size):
-    pointcloud = remove_outliers(pointcloud)
+    # pointcloud = remove_outliers(pointcloud)
+    pointcloud = filter_area(pointcloud)
 
     # pointcloud = pointcloud.voxel_down_sample(voxel_size=voxel_size)
 
@@ -274,8 +290,8 @@ def finetune_extrinsics(subject, cams, experiment, interval, voxel_size,
 
 # TODO: Move to config file
 VOXEL_SIZE = .005
-EXPERIMENT = 'a1'
-SUBJECT = 0
+EXPERIMENT = 'a2'
+SUBJECT = 1
 INTERVAL = 10
 
 # TODO: Move cameras to dataloader
