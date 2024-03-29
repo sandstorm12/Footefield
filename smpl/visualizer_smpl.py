@@ -144,7 +144,7 @@ if __name__ == "__main__":
             verts = np.array(smpl['verts'])
             faces = np.array(smpl['th_faces'])
             scale_smpl = smpl['scale']
-            translation_smpl = smpl['translation']
+            transformation = smpl['transformation']
 
             # Load alignment params
             path_params = os.path.join(DIR_PARAMS, file_smpl[1])
@@ -155,12 +155,22 @@ if __name__ == "__main__":
             translation = params['translation']
 
             rotation_inverted = np.linalg.inv(rotation)
-            poses_smpl = poses_smpl + translation_smpl
+            poses_smpl = np.concatenate(
+                (poses_smpl,
+                 np.ones((poses_smpl.shape[0], poses_smpl.shape[1], 1))
+                ), axis=2)
+            poses_smpl = np.matmul(poses_smpl, transformation)
+            poses_smpl = poses_smpl[:, :, :3] / poses_smpl[:, :, -1:]
             poses_smpl = poses_smpl.dot(rotation_inverted.T)
             poses_smpl = poses_smpl * scale
             poses_smpl = poses_smpl + translation
 
-            verts = verts + translation_smpl
+            verts = np.concatenate(
+                (verts,
+                 np.ones((verts.shape[0], verts.shape[1], 1))
+                ), axis=2)
+            verts = np.matmul(verts, transformation)
+            verts = verts[:, :, :3] / verts[:, :, -1:]
             verts = verts.dot(rotation_inverted.T)
             verts = verts * scale
             verts = verts + translation

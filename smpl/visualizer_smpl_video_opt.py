@@ -177,7 +177,7 @@ def get_smpl_parameters(smpl_layer, file_org):
         with open(path_smpl, 'rb') as handle:
             smpl = pickle.load(handle)
         scale_smpl = smpl['scale']
-        translation_smpl = smpl['translation']
+        transformation = smpl['transformation']
 
         # Load SMPL params and get verts
         path_smpl_opt = os.path.join(DIR_STORE_OPT, file_smpl[2])
@@ -196,8 +196,7 @@ def get_smpl_parameters(smpl_layer, file_org):
             verts_single, _ = smpl_layer(pose_torch, th_betas=shape_torch)
 
             verts.append(verts_single.detach().cpu().numpy().astype(float))
-        verts = np.array(verts)
-        verts = np.transpose(verts, (1, 0, 2, 3))
+        verts = np.array(verts).squeeze()
 
         # Load alignment params
         path_params = os.path.join(DIR_PARAMS, file_smpl[1])
@@ -208,7 +207,12 @@ def get_smpl_parameters(smpl_layer, file_org):
         translation = params['translation']
 
         rotation_inverted = np.linalg.inv(rotation)
-        verts = verts + translation_smpl
+        verts = np.concatenate(
+            (verts,
+                np.ones((verts.shape[0], verts.shape[1], 1))
+            ), axis=2)
+        verts = np.matmul(verts, transformation)
+        verts = verts[:, :, :3] / verts[:, :, -1:]
         verts = verts.dot(rotation_inverted.T)
         verts = verts * scale
         verts = verts + translation
