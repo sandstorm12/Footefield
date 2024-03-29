@@ -21,20 +21,31 @@ DIR_OUTPUT = './params_smpl'
 
 def optimize_beta(smpl_layer, pose_params, shape_params, pcds, epochs):
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
+    smpl_layer.to(device)
+
+    # pose_params_org = torch.from_numpy(
+    #     pose_params).float().to(device)
 
     pose_torch = torch.from_numpy(
         pose_params).float().to(device)
     shape_torch = (torch.rand(10) * 0.03).to(device)
-    
-    pose_torch.requires_grad = False
-    shape_torch.requires_grad = True
+    transformation = torch.eye(4).to(device)
 
-    optim_params = [{'params': shape_torch, 'lr': 2e-2},
-                    {'params': pose_torch, 'lr': 2e-2},]
+    verts, _ = smpl_layer(pose_torch[0].unsqueeze(0), th_betas=shape_torch.unsqueeze(0))
+    pcd_torch = torch.from_numpy(
+        pcds[0]).unsqueeze(0).float().to(device)
+    transformation[:3, 3] = (torch.mean(pcd_torch, dim=1) - torch.mean(verts, dim=1))
+    
+    pose_torch.requires_grad = True
+    shape_torch.requires_grad = True
+    transformation.requires_grad = True
+
+    optim_params = [{'params': shape_torch, 'lr': 2e-4},
+                    {'params': pose_torch, 'lr': 2e-4},
+                    {'params': transformation, 'lr': 0},]
     optimizer = torch.optim.Adam(optim_params)
 
-    smpl_layer.to(device)
-
+    # TODO: maybe add transfromation term as well
     loss_init = None
     bar = tqdm(range(epochs))
     for _ in bar:
@@ -42,10 +53,24 @@ def optimize_beta(smpl_layer, pose_params, shape_params, pcds, epochs):
         for idx in range(pose_params.shape[0]):
             pcd_torch = torch.from_numpy(
                 pcds[idx]).unsqueeze(0).float().to(device)
+            
+            pcd_torch = torch.cat((
+                pcd_torch,
+                torch.ones(pcd_torch.shape[0], pcd_torch.shape[1], 1, device=device)), dim=2)
+            pcd_torch = (torch.matmul(pcd_torch, transformation))
+            pcd_torch = pcd_torch[:, :, :3] / pcd_torch[:, :, -1:]
 
             verts, _ = smpl_layer(pose_torch[idx].unsqueeze(0), th_betas=shape_torch.unsqueeze(0))
 
             loss += chamfer_distance(verts, pcd_torch)[0]
+            # print("Before", loss)
+            # loss += torch.sum(torch.abs(pose_torch[idx] - pose_params_org[idx])) / pose_torch.shape[0] * .3
+            pose_prev = pose_torch[max(0, idx - 1)]
+            pose_next = pose_torch[min(pose_params.shape[0] - 1, idx + 1)]
+            loss += torch.sum(torch.abs((pose_torch[idx] - pose_prev) + (pose_torch[idx] - pose_next))) / pose_torch.shape[0] * PARAM_POSE_COEFF
+            # print("After", loss, '\n')
+
+            loss += torch.abs(1 - torch.det(transformation))
 
         optimizer.zero_grad()
         loss.backward()
@@ -60,10 +85,11 @@ def optimize_beta(smpl_layer, pose_params, shape_params, pcds, epochs):
     print('Loss went from {:.4f} to {:.4f}'.format(loss_init, loss))
 
     return pose_torch.detach().cpu().numpy(), \
-        shape_torch.detach().cpu().numpy()
+        shape_torch.detach().cpu().numpy(), \
+        transformation.detach().cpu().numpy()
 
 
-def visualize_poses(alpha, beta, faces, pcds):
+def visualize_poses(alpha, beta, transformation, faces, pcds):
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
     pose_torch = torch.from_numpy(alpha).to(device)
     shape_torch = torch.from_numpy(beta).to(device)
@@ -83,6 +109,13 @@ def visualize_poses(alpha, beta, faces, pcds):
     mesh_line = o3d.geometry.LineSet()
     for idx in range(len(verts)):
         pcd_combined = pcds[idx]
+
+        pcd_combined = np.concatenate(
+            (pcd_combined,
+                np.ones((pcd_combined.shape[0], 1))
+            ), axis=1)
+        pcd_combined = np.matmul(pcd_combined, transformation)
+        pcd_combined = pcd_combined[:, :3] / pcd_combined[:, -1:]
 
         geometry_combined.points = o3d.utility.Vector3dVector(pcd_combined)
         if idx == 0:
@@ -166,8 +199,9 @@ def store_smpl_parameters(alpha, beta, faces, experiment, subject):
 
 EXPERIMENTS = ['a1', 'a2']
 SUBJECTS = [0, 1]
-EPOCHS = 20
-VISUALIZE = False
+EPOCHS = 50
+VISUALIZE = True
+PARAM_POSE_COEFF = .1
 
 if __name__ == '__main__':
     smpl_layer = SMPL_Layer(
@@ -183,10 +217,10 @@ if __name__ == '__main__':
             pcds = load_pointcloud(experiment, subject)
 
             print(f'Optimizing {experiment} {subject}')
-            alpha, beta = optimize_beta(
+            alpha, beta, transformation = optimize_beta(
                 smpl_layer, pose_params, shape_params, pcds, EPOCHS)
 
             if VISUALIZE:
-                visualize_poses(alpha, beta, faces, pcds)
+                visualize_poses(alpha, beta, transformation, faces, pcds)
 
             store_smpl_parameters(alpha, beta, faces, experiment, subject)
