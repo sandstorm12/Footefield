@@ -128,7 +128,6 @@ nest-asyncio=1.6.0=pypi_0
 nettle=3.7.3=hbbd107a_1
 networkx=3.2.1=pypi_0
 numpy=1.26.4=pypi_0
-numpy-base=1.26.3=py39hb5e798b_0
 nvidia-cublas-cu12=12.1.3.1=pypi_0
 nvidia-cuda-cupti-cu12=12.1.105=pypi_0
 nvidia-cuda-nvrtc-cu12=12.1.105=pypi_0

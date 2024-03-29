@@ -1,9 +1,0 @@
-tqdm
-diskcache
-opencv-python
-
-mmpose
-mmcv
-mmdet
-
-open3d
