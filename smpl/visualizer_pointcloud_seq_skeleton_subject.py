@@ -190,9 +190,8 @@ def visualize_poses(poses, verts, faces, subject, experiment,
         pcd += get_pcd(subject, cam34, experiment, idx, extrinsics, cache)
         pcd += get_pcd(subject, cam35, experiment, idx, extrinsics, cache)
 
-        pcd = pcd.transform(np.linalg.inv(extrinsics['global']))
-
         pcd_combined = preprocess(pcd)
+        pcd = pcd_combined.transform(extrinsics['global'])
 
         geometry_combined.points = pcd_combined.points
         if idx == 0:
@@ -222,7 +221,6 @@ def visualize_poses(poses, verts, faces, subject, experiment,
             time.sleep(.01)
 
         print(f"Update {idx}: {time.time()}")
-        break
 
 
 def load_global_extrinsics():
