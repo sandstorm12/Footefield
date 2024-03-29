@@ -54,8 +54,6 @@ def visualize_poses(verts, faces, pcds):
             vis.update_renderer()
             time.sleep(.01)
 
-        print(f"Update {idx}: {time.time()}")
-
 
 def get_corresponding_files(path, subject):
     file_name = path.split('/')[-1].split('.')[0]
@@ -124,13 +122,14 @@ def load_smpl_optimized(experiment, subject):
 
 SUBJECT = 0
 EXPERIMENT = 'a1'
-OPTIMIZED = True
+OPTIMIZED = False
 
 if __name__ == '__main__':
+    device = 'cuda' if torch.cuda.is_available() else 'cpu'
     smpl_layer = SMPL_Layer(
         center_idx=0,
         gender="neutral",
-        model_root='smplpytorch/native/models')
+        model_root='smplpytorch/native/models').to(device)
 
     if OPTIMIZED:
         pose_params, shape_params, faces = \
@@ -146,7 +145,8 @@ if __name__ == '__main__':
         shape_torch = torch.from_numpy(
             shape_params[idx]).unsqueeze(0).float()
 
-        verts, Jtr = smpl_layer(pose_torch, th_betas=shape_torch)
+        verts, Jtr = smpl_layer(pose_torch.to(device),
+                                th_betas=shape_torch.to(device))
 
         verts_all.append(verts.detach().cpu().numpy().astype(float))
 
