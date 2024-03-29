@@ -1,10 +1,7 @@
 import os
 import math
 import pickle
-from time import sleep
 import numpy as np
-
-from tqdm import tqdm
 
 
 DIR_INPUT = './keypoints_3d_ba'
@@ -103,21 +100,21 @@ def skeleton_2_numpypkl(path_input, dir_output, name):
         for i in range(len(skeleton)):
             skeleton[i] = skeleton[i] - translation
 
-            # print("Facing_angle before",
-            #       facing_angle(skeleton[i, 19],
-            #                    skeleton[i, 5],
-            #                    skeleton[i, 6]))
-
             skeleton[i] = rotate_skeleton(skeleton[i], rotation)
-
-            # print("Facing_angle after",
-            #       facing_angle(skeleton[i, 19],
-            #                    skeleton[i, 5],
-            #                    skeleton[i, 6]))
 
         scale = np.max(abs(skeleton))
         for i in range(len(skeleton)):
             skeleton[i] = skeleton[i] / scale
+
+        skeleton_aug = []
+        for i in range(len(skeleton)):
+            skeleton_aug.append(
+                np.append(
+                    skeleton[i],
+                    ((skeleton[i, 19] + skeleton[i, 18]) / 2).reshape(1, -1),
+                    axis=0)
+            )
+        skeleton = np.array(skeleton_aug)
 
         output_path_skeleton = os.path.join(
             dir_output,
