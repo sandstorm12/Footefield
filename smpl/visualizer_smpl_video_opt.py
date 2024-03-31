@@ -21,7 +21,6 @@ DIR_OUTPUT = "./output_videos_opt"
 
 PARAM_OUTPUT_SIZE = (1920, 1080)
 PARAM_OUTPUT_FPS = 5.0
-PARAM_CALIB_SIZE = 16
 
 TYPE_ORG = "org"
 TYPE_JTR = "jtr"
@@ -234,6 +233,7 @@ cam15 = 'azure_kinect1_5_calib_snap'
 cam14 = 'azure_kinect1_4_calib_snap'
 cam34 = 'azure_kinect3_4_calib_snap'
 cam35 = 'azure_kinect3_5_calib_snap'
+
 # TODO: Too long
 if __name__ == "__main__":
     cache = diskcache.Cache('../calibration/cache')
