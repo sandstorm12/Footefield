@@ -122,6 +122,7 @@ def get_corresponding_files(path):
     return files
 
 
+# TODO: Shorten
 if __name__ == "__main__":
     files_org = glob.glob(os.path.join(DIR_STORE_ORG, "*.pkl"))
     for file_org in files_org:
