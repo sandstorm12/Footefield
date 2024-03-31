@@ -52,7 +52,7 @@ def project_3d_to_2d(camera_matrix, dist_coeffs, rvec, tvec, object_points):
     return image_points
 
 
-def get_video_writer(experiment, camera, type):
+def get_video_writer(experiment, camera):
     if not os.path.exists(DIR_OUTPUT):
         os.mkdir(DIR_OUTPUT)
 
@@ -60,7 +60,7 @@ def get_video_writer(experiment, camera, type):
     writer = cv2.VideoWriter(
         os.path.join(
             DIR_OUTPUT,
-            f'visualizer_skeleton_video_{experiment}_{camera}_{type}.avi'
+            f'visualizer_skeleton_video_{experiment}_{camera}.avi'
         ),
         fourcc,
         PARAM_OUTPUT_FPS,
@@ -101,31 +101,21 @@ def get_point_size_by_type(type):
     return point_size
     
 
-def write_video(poses_2d, experiment, camera, type, params, cache):
-    img_rgb_paths = data_loader.list_rgb_images(os.path.join(dir, "color"))
+def write_frame(img_rgb, poses_2d, type):
+    point_size = get_point_size_by_type(type)
+    for point in poses_2d:
+        cv2.circle(img_rgb, (int(point[0]), int(point[1])),
+                    point_size, (0, 255, 0), -1)
 
-    mtx, dist, _ = get_parameters(params)
-
-    writer = get_video_writer(experiment, camera, type)
-    for idx, t in enumerate(poses_2d.reshape(poses_2d.shape[0], -1, 2)):
-        img_rgb = cv2.imread(img_rgb_paths[idx])
-
-        img_rgb = cv2.undistort(img_rgb, mtx, dist, None, None)
-
-        point_size = get_point_size_by_type(type)
-        for point in t:
-            cv2.circle(img_rgb, (int(point[0]), int(point[1])),
-                       point_size, (0, 255, 0), -1)
-
-        connections = get_connections_by_type(type)
-        if connections is not None:
-            for connection in connections:
-                cv2.line(img_rgb,
-                        (int(t[connection[0]][0]), int(t[connection[0]][1])),
-                        (int(t[connection[1]][0]), int(t[connection[1]][1])),
-                        (255, 255, 255), 1)
-
-        writer.write(img_rgb)
+    connections = get_connections_by_type(type)
+    if connections is not None:
+        for connection in connections:
+            cv2.line(img_rgb,
+                    (int(poses_2d[connection[0]][0]),
+                     int(poses_2d[connection[0]][1])),
+                    (int(poses_2d[connection[1]][0]),
+                     int(poses_2d[connection[1]][1])),
+                    (255, 255, 255), 1)
 
 
 def poses_3d_2_2d(poses_3d, params):
@@ -158,6 +148,7 @@ def get_corresponding_files(path):
     return files
 
 
+# TODO: Shorten
 def get_smpl_parameters(file_org):
     files_smpl = get_corresponding_files(file_org)
         
@@ -224,6 +215,7 @@ cam15 = 'azure_kinect1_5_calib_snap'
 cam14 = 'azure_kinect1_4_calib_snap'
 cam34 = 'azure_kinect3_4_calib_snap'
 cam35 = 'azure_kinect3_5_calib_snap'
+
 # TODO: Too long
 if __name__ == "__main__":
     cache = diskcache.Cache('../calibration/cache')
@@ -253,23 +245,34 @@ if __name__ == "__main__":
         for idx_cam, camera in enumerate(tqdm(cameras)):
             dir = data_loader.EXPERIMENTS[experiment][camera]
 
-            if VIS_ORG:
-                poses_2d = poses_3d_2_2d(
-                    poses,
-                    params[idx_cam])
-                write_video(poses_2d, experiment, camera,
-                            TYPE_ORG, params[idx_cam], cache)
+            img_rgb_paths = data_loader.list_rgb_images(
+                os.path.join(dir, "color"))
+            
+            poses_2d = poses_3d_2_2d(
+                poses,
+                params[idx_cam]).reshape(poses.shape[0], -1, 2)
+            poses_2d_smpl = poses_3d_2_2d(
+                poses_smpl_all,
+                params[idx_cam]).reshape(poses.shape[0], -1, 2)
+            poses_2d_verts = poses_3d_2_2d(
+                verts_all,
+                params[idx_cam]).reshape(poses.shape[0], -1, 2)
 
-            if VIS_JTR:
-                poses_2d_smpl = poses_3d_2_2d(
-                    poses_smpl_all,
-                    params[idx_cam])
-                write_video(poses_2d_smpl, experiment, camera,
-                            TYPE_JTR, params[idx_cam], cache)
+            writer = get_video_writer(experiment, camera)
+            for idx, t in enumerate(poses_2d.reshape(poses_2d.shape[0], -1, 2)):
+                img_rgb = cv2.imread(img_rgb_paths[idx])
+                mtx, dist, _ = get_parameters(params[idx_cam])
+                img_rgb = cv2.undistort(img_rgb, mtx, dist, None, None)
+                if VIS_ORG:
+                    write_frame(img_rgb, poses_2d[idx],
+                                TYPE_ORG)
 
-            if VIS_MESH:
-                poses_2d_verts = poses_3d_2_2d(
-                    verts_all,
-                    params[idx_cam])
-                write_video(poses_2d_verts, experiment, camera,
-                            TYPE_MESH, params[idx_cam], cache)
+                if VIS_JTR:
+                    write_frame(img_rgb, poses_2d_smpl[idx],
+                                TYPE_JTR)
+
+                if VIS_MESH:
+                    write_frame(img_rgb, poses_2d_verts[idx],
+                                TYPE_MESH)
+                    
+                writer.write(img_rgb)
