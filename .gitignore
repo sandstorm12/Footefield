@@ -5,6 +5,7 @@ smpl/smplpytorch/native/models/basicModel_neutral_lbs_10_207_0_v1.0.0.pkl
 .vscode
 
 # Temporary IO files
+**/keypoints_3d_x/
 **/keypoints_3d/
 **/keypoints_3d_ba/
 **/keypoints_3d_pose2smpl/
