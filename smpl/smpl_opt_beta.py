@@ -18,59 +18,72 @@ DIR_SMPL = '/home/hamid/Documents/phd/footefield/Pose_to_SMPL/fit/output/HALPE/'
 DIR_POINTCLOUD = './pointcloud_normalized'
 DIR_OUTPUT = './params_smpl'
 
+EXPERIMENTS = ['a1', 'a2']
+SUBJECTS = [0, 1]
+EPOCHS = 50
+VISUALIZE = True
+PARAM_COEFF_POSE = .0
+PARAM_COEFF_DET = .001
 
+
+# TODO: Shorten
 def optimize_beta(smpl_layer, pose_params, shape_params, pcds, epochs):
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
     smpl_layer.to(device)
-
-    # pose_params_org = torch.from_numpy(
-    #     pose_params).float().to(device)
 
     pose_torch = torch.from_numpy(
         pose_params).float().to(device)
     shape_torch = (torch.rand(10) * 0.03).to(device)
     transformation = torch.eye(4).to(device)
-
-    verts, _ = smpl_layer(pose_torch[0].unsqueeze(0), th_betas=shape_torch.unsqueeze(0))
-    pcd_torch = torch.from_numpy(
-        pcds[0]).unsqueeze(0).float().to(device)
-    transformation[:3, 3] = (torch.mean(pcd_torch, dim=1) - torch.mean(verts, dim=1))
     
     pose_torch.requires_grad = True
     shape_torch.requires_grad = True
     transformation.requires_grad = True
 
-    optim_params = [{'params': shape_torch, 'lr': 2e-4},
-                    {'params': pose_torch, 'lr': 2e-4},
-                    {'params': transformation, 'lr': 0},]
+    lr = 2e-3
+    optim_params = [{'params': shape_torch, 'lr': lr},
+                    {'params': pose_torch, 'lr': lr * 0},
+                    {'params': transformation, 'lr': lr * 10},]
     optimizer = torch.optim.Adam(optim_params)
 
     # TODO: maybe add transfromation term as well
     loss_init = None
     bar = tqdm(range(epochs))
     for _ in bar:
-        loss = 0
+        loss_chamfer = 0
+        loss_smooth = 0
+        loss_det = 0
         for idx in range(pose_params.shape[0]):
             pcd_torch = torch.from_numpy(
                 pcds[idx]).unsqueeze(0).float().to(device)
             
             pcd_torch = torch.cat((
                 pcd_torch,
-                torch.ones(pcd_torch.shape[0], pcd_torch.shape[1], 1, device=device)), dim=2)
+                torch.ones(
+                    pcd_torch.shape[0], pcd_torch.shape[1], 1,
+                    device=device)), dim=2)
             pcd_torch = (torch.matmul(pcd_torch, transformation))
             pcd_torch = pcd_torch[:, :, :3] / pcd_torch[:, :, -1:]
 
-            verts, _ = smpl_layer(pose_torch[idx].unsqueeze(0), th_betas=shape_torch.unsqueeze(0))
+            verts, _ = smpl_layer(
+                pose_torch[idx].unsqueeze(0),
+                th_betas=shape_torch.unsqueeze(0))
 
-            loss += chamfer_distance(verts, pcd_torch)[0]
-            # print("Before", loss)
-            # loss += torch.sum(torch.abs(pose_torch[idx] - pose_params_org[idx])) / pose_torch.shape[0] * .3
+            loss_chamfer += chamfer_distance(verts, pcd_torch)[0]
+
             pose_prev = pose_torch[max(0, idx - 1)]
             pose_next = pose_torch[min(pose_params.shape[0] - 1, idx + 1)]
-            loss += torch.sum(torch.abs((pose_torch[idx] - pose_prev) + (pose_torch[idx] - pose_next))) / pose_torch.shape[0] * PARAM_POSE_COEFF
-            # print("After", loss, '\n')
+            loss_smooth += torch.sum(
+                torch.abs(
+                    (pose_torch[idx] - pose_prev) +
+                    (pose_torch[idx] - pose_next))
+            ) / pose_torch.shape[0]
 
-            loss += torch.abs(1 - torch.det(transformation))
+            loss_det += torch.abs(1 - torch.det(transformation))
+
+        loss = loss_chamfer + \
+            loss_smooth * PARAM_COEFF_POSE + \
+            loss_det * PARAM_COEFF_DET
 
         optimizer.zero_grad()
         loss.backward()
@@ -80,7 +93,14 @@ def optimize_beta(smpl_layer, pose_params, shape_params, pcds, epochs):
         if loss_init is None:
             loss_init = loss
 
-        bar.set_description('Loss: {:.4f}'.format(loss))
+        bar.set_description(
+            "L: {:.4f} C: {:.4f} S: {:.4f} D: {:.4f} Dv:{:.4f}".format(
+            loss,
+            loss_chamfer,
+            loss_smooth * PARAM_COEFF_POSE,
+            loss_det * PARAM_COEFF_DET,
+            torch.det(transformation))
+        )
 
     print('Loss went from {:.4f} to {:.4f}'.format(loss_init, loss))
 
@@ -89,6 +109,7 @@ def optimize_beta(smpl_layer, pose_params, shape_params, pcds, epochs):
         transformation.detach().cpu().numpy()
 
 
+# TODO: Shorten
 def visualize_poses(alpha, beta, transformation, faces, pcds):
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
     pose_torch = torch.from_numpy(alpha).to(device)
@@ -196,12 +217,6 @@ def store_smpl_parameters(alpha, beta, faces, experiment, subject):
         
     print(f'Stored results: {path}')
 
-
-EXPERIMENTS = ['a1', 'a2']
-SUBJECTS = [0, 1]
-EPOCHS = 50
-VISUALIZE = True
-PARAM_POSE_COEFF = .1
 
 if __name__ == '__main__':
     smpl_layer = SMPL_Layer(
