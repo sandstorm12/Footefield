@@ -81,7 +81,7 @@ if __name__ == "__main__":
     model = SMPL_Layer(
         center_idx=0,
         gender="neutral",
-        model_root='smplpytorch/native/models')
+        model_root='models')
 
     alphas = torch.zeros([1, 72], dtype=torch.float32)
     betas = torch.zeros([1, 10], dtype=torch.float32)

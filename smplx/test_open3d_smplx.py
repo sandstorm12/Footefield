@@ -11,7 +11,7 @@ from utils import data_loader
 
 
 VIS_JTR = True
-VIS_MESH = False
+VIS_MESH = True
 
 
 JOINTS_SMPLX = np.array([
@@ -103,7 +103,7 @@ def visualize_poses(poses_smpl, verts, faces):
 
 # TODO: Shorten
 if __name__ == "__main__":
-    model_path = '/home/hamid/Documents/phd/other/body-model-visualizer/data/body_models/'
+    model_path = 'models'
     model = smplx.create(
         model_path, model_type='smplx',
         gender='neutral', use_face_contour=False,
@@ -111,8 +111,8 @@ if __name__ == "__main__":
         num_expression_coeffs=10,
         ext='npz')
 
-    betas = torch.randn([1, model.num_betas], dtype=torch.float32)
-    expression = torch.randn(
+    betas = torch.zeros([1, model.num_betas], dtype=torch.float32)
+    expression = torch.zeros(
         [1, model.num_expression_coeffs], dtype=torch.float32)
 
     output = model(betas=betas, expression=expression,
