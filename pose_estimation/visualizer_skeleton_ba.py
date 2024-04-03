@@ -17,6 +17,7 @@ HALPE_LINES = np.array(
      (19, 12), (11, 13), (12, 14), (13, 15), (14, 16), (20, 24),
      (21, 25), (23, 25), (22, 24), (15, 24), (16, 25)])
 
+
 def visualize_poses(poses):
     vis = o3d.visualization.VisualizerWithKeyCallback()
     vis.create_window()
@@ -31,7 +32,7 @@ def visualize_poses(poses):
         pcd.points = o3d.utility.Vector3dVector(keypoints)
         pcd.paint_uniform_color([0, 1, 0]) # Blue points
 
-        connections = np.concatenate((HALPE_LINES, HALPE_LINES + 26))
+        connections = np.concatenate((HALPE_LINES, HALPE_LINES + 133))
         
         lines.points = o3d.utility.Vector3dVector(keypoints)
         lines.lines = o3d.utility.Vector2iVector(connections)
@@ -65,4 +66,4 @@ if __name__ == "__main__":
 
         poses = output['points_3d']
 
-        visualize_poses(poses.reshape(-1, 26*2, 3))
+        visualize_poses(poses.reshape(-1, 133*2, 3))

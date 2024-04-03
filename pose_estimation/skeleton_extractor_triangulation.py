@@ -4,6 +4,7 @@ sys.path.append('../')
 import os
 import cv2
 import pickle
+import pycalib
 import diskcache
 import numpy as np
 
@@ -12,9 +13,9 @@ from utils import data_loader
 from mmpose.apis import MMPoseInferencer
 
 
-VISUALIZE = True
+VISUALIZE = False
 EXP_LENGTH = 100
-DIR_STORE = "./keypoints_3d_x"
+DIR_STORE = "./keypoints_3d"
 
 
 def filter_sort(people_keypoints, num_select=2, invert=False):
@@ -24,7 +25,7 @@ def filter_sort(people_keypoints, num_select=2, invert=False):
         heights.append(
             (np.max(person[:, 1]) - np.min(person[:, 1])) *
             (np.max(person[:, 0]) - np.min(person[:, 0])) *
-            (1 / np.linalg.norm(np.mean(person[:], axis=0) - (1920 / 2, 1080 / 2)))
+            (700 -  np.linalg.norm(np.mean(person[:], axis=0) - (1920 / 2, 1080 / 2)))
         )
 
     indecies = np.argsort(heights)[::-1]
@@ -55,8 +56,8 @@ def _get_skeleton(image, inferencer, max_people=2, invert=False):
                                        num_select=max_people,
                                        invert=invert)
         for predictions in poeple_keypoints:
-            keypoints = predictions['keypoints'][24:]
-            confidences = predictions['keypoint_scores'][24:]
+            keypoints = predictions['keypoints']
+            confidences = predictions['keypoint_scores']
             detected_keypoints.append(keypoints)
             detected_confidences.append(confidences)
 
@@ -79,7 +80,8 @@ def extract_poses(dir, camera, model, max_people=2, invert=False):
 
         people_keypoints, confidences = _get_skeleton(
             img_rgb, model, max_people, invert)
-        visualize_keypoints(img_rgb, people_keypoints)
+        if VISUALIZE:
+            visualize_keypoints(img_rgb, people_keypoints)
 
         poses.append(people_keypoints)
         poses_confidence.append(confidences)
@@ -198,7 +200,14 @@ def calc_3d_skeleton(cameras, model_2d, cache):
     poses_multicam = np.asarray(poses_multicam)
     p_gt = np.asarray(p_gt)
 
+    poses_global = pycalib.triangulate_Npts(
+        pt2d_CxPx2=poses_multicam.reshape(len(cameras), -1, 2), P_Cx3x4=p_gt)
+
+    # TODO: Refactor the magic numbers
+    poses_global = poses_global.reshape(EXP_LENGTH, 2, 133, 3)
+
     ba_parameters = {
+        "poses_3d": poses_global.reshape(-1, 3),
         "points_2d": np.array(points_2d),
         "points_2d_confidence": np.array(points_2d_confidence),
         "camera_indices": np.array(camera_indices),
@@ -206,7 +215,7 @@ def calc_3d_skeleton(cameras, model_2d, cache):
         "params": camera_params,
     }
 
-    return ba_parameters
+    return poses_global, ba_parameters
 
 
 # TODO: Move the cameras somewhere else
@@ -219,7 +228,7 @@ cam35 = 'azure_kinect3_5_calib_snap'
 if __name__ == "__main__":
     cache = diskcache.Cache('../calibration/cache')
 
-    model_2d = MMPoseInferencer('rtmpose-l_8xb32-270e_coco-wholebody-384x288')
+    model_2d = MMPoseInferencer('rtmpose-x_8xb256-700e_body8-halpe26-384x288')
     
     # TODO: It is possible to add the 1_4 camera but it requires
     # some conditioning. make it happen
@@ -231,10 +240,16 @@ if __name__ == "__main__":
         cam35
     ]
 
-    for experiment in data_loader.EXPERIMENTS.keys():
+    poses_global = None
+    for experiment in list(data_loader.EXPERIMENTS.keys()):
         print(f"Processing experiment {experiment}...")
         
-        ba_parameters = calc_3d_skeleton(cameras, model_2d, cache)
+        poses_global, ba_parameters = calc_3d_skeleton(cameras, model_2d, cache)
+        
+        store_poses(
+            poses_global,
+            'keypoints3d_{}'.format(experiment),
+            DIR_STORE)
         
         store_poses(
             ba_parameters,

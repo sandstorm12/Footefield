@@ -14,16 +14,19 @@ from mmpose.apis import MMPoseInferencer
 
 
 VISUALIZE = True
-EXP_LENGTH = 500
-DIR_STORE = "./keypoints_3d"
+EXP_LENGTH = 100
+DIR_STORE = "./keypoints_3d_x"
 
 
 def filter_sort(people_keypoints, num_select=2, invert=False):
     heights = []
     for person in people_keypoints:
-        person = person['keypoints']
-        heights.append((person[25][1] - person[17][1]) \
-                       - np.abs(person[19][0] - 540) / 3)
+        person = np.array(person['keypoints'])
+        heights.append(
+            (np.max(person[:, 1]) - np.min(person[:, 1])) *
+            (np.max(person[:, 0]) - np.min(person[:, 0])) *
+            (700 -  np.linalg.norm(np.mean(person[:], axis=0) - (1920 / 2, 1080 / 2)))
+        )
 
     indecies = np.argsort(heights)[::-1]
     people_keypoints = [people_keypoints[indecies[idx]]
@@ -77,7 +80,8 @@ def extract_poses(dir, camera, model, max_people=2, invert=False):
 
         people_keypoints, confidences = _get_skeleton(
             img_rgb, model, max_people, invert)
-        # visualize_keypoints(img_rgb, people_keypoints)
+        if VISUALIZE:
+            visualize_keypoints(img_rgb, people_keypoints)
 
         poses.append(people_keypoints)
         poses_confidence.append(confidences)
@@ -200,7 +204,7 @@ def calc_3d_skeleton(cameras, model_2d, cache):
         pt2d_CxPx2=poses_multicam.reshape(len(cameras), -1, 2), P_Cx3x4=p_gt)
 
     # TODO: Refactor the magic numbers
-    poses_global = poses_global.reshape(EXP_LENGTH, 2, 26, 3)
+    poses_global = poses_global.reshape(EXP_LENGTH, 2, 133, 3)
 
     ba_parameters = {
         "poses_3d": poses_global.reshape(-1, 3),
@@ -224,7 +228,7 @@ cam35 = 'azure_kinect3_5_calib_snap'
 if __name__ == "__main__":
     cache = diskcache.Cache('../calibration/cache')
 
-    model_2d = MMPoseInferencer('rtmpose-x_8xb256-700e_body8-halpe26-384x288')
+    model_2d = MMPoseInferencer('rtmw-x_8xb320-270e_cocktail14-384x288')
     
     # TODO: It is possible to add the 1_4 camera but it requires
     # some conditioning. make it happen
@@ -237,7 +241,7 @@ if __name__ == "__main__":
     ]
 
     poses_global = None
-    for experiment in data_loader.EXPERIMENTS.keys():
+    for experiment in list(data_loader.EXPERIMENTS.keys()):
         print(f"Processing experiment {experiment}...")
         
         poses_global, ba_parameters = calc_3d_skeleton(cameras, model_2d, cache)

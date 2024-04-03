@@ -11,8 +11,8 @@ from scipy.sparse import lil_matrix
 from scipy.optimize import least_squares
 
 
-DIR_INPUT = './keypoints_3d'
-DIR_STORE = './keypoints_3d_ba'
+DIR_INPUT = './keypoints_3d_x'
+DIR_STORE = './keypoints_3d_ba_x'
 PARAM_CALIB_SIZE = 21
 PARAM_CORRECT_DISTORTION = False
 
@@ -76,7 +76,7 @@ def fun(params, n_cameras, n_points, camera_indices, point_indices,
     # print(points_proj.shape)
     # print(((points_proj - points_2d) * points_2d_confidence[:, None]).ravel().shape)
 
-    # points_2d_confidence[points_2d_confidence < .9] = 0
+    points_2d_confidence[points_2d_confidence < .7] = 0
 
     return ((points_proj - points_2d) * points_2d_confidence[:, None]).ravel()
 

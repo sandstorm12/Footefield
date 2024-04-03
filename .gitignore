@@ -10,6 +10,7 @@ smpl/models/
 # Temporary IO files
 **/keypoints_3d_x/
 **/keypoints_3d/
+**/keypoints_3d_ba_x/
 **/keypoints_3d_ba/
 **/keypoints_3d_pose2smpl/
 **/extrinsics_finetuned/
