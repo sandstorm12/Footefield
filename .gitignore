@@ -13,6 +13,7 @@ smpl/models/
 **/keypoints_3d_ba_x/
 **/keypoints_3d_ba/
 **/keypoints_3d_pose2smpl/
+**/keypoints_3d_pose2smpl_x/
 **/extrinsics_finetuned/
 **/extrinsics_global/
 **/pointcloud_normalized/
