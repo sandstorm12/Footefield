@@ -32,7 +32,7 @@ def visualize_poses(poses):
         pcd.points = o3d.utility.Vector3dVector(keypoints)
         pcd.paint_uniform_color([0, 1, 0]) # Blue points
 
-        connections = np.concatenate((HALPE_LINES, HALPE_LINES + 133))
+        connections = np.concatenate((HALPE_LINES, HALPE_LINES + 26))
         
         lines.points = o3d.utility.Vector3dVector(keypoints)
         lines.lines = o3d.utility.Vector2iVector(connections)
@@ -66,4 +66,4 @@ if __name__ == "__main__":
 
         poses = output['points_3d']
 
-        visualize_poses(poses.reshape(-1, 133*2, 3))
+        visualize_poses(poses.reshape(-1, 26*2, 3))

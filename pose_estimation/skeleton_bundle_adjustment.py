@@ -71,14 +71,11 @@ def fun(params, n_cameras, n_points, camera_indices, point_indices,
         camera_params[camera_indices],
         [camera_params_org[idx] for idx in camera_indices])
     
-    # print(points_2d.shape)
-    # print(points_2d_confidence.shape)
-    # print(points_proj.shape)
-    # print(((points_proj - points_2d) * points_2d_confidence[:, None]).ravel().shape)
+    points_2d_confidence = np.tile(np.expand_dims(
+        points_2d_confidence, 1), (1, 2))
+    points_2d_confidence[points_2d_confidence < .6] = 0
 
-    # points_2d_confidence[points_2d_confidence < .9] = 0
-
-    return ((points_proj - points_2d) * points_2d_confidence[:, None]).ravel()
+    return ((points_proj - points_2d) * points_2d_confidence).ravel()
 
 
 def bundle_adjustment_sparsity(n_cameras, n_points, camera_indices,

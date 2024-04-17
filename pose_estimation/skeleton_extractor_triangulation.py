@@ -204,7 +204,7 @@ def calc_3d_skeleton(cameras, model_2d, cache):
         pt2d_CxPx2=poses_multicam.reshape(len(cameras), -1, 2), P_Cx3x4=p_gt)
 
     # TODO: Refactor the magic numbers
-    poses_global = poses_global.reshape(EXP_LENGTH, 2, 133, 3)
+    poses_global = poses_global.reshape(EXP_LENGTH, 2, 26, 3)
 
     ba_parameters = {
         "poses_3d": poses_global.reshape(-1, 3),

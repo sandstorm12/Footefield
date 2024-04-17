@@ -42,10 +42,10 @@ def project(points, params, params_org):
     camera_matrix[:, 2, 2] = 1.0
     dist_coeffs = np.array([item['dist'] for item in params_org])
     # dist_coeffs = params[:, 16:]
-    # rotation = np.array([item['extrinsics'][:3, :3] for item in params_org])
     rotation = params[:, :9].reshape(-1, 3, 3)
-    # translation = np.array([item['extrinsics'][:3, 3] for item in params_org])
     translation = params[:, 9:12]
+    # rotation = np.array([item['extrinsics'][:3, :3] for item in params_org])
+    # translation = np.array([item['extrinsics'][:3, 3] for item in params_org])
 
     points_proj = []
     for idx, point in enumerate(points):
@@ -63,22 +63,21 @@ def project(points, params, params_org):
 
 def fun(params, n_cameras, n_points, camera_indices, point_indices,
         points_2d, points_2d_confidence):
+
     camera_params = params[:n_cameras * PARAM_CALIB_SIZE].reshape(
         (n_cameras, PARAM_CALIB_SIZE))
+
     points_3d = params[n_cameras * PARAM_CALIB_SIZE:].reshape((n_points, 3))
     points_proj = project(
         points_3d[point_indices],
         camera_params[camera_indices],
         [camera_params_org[idx] for idx in camera_indices])
-    
-    # print(points_2d.shape)
-    # print(points_2d_confidence.shape)
-    # print(points_proj.shape)
-    # print(((points_proj - points_2d) * points_2d_confidence[:, None]).ravel().shape)
 
-    points_2d_confidence[points_2d_confidence < .7] = 0
+    points_2d_confidence = np.tile(np.expand_dims(
+        points_2d_confidence, 1), (1, 2))
+    points_2d_confidence[points_2d_confidence < .6] = 0
 
-    return ((points_proj - points_2d) * points_2d_confidence[:, None]).ravel()
+    return ((points_proj - points_2d) * points_2d_confidence).ravel()
 
 
 def bundle_adjustment_sparsity(n_cameras, n_points, camera_indices,
@@ -122,7 +121,7 @@ def visualize_error(x0, n_cameras, n_points, camera_indices, point_indices,
     plt.show()
 
 
-def optimize(n_cameras, n_points, camera_indices, point_indices,
+def optimize(x0, n_cameras, n_points, camera_indices, point_indices,
              points_2d, points_2d_confidence):
     jac_sparsity = bundle_adjustment_sparsity(
         n_cameras, n_points, camera_indices, point_indices)
@@ -203,9 +202,6 @@ if __name__ == '__main__':
         n_cameras = len(camera_params_org)
         n_points = points_3d.shape[0]
 
-        n = PARAM_CALIB_SIZE * n_cameras + 3 * n_points
-        m = 2 * points_2d.shape[0]
-
         # Visualizing initial error
         x0 = np.hstack((ravel(camera_params_org), points_3d.ravel()))
         # x0 = np.hstack((points_3d.ravel(),))
@@ -213,9 +209,9 @@ if __name__ == '__main__':
         visualize_error(x0, n_cameras, n_points, camera_indices,
                         point_indices, points_2d, points_2d_confidence)
 
+        results = optimize(x0, n_cameras, n_points, camera_indices,
+                    point_indices, points_2d, points_2d_confidence)
         # results = {'x': x0}
-        results = optimize(n_cameras, n_points, camera_indices,
-                       point_indices, points_2d, points_2d_confidence)
         
         store_results(results, experiment, n_cameras, camera_params_org)
 

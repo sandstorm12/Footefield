@@ -13,7 +13,7 @@ from utils import data_loader
 from mmpose.apis import MMPoseInferencer
 
 
-VISUALIZE = True
+VISUALIZE = False
 EXP_LENGTH = 100
 DIR_STORE = "./keypoints_3d_x"
 
@@ -61,7 +61,7 @@ def _get_skeleton(image, inferencer, max_people=2, invert=False):
             detected_keypoints.append(keypoints)
             detected_confidences.append(confidences)
 
-    return np.array(detected_keypoints), np.array(detected_confidences)
+    return np.array(detected_keypoints), np.array(detected_confidences) / 10
 
 
 def extract_poses(dir, camera, model, max_people=2, invert=False):
