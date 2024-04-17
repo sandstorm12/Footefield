@@ -51,7 +51,8 @@ def visualize_poses(poses_smpl, verts, faces):
     vis = o3d.visualization.VisualizerWithKeyCallback()
     vis.create_window()
     vis.get_render_option().background_color = data_loader.COLOR_SPACE_GRAY
-    vis.get_render_option().show_coordinate_frame = True
+    origin = o3d.geometry.TriangleMesh().create_coordinate_frame(size=.1)
+    vis.add_geometry(origin)
     
     geometry_jtr = o3d.geometry.PointCloud()
     lines_jtr = o3d.geometry.LineSet()
@@ -111,15 +112,22 @@ if __name__ == "__main__":
         num_expression_coeffs=10,
         ext='npz')
 
-    betas = torch.zeros([1, model.num_betas], dtype=torch.float32)
-    expression = torch.zeros(
-        [1, model.num_expression_coeffs], dtype=torch.float32)
+    body = torch.rand([1, 21, 3], dtype=torch.float32) * .1
+    left_hand_pose = torch.rand([1, 6], dtype=torch.float32) * 1
+    right_hand_pose = torch.rand([1, 6], dtype=torch.float32) * 1
+    betas = torch.rand([1, 10], dtype=torch.float32) * 1
+    expression = torch.rand([1, 10], dtype=torch.float32) * 1
 
-    output = model(betas=betas, expression=expression,
-                return_verts=True)
+    output = model(body_pose=body, left_hand_pose=left_hand_pose,
+                   right_hand_pose=right_hand_pose,
+                   betas=betas, expression=expression, return_verts=True)
 
     vertices = output.vertices.detach().cpu().numpy().squeeze()
     joints = output.joints.detach().cpu().numpy().squeeze()
+
+    vertices -= joints[0]
+    joints -= joints[0]
+    
 
     print('Vertices shape =', vertices.shape)
     print('Joints shape =', joints.shape)

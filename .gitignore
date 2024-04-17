@@ -1,5 +1,6 @@
 # SMPL-X models
 smplx/models/
+smplx/params_smplx/
 
 # SMPL models
 smpl/models/
