@@ -20,6 +20,20 @@ Skeleton animation (angle 1) | Skeleton animation (angle 2)
 
 ## Usage
 
+You need to first execute the scripts in the `calibration folder`.
+
+Run the scripts in the following order:
+1. [skeleton_extractor_triangulation.py](skeleton_extractor_triangulation.py) and to visualize [visualizer_skeleton_triangulation.py](visualizer_skeleton_triangulation.py)
+1. [skeleton_bundle_adjustment.py](skeleton_bundle_adjustment.py) and to visualize [visualizer_skeleton_ba.py](visualizer_skeleton_ba.py) and [visualizer_skeleton_video.py](visualizer_skeleton_video.py)
+1. [skeleton_2_posetosmpl.py](skeleton_2_posetosmpl.py) and to visualize [visualizer_skeleton_2_posetosmpl_open3d.py](visualizer_skeleton_2_posetosmpl_open3d.py)
+
+Now you can fit the SMPL parameters to the 3D skeletons using the `pose2smpl` model:
+
+```bash
+python3 fit/tools/main.py --dataset_name HALPE --dataset_path path/to/keypoints_3d_pose2smpl
+```
+
+Then you can go ahead and use the scripts in the `smpl folder` for beta optimization and fine-tuning the SMPL parameters
 
 
 ## Troubleshooting
