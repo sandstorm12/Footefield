@@ -106,16 +106,6 @@ def skeleton_2_numpypkl(path_input, dir_output, name):
         for i in range(len(skeleton)):
             skeleton[i] = skeleton[i] / scale
 
-        # skeleton_aug = []
-        # for i in range(len(skeleton)):
-        #     skeleton_aug.append(
-        #         np.append(
-        #             skeleton[i],
-        #             ((skeleton[i, 12] + skeleton[i, 13]) / 2).reshape(1, -1),
-        #             axis=0)
-        #     )
-        # skeleton = np.array(skeleton_aug)
-
         output_path_skeleton = os.path.join(
             dir_output,
             f'{name}_{idx_person}_normalized.npy')
