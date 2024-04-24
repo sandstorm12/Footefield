@@ -21,9 +21,10 @@ VIS_MESH = True
 STORE_DIR = '../pose_estimation/keypoints_3d_ba'
 LENGTH = 100
 DIR_PARMAS_GLOBAL = "./extrinsics_global"
+DIR_PARMAS_MASK = "./extrinsics_mask"
 DIR_STORE = '/home/hamid/Documents/phd/footefield/Pose_to_SMPL/fit/output/HALPE/'
 DIR_PARAMS = '../pose_estimation/keypoints_3d_pose2smpl/'
-DIR_OUTPUT = "./output_videos_pc"
+DIR_OUTPUT = "./output_videos_pc_opt_mask"
 
 PARAM_OUTPUT_SIZE = (1920, 1080)
 PARAM_OUTPUT_FPS = 5.0
@@ -40,32 +41,6 @@ def get_depth_image(cam_name, experiment, idx):
     img_depth = '/home/hamid/Documents/phd/footefield/data/AzureKinectRecord_0729/{}/azure_kinect{}/depth/depth{:05d}.png'.format(experiment, cam_num, idx)
 
     return img_depth
-
-
-def get_params(cam, params):
-    if cam == cam24:
-        idx_cam = 0
-    elif cam == cam15:
-        idx_cam = 1
-    elif cam == cam14:
-        raise Exception("Unknown camera.")
-    elif cam == cam34:
-        idx_cam = 2
-    elif cam == cam35:
-        idx_cam = 3
-    else:
-        raise Exception("Unknown camera.")
-
-    mtx = params[idx_cam]['mtx']
-    dist = params[idx_cam]['dist']
-    rotation = params[idx_cam]['rotation']
-    translation = params[idx_cam]['translation']
-
-    extrinsics = np.identity(4, dtype=float)
-    extrinsics[:3, :3] = rotation
-    extrinsics[:3, 3] = translation / 1000
-
-    return mtx, dist, extrinsics
 
 
 def get_extrinsics(cam, cache):
@@ -212,7 +187,7 @@ def project_3d_to_2d(camera_matrix, dist_coeffs, rvec, tvec, object_points):
 
 # TODO: Shorten
 def write_video(img_paths, experiment,
-                extrinsics, camera, params, cache):
+                extrinsics, translations, camera, params, cache):
     writer = get_video_writer(experiment, camera)
     for idx in range(min(len(img_paths), LENGTH)):
         img_rgb = cv2.imread(img_rgb_paths[idx])
@@ -231,11 +206,12 @@ def write_video(img_paths, experiment,
             pcd += get_pcd(subject, cam35, experiment, idx, 
                            extrinsics[experiment + '_' + str(subject)], cache)
 
-            pcd_combined = pcd
-            pcd = pcd_combined.transform(
+            pcd = pcd.transform(
                 extrinsics[experiment + '_' + str(subject)]['global'])
+            trans = translations[experiment + '_' + str(subject)]['transformation']
 
-            pcd_np = np.asarray(pcd.points) * 1000
+            pcd_np = np.asarray(pcd.points) + trans
+            pcd_np = pcd_np * 1000
 
             mtx = params['mtx']
             dist = params['dist']
@@ -247,9 +223,8 @@ def write_video(img_paths, experiment,
                 x = int(point[0])
                 y = int(point[1])
                 if 0 < x < img_rgb.shape[1] and 0 < y < img_rgb.shape[0]:
-                    color = tuple(((img_rgb[y, x] + [0, 255, 0]) // 2).tolist())
                     cv2.circle(img_rgb, (int(point[0]), int(point[1])),
-                            1, color, -1)
+                            1, (0, 255, 0), -1)
 
         writer.write(img_rgb)
 
@@ -265,6 +240,19 @@ def load_global_extrinsics():
         extrinsics_global[experiment + '_' + subject] = params
 
     return extrinsics_global
+
+
+def load_global_translations():
+    translation_global = {}
+    for path in glob.glob(os.path.join(DIR_PARMAS_MASK, '*')):
+        experiment = path.split('.')[-2].split('_')[-2]
+        subject = path.split('.')[-2].split('_')[-1]
+        with open(path, 'rb') as handle:
+            params = pickle.load(handle)
+
+        translation_global[experiment + '_' + subject] = params
+
+    return translation_global
 
 
 # TODO: Move the cameras somewhere else
@@ -285,6 +273,7 @@ if __name__ == "__main__":
     ]
 
     extrinsics_global = load_global_extrinsics()
+    translations_global = load_global_translations()
 
     for file in sorted(os.listdir(STORE_DIR), reverse=False):
         for idx_cam, camera in enumerate(tqdm(cameras)):
@@ -303,5 +292,5 @@ if __name__ == "__main__":
 
             write_video(
                 img_rgb_paths, 
-                experiment, extrinsics_global, camera,
+                experiment, extrinsics_global, translations_global, camera,
                 params[idx_cam], cache)

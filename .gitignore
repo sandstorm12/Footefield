@@ -20,6 +20,7 @@ smpl/models/
 **/keypoints_3d_pose2smpl_x/
 **/extrinsics_finetuned/
 **/extrinsics_global/
+**/extrinsics_mask/
 **/pointcloud_normalized/
 **/smpl/params_smpl/
 

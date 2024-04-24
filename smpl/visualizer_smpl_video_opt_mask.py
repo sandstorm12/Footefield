@@ -17,7 +17,8 @@ DIR_STORE = '/home/hamid/Documents/phd/footefield/Pose_to_SMPL/fit/output/HALPE'
 DIR_STORE_OPT = './params_smpl'
 DIR_PARAMS = '../pose_estimation/keypoints_3d_pose2smpl/'
 DIR_STORE_ORG = '../pose_estimation/keypoints_3d_ba'
-DIR_OUTPUT = "./output_videos_opt"
+DIR_OUTPUT = "./output_videos_opt_mask"
+DIR_PARAMS_MASK = "./extrinsics_mask"
 
 PARAM_OUTPUT_SIZE = (1920, 1080)
 PARAM_OUTPUT_FPS = 5.0
@@ -153,10 +154,12 @@ def get_corresponding_files(path, experiment):
             file_name + '_0_normalized_params.pkl',
             file_name + '_0_params.pkl',
             f'params_smpl_{experiment}_1.pkl',
+            f'trans_mask_{experiment}_1.pkl',
         ),(
             file_name + '_1_normalized_params.pkl',
             file_name + '_1_params.pkl',
-            f'params_smpl_{experiment}_0.pkl'
+            f'params_smpl_{experiment}_0.pkl',
+            f'trans_mask_{experiment}_0.pkl',
         ),
     ]
 
@@ -205,6 +208,11 @@ def get_smpl_parameters(smpl_layer, file_org):
         scale = params['scale'] * scale_smpl
         translation = params['translation']
 
+        path_params = os.path.join(DIR_PARAMS_MASK, file_smpl[3])
+        with open(path_params, 'rb') as handle:
+            params = pickle.load(handle)
+        translation_mask = params['transformation']
+
         rotation_inverted = np.linalg.inv(rotation)
         verts = np.concatenate(
             (verts,
@@ -215,6 +223,7 @@ def get_smpl_parameters(smpl_layer, file_org):
         verts = verts.dot(rotation_inverted.T)
         verts = verts * scale
         verts = verts + translation
+        verts = verts + translation_mask
 
         verts_all.append(verts)
         faces_all.append(faces)
