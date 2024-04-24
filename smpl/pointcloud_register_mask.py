@@ -294,23 +294,25 @@ def get_masks(experiment, params):
     return masks
 
 
-def visualize_points(points, points2, name="frame"):
-    img = np.zeros((1080, 1920, 3))
+def visualize_points(points, points2, name="frame", writer=None):
+    img = np.zeros((1080, 1920, 3), np.uint8)
     
     for point in points:
         x = int(point[0])
         y = int(point[1])
         if 0 < x < 1920 and 0 < y < 1080:
-            img[y, x, 0] = 255
+            img[y, x] = (255, 255, 255)
 
     for point in points2:
         x = int(point[0])
         y = int(point[1])
         if 0 < x < 1920 and 0 < y < 1080:
-            img[y, x, 1] = 255
+            img[y, x] = (0, 255, 0)
 
-    cv2.imshow(name, cv2.resize(img, (960, 540)))
-    cv2.waitKey(10)
+    # cv2.imshow(name, cv2.resize(img, (960, 540)))
+    # cv2.waitKey(10)
+
+    writer.write(img)
 
 
 def optimize(subject, experiment, extrinsics, voxel_size, cache):
@@ -326,6 +328,27 @@ def optimize(subject, experiment, extrinsics, voxel_size, cache):
     optimizer = torch.optim.Adam(optim_params)
 
     bar = tqdm(range(PARAM_EPOCHS))
+
+    writer24 = cv2.VideoWriter(
+        "./output_videos_register_mask/24.mp4",
+        cv2.VideoWriter_fourcc(*"mp4v"),
+        25,
+        (data_loader.IMAGE_RGB_WIDTH, data_loader.IMAGE_RGB_HEIGHT))
+    writer15 = cv2.VideoWriter(
+        "./output_videos_register_mask/15.mp4",
+        cv2.VideoWriter_fourcc(*"mp4v"),
+        25,
+        (data_loader.IMAGE_RGB_WIDTH, data_loader.IMAGE_RGB_HEIGHT))
+    writer34 = cv2.VideoWriter(
+        "./output_videos_register_mask/34.mp4",
+        cv2.VideoWriter_fourcc(*"mp4v"),
+        25,
+        (data_loader.IMAGE_RGB_WIDTH, data_loader.IMAGE_RGB_HEIGHT))
+    writer35 = cv2.VideoWriter(
+        "./output_videos_register_mask/35.mp4",
+        cv2.VideoWriter_fourcc(*"mp4v"),
+        25,
+        (data_loader.IMAGE_RGB_WIDTH, data_loader.IMAGE_RGB_HEIGHT))
 
     # masks24_tensor = torch.from_numpy(masks24).float().cuda()
     loss_init = None
@@ -400,16 +423,20 @@ def optimize(subject, experiment, extrinsics, voxel_size, cache):
 
         visualize_points(
             mask24_tensor.squeeze().detach().cpu().numpy(),
-            pcd_proj_24.squeeze().detach().cpu().numpy(), name="24")
+            pcd_proj_24.squeeze().detach().cpu().numpy(), name="24",
+            writer=writer24)
         visualize_points(
             mask15_tensor.squeeze().detach().cpu().numpy(),
-            pcd_proj_15.squeeze().detach().cpu().numpy(), name="15")
+            pcd_proj_15.squeeze().detach().cpu().numpy(), name="15",
+            writer=writer15)
         visualize_points(
             mask34_tensor.squeeze().detach().cpu().numpy(),
-            pcd_proj_34.squeeze().detach().cpu().numpy(), name="34")
+            pcd_proj_34.squeeze().detach().cpu().numpy(), name="34",
+            writer=writer34)
         visualize_points(
             mask35_tensor.squeeze().detach().cpu().numpy(),
-            pcd_proj_35.squeeze().detach().cpu().numpy(), name="35")
+            pcd_proj_35.squeeze().detach().cpu().numpy(), name="35",
+            writer=writer35)
 
         # loss += torch.abs(1 - torch.det(transformation))[0]
 
@@ -453,7 +480,7 @@ def store_smpl_parameters(transformation, experiment, subject):
     print(f'Stored results: {path}')
 
 
-EXPERIMENT = 'a1'
+EXPERIMENT = 'a2'
 SUBJECT = 0
 VOXEL_SIZE = .005
 
