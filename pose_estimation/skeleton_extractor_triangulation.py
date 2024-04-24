@@ -13,17 +13,20 @@ from utils import data_loader
 from mmpose.apis import MMPoseInferencer
 
 
-VISUALIZE = True
-EXP_LENGTH = 500
+VISUALIZE = False
+EXP_LENGTH = 100
 DIR_STORE = "./keypoints_3d"
 
 
 def filter_sort(people_keypoints, num_select=2, invert=False):
     heights = []
     for person in people_keypoints:
-        person = person['keypoints']
-        heights.append((person[25][1] - person[17][1]) \
-                       - np.abs(person[19][0] - 540) / 3)
+        person = np.array(person['keypoints'])
+        heights.append(
+            (np.max(person[:, 1]) - np.min(person[:, 1])) *
+            (np.max(person[:, 0]) - np.min(person[:, 0])) *
+            (700 -  np.linalg.norm(np.mean(person[:], axis=0) - (1920 / 2, 1080 / 2)))
+        )
 
     indecies = np.argsort(heights)[::-1]
     people_keypoints = [people_keypoints[indecies[idx]]
@@ -77,7 +80,8 @@ def extract_poses(dir, camera, model, max_people=2, invert=False):
 
         people_keypoints, confidences = _get_skeleton(
             img_rgb, model, max_people, invert)
-        # visualize_keypoints(img_rgb, people_keypoints)
+        if VISUALIZE:
+            visualize_keypoints(img_rgb, people_keypoints)
 
         poses.append(people_keypoints)
         poses_confidence.append(confidences)
@@ -237,7 +241,7 @@ if __name__ == "__main__":
     ]
 
     poses_global = None
-    for experiment in data_loader.EXPERIMENTS.keys():
+    for experiment in list(data_loader.EXPERIMENTS.keys()):
         print(f"Processing experiment {experiment}...")
         
         poses_global, ba_parameters = calc_3d_skeleton(cameras, model_2d, cache)

@@ -1,13 +1,23 @@
+# Images for my reference
+coco_wholebody.png
+
+# SMPL-X models
+smplx/models/
+smplx/params_smplx/
+
 # SMPL models
-smpl/smplpytorch/native/models/basicModel_neutral_lbs_10_207_0_v1.0.0.pkl
+smpl/models/
 
 # VSCode
 .vscode
 
 # Temporary IO files
+**/keypoints_3d_x/
 **/keypoints_3d/
+**/keypoints_3d_ba_x/
 **/keypoints_3d_ba/
 **/keypoints_3d_pose2smpl/
+**/keypoints_3d_pose2smpl_x/
 **/extrinsics_finetuned/
 **/extrinsics_global/
 **/pointcloud_normalized/

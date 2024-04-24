@@ -17,6 +17,7 @@ HALPE_LINES = np.array(
      (19, 12), (11, 13), (12, 14), (13, 15), (14, 16), (20, 24),
      (21, 25), (23, 25), (22, 24), (15, 24), (16, 25)])
 
+
 def visualize_poses(poses):
     vis = o3d.visualization.VisualizerWithKeyCallback()
     vis.create_window()
