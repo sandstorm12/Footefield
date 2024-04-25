@@ -1,24 +1,28 @@
+from shlex import join
 import sys
 sys.path.append('../')
 
 import os
 import cv2
+import torch
 import pickle
 import diskcache
 import numpy as np
 
 from tqdm import tqdm
 from utils import data_loader
+from smplpytorch.pytorch.smpl_layer import SMPL_Layer
 
 
 VIS_MESH = True
-VIS_ORG = True
+VIS_ORG = False
 VIS_JTR = True
 
 DIR_STORE = '/home/hamid/Documents/phd/footefield/Pose_to_SMPL/fit/output/HALPE/'
 DIR_PARAMS = '../pose_estimation/keypoints_3d_pose2smpl/'
 DIR_STORE_ORG = '../pose_estimation/keypoints_3d_ba'
-DIR_OUTPUT = "./output_videos"
+DIR_OUTPUT = "./videos_smpl"
+DIR_SMPL = 'params_smpl'
 
 PARAM_OUTPUT_SIZE = (1920, 1080)
 PARAM_OUTPUT_FPS = 5.0
@@ -131,7 +135,7 @@ def poses_3d_2_2d(poses_3d, params):
         rotation,
         translation,
         poses_3d.reshape(-1, 3))
-    poses_2d[:, 1] = poses_2d[:, 1]
+    # poses_2d[:, 1] = poses_2d[:, 1]
     poses_2d = poses_2d.reshape(poses_shape)
 
     return poses_2d
@@ -148,65 +152,81 @@ def get_corresponding_files(path):
     return files
 
 
+def load_smpl(experiment, subject):
+    name = "params_smpl_{}_{}.pkl".format(
+        experiment, subject
+    )
+    path_smpl = os.path.join(DIR_SMPL, name)
+    with open(path_smpl, 'rb') as handle:
+        smpl = pickle.load(handle)
+
+    alphas = np.array(smpl['alphas'])
+    betas = np.array(smpl['betas'])
+    scale = np.array(smpl['scale'])
+    translation = np.array(smpl['translation'])
+
+    return alphas, betas, scale, translation
+
+
 # TODO: Shorten
-def get_smpl_parameters(file_org):
-    files_smpl = get_corresponding_files(file_org)
+def get_smpl_parameters(experiment):
+    device = 'cuda' if torch.cuda.is_available() else 'cpu'
+    smpl_layer = SMPL_Layer(
+        center_idx=0,
+        gender="neutral",
+        model_root='models').to(device)
         
-    poses_smpl_all = []
+    joints_all = []
     verts_all = []
     faces_all = []
-    for file_smpl in files_smpl:
+    for subject in [0, 1]:
         # Load SMPL data
-        path_smpl = os.path.join(DIR_STORE, file_smpl[0])
-        with open(path_smpl, 'rb') as handle:
-            smpl = pickle.load(handle)
-        poses_smpl = np.array(smpl['Jtr'])
-        verts = np.array(smpl['verts'])
-        faces = np.array(smpl['th_faces'])
-        scale_smpl = smpl['scale']
-        transformation = smpl['transformation']
+        alphas, betas, scale_smpl, translation_smpl = \
+            load_smpl(experiment, subject)
+    
+        alphas = torch.from_numpy(alphas).to(device)
+        betas = torch.from_numpy(betas).to(device)
+        batch_tensor = torch.ones((alphas.shape[0], 1)).to(device)
+
+        verts, joints = smpl_layer(
+            alphas, th_betas=betas * batch_tensor)
+        
+        verts = verts.detach().cpu().numpy()
+        joints = joints.detach().cpu().numpy()
+        faces = smpl_layer.th_faces.detach().cpu().numpy()
 
         # Load alignment params
-        path_params = os.path.join(DIR_PARAMS, file_smpl[1])
+        path_params = os.path.join(DIR_PARAMS, f"keypoints3d_{experiment}_ba_{subject}_params.pkl")
         with open(path_params, 'rb') as handle:
             params = pickle.load(handle)
         rotation = params['rotation']
-        scale = params['scale'] * scale_smpl
+        scale = params['scale']
         translation = params['translation']
 
         rotation_inverted = np.linalg.inv(rotation)
-        poses_smpl = np.concatenate(
-            (poses_smpl,
-                np.ones((poses_smpl.shape[0], poses_smpl.shape[1], 1))
-            ), axis=2)
-        poses_smpl = np.matmul(poses_smpl, transformation)
-        poses_smpl = poses_smpl[:, :, :3] / poses_smpl[:, :, -1:]
-        poses_smpl = poses_smpl.dot(rotation_inverted.T)
-        poses_smpl = poses_smpl * scale
-        poses_smpl = poses_smpl + translation
 
-        verts = np.concatenate(
-            (verts,
-                np.ones((verts.shape[0], verts.shape[1], 1))
-            ), axis=2)
-        verts = np.matmul(verts, transformation)
-        verts = verts[:, :, :3] / verts[:, :, -1:]
+        joints = (joints + translation_smpl) * scale_smpl
+        joints = joints.dot(rotation_inverted.T)
+        joints = joints * scale
+        joints = joints + translation
+
+        verts = (verts + translation_smpl) * scale_smpl
         verts = verts.dot(rotation_inverted.T)
         verts = verts * scale
         verts = verts + translation
 
-        poses_smpl_all.append(poses_smpl)
+        joints_all.append(joints)
         verts_all.append(verts)
         faces_all.append(faces)
 
-    poses_smpl_all = np.array(poses_smpl_all)
+    joints_all = np.array(joints_all)
     verts_all = np.array(verts_all)
     faces_all = np.array(faces_all)
 
-    poses_smpl_all = np.transpose(poses_smpl_all, (1, 0, 2, 3))
+    joints_all = np.transpose(joints_all, (1, 0, 2, 3))
     verts_all = np.transpose(verts_all, (1, 0, 2, 3))
 
-    return poses_smpl_all, verts_all, faces_all
+    return joints_all, verts_all, faces_all
 
 
 # TODO: Move the cameras somewhere else
@@ -215,6 +235,8 @@ cam15 = 'azure_kinect1_5_calib_snap'
 cam14 = 'azure_kinect1_4_calib_snap'
 cam34 = 'azure_kinect3_4_calib_snap'
 cam35 = 'azure_kinect3_5_calib_snap'
+
+EXPERIMENTS = ['a1', 'a2']
 
 # TODO: Too long
 if __name__ == "__main__":
@@ -228,19 +250,17 @@ if __name__ == "__main__":
         cam35
     ]
 
-    for file in os.listdir(DIR_STORE_ORG):
-        experiment = file.split('.')[-2].split('_')[-2]
-
-        file_path = os.path.join(DIR_STORE_ORG, file)
-        print(f"Visualizing {file_path}")
+    for experiment in EXPERIMENTS:
+        print(f"Visualizing {experiment}")
         
-        with open(file_path, 'rb') as handle:
+        skeleton_path = os.path.join(DIR_STORE_ORG, f"keypoints3d_{experiment}_ba.pkl")
+        with open(skeleton_path, 'rb') as handle:
             output = pickle.load(handle)
 
         poses = output['points_3d'].reshape(-1, 2, 26, 3)
         params = output['params']
 
-        poses_smpl_all, verts_all, faces_all = get_smpl_parameters(file_path)
+        joints_all, verts_all, faces_all = get_smpl_parameters(experiment)
 
         for idx_cam, camera in enumerate(tqdm(cameras)):
             dir = data_loader.EXPERIMENTS[experiment][camera]
@@ -252,7 +272,7 @@ if __name__ == "__main__":
                 poses,
                 params[idx_cam]).reshape(poses.shape[0], -1, 2)
             poses_2d_smpl = poses_3d_2_2d(
-                poses_smpl_all,
+                joints_all,
                 params[idx_cam]).reshape(poses.shape[0], -1, 2)
             poses_2d_verts = poses_3d_2_2d(
                 verts_all,

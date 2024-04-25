@@ -1,3 +1,4 @@
+from re import sub
 import sys
 sys.path.append('../')
 
@@ -13,7 +14,7 @@ from utils import data_loader
 from smplpytorch.pytorch.smpl_layer import SMPL_Layer
 
 
-DIR_SMPL = '/home/hamid/Documents/phd/footefield/Pose_to_SMPL/fit/output/HALPE/'
+DIR_SMPL = 'params_smpl'
 DIR_POINTCLOUD = './pointcloud_normalized'
 DIR_OPTIMIZED = './params_smpl'
 
@@ -66,18 +67,22 @@ def get_corresponding_files(path, subject):
     return files
 
 
-def load_smpl(file_org, subject):
-    file_smpl = get_corresponding_files(file_org, subject)
-    
-    # Load SMPL data
-    path_smpl = os.path.join(DIR_SMPL, file_smpl[0])
+def load_smpl(experiment, subject):
+    name = "params_smpl_{}_{}.pkl".format(
+        experiment, subject
+    )
+    path_smpl = os.path.join(DIR_SMPL, name)
     with open(path_smpl, 'rb') as handle:
         smpl = pickle.load(handle)
-    pose_params = np.array(smpl['pose_params'])
-    shape_params = np.array(smpl['shape_params'])
-    faces = np.array(smpl['th_faces'])
 
-    return pose_params, shape_params, faces
+    print(type(smpl['alphas']))
+
+    alphas = np.array(smpl['alphas'])
+    betas = np.array(smpl['betas'])
+    scale = np.array(smpl['scale'])
+    translation = np.array(smpl['scale'])
+
+    return alphas, betas, scale, translation
 
 
 def load_pointcloud(experiment, subject):
@@ -129,27 +134,25 @@ if __name__ == '__main__':
     smpl_layer = SMPL_Layer(
         center_idx=0,
         gender="neutral",
-        model_root='smplpytorch/native/models').to(device)
+        model_root='models').to(device)
 
     if OPTIMIZED:
         pose_params, shape_params, faces = \
             load_smpl_optimized(EXPERIMENT, SUBJECT)
     else:
-        pose_params, shape_params, faces = \
-            load_smpl('keypoints3d_a1_ba', SUBJECT)
+        alphas, betas, scale, translation = \
+            load_smpl(EXPERIMENT, SUBJECT)
     
-    verts_all = []
-    for idx in tqdm(range(pose_params.shape[0])):
-        pose_torch = torch.from_numpy(
-            pose_params[idx]).unsqueeze(0).float()
-        shape_torch = torch.from_numpy(
-            shape_params[idx]).unsqueeze(0).float()
+    alphas = torch.from_numpy(alphas).to(device)
+    betas = torch.from_numpy(betas).to(device)
+    batch_tensor = torch.ones((alphas.shape[0], 1)).to(device)
 
-        verts, Jtr = smpl_layer(pose_torch.to(device),
-                                th_betas=shape_torch.to(device))
+    verts, Jtr = smpl_layer(alphas,
+                            th_betas=betas * batch_tensor)
 
-        verts_all.append(verts.detach().cpu().numpy().astype(float))
+    verts = verts.detach().cpu().numpy().astype(float)
 
     pcds = preprocess(load_pointcloud(EXPERIMENT, SUBJECT))
 
-    visualize_poses(verts_all, faces, pcds)
+    faces = smpl_layer.th_faces.detach().cpu().numpy()
+    visualize_poses(verts, faces, pcds)
