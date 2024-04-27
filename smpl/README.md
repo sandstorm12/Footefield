@@ -9,6 +9,10 @@ Converting the 3D skeleton keypoints and RGBD point cloud to the skinned model o
 
 ## Usage
 
+After obtaining the SMPL parameters using the scripts in the `pose_estimation folder`, run the scripts in the following order:
+
+1. You might want to visualize the SMPL + 3D keypoints fitting results: run [visualizer_smpl.py](visualizer_smpl.py) for an Open3D visualization and [visualizer_smpl_video.py](visualizer_smpl_video.py) for a video reprojection visualization.
+
 
 ## TODO
 
