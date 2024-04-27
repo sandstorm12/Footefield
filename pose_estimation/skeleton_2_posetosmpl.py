@@ -108,11 +108,20 @@ def skeleton_2_numpypkl(path_input, dir_output, name):
 
         skeleton_aug = []
         for i in range(len(skeleton)):
+            augmentation = np.append(
+                skeleton[i],
+                ((skeleton[i, 19] + skeleton[i, 18]) / 2).reshape(1, -1),
+                axis=0)
+            augmentation = np.append(
+                augmentation,
+                ((skeleton[i, 20] + skeleton[i, 22]) / 2).reshape(1, -1),
+                axis=0)
+            augmentation = np.append(
+                augmentation,
+                ((skeleton[i, 21] + skeleton[i, 23]) / 2).reshape(1, -1),
+                axis=0)
             skeleton_aug.append(
-                np.append(
-                    skeleton[i],
-                    ((skeleton[i, 19] + skeleton[i, 18]) / 2).reshape(1, -1),
-                    axis=0)
+                augmentation
             )
         skeleton = np.array(skeleton_aug)
 
