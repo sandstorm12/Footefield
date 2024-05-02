@@ -37,7 +37,7 @@ def filter_sort(people_keypoints, num_select=2, invert=False):
         person = person['keypoints']
         horizontal_position.append(person[0][0])
 
-    indecies = np.argsort(horizontal_position)
+    indecies = np.argsort(horizontal_position)[::-1]
     if invert:
         indecies = indecies[::-1]
     people_keypoints = [people_keypoints[indecies[idx]]
@@ -90,12 +90,16 @@ def extract_poses(dir, camera, model, max_people=2, invert=False):
 
 
 def visualize_keypoints(image, keypoints):
-    for person in keypoints:
+    for idx_person, person in enumerate(keypoints):
         for point in person:
             cv2.circle(image, (int(point[0]), int(point[1])),
                     5, (0, 255, 0), -1)
+            cv2.putText(image, str(idx_person), 
+                (int(point[0]), int(point[1])), 
+                cv2.FONT_HERSHEY_SIMPLEX,
+                1, (255, 255, 255), 1, 2)
         
-    cv2.imshow("Detected", image)
+    cv2.imshow("Detected", cv2.resize(image, (1280, 720)))
     cv2.waitKey(1)
 
 
@@ -178,18 +182,31 @@ def calc_3d_skeleton(cameras, model_2d, cache):
         invert = True if camera == cam34 or camera == cam35 else False
         poses, poses_confidence = extract_poses(
             dir, camera, model_2d, max_people, invert)
-
-        poses_multicam.append(poses)
-
+        
         mtx, dist = get_intrinsics(camera, cache)
         extrinsics = get_extrinsics(camera, cache)
-        p_gt.append(mtx @ extrinsics)
+        if camera != cam14:
+            poses_multicam.append(poses)
+            p_gt.append(mtx @ extrinsics)
 
         # Bundle adjustment parameters
-        points_2d.extend(poses.reshape(-1, 2))
-        points_2d_confidence.extend(poses_confidence.reshape(-1))
-        camera_indices.extend([idx_cam] * len(poses.reshape(-1, 2)))
-        point_indices.extend([i for i in range(len(poses.reshape(-1, 2)))])
+        if camera == cam14:
+            poses_2d = poses.reshape(-1, 2)
+            points_2d.extend(np.concatenate((poses_2d, np.zeros_like(poses_2d))))
+            points_2d_confidence.extend(
+                np.concatenate(
+                    (poses_confidence.reshape(-1),
+                     np.zeros_like(poses_confidence.reshape(-1)))
+                )
+            ) 
+            camera_indices.extend([idx_cam] * len(poses_2d) * 2)
+            point_indices.extend([i for i in range(len(poses_2d) * 2)])
+        else:
+            points_2d.extend(poses.reshape(-1, 2))
+            points_2d_confidence.extend(poses_confidence.reshape(-1))
+            camera_indices.extend([idx_cam] * len(poses.reshape(-1, 2)))
+            point_indices.extend([i for i in range(len(poses.reshape(-1, 2)))])
+        
         params = {
             'mtx': mtx,
             'dist': dist,

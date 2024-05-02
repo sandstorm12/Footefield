@@ -12,7 +12,7 @@ from utils import data_loader
 
 
 DIR_INPUT = "./keypoints_3d_ba_x"
-DIR_OUTPUT = "./output_videos_x"
+DIR_OUTPUT = "./videos_skeleton_ba_x"
 PARAM_OUTPUT_SIZE = (1920, 1080)
 PARAM_OUTPUT_FPS = 5.0
 

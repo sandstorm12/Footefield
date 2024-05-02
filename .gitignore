@@ -23,6 +23,7 @@ smpl/models/
 **/extrinsics_mask/
 **/pointcloud_normalized/
 **/smpl/params_smpl/
+**/smpl/params_smpl_mask/
 
 # Pose to SMPL input files
 *.npy

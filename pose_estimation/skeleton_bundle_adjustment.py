@@ -73,7 +73,7 @@ def fun(params, n_cameras, n_points, camera_indices, point_indices,
     
     points_2d_confidence = np.tile(np.expand_dims(
         points_2d_confidence, 1), (1, 2))
-    points_2d_confidence[points_2d_confidence < .6] = 0
+    points_2d_confidence[points_2d_confidence < .3] = 0
 
     return ((points_proj - points_2d) * points_2d_confidence).ravel()
 

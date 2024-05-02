@@ -162,26 +162,6 @@ def preprocess(pointcloud, voxel_size):
     return pointcloud
 
 
-def pairwise_registration(source, target, voxel_size):
-    max_correspondence_distance_coarse = voxel_size * 15
-    max_correspondence_distance_fine = voxel_size * 1.5
-
-    source.estimate_normals()
-    target.estimate_normals()
-
-    icp_coarse = o3d.pipelines.registration.registration_icp(
-        source, target, max_correspondence_distance_coarse, np.identity(4),
-        o3d.pipelines.registration.TransformationEstimationPointToPlane())
-    icp_fine = o3d.pipelines.registration.registration_icp(
-        source, target, max_correspondence_distance_fine,
-        icp_coarse.transformation,
-        o3d.pipelines.registration.TransformationEstimationPointToPlane())
-    
-    transformation_icp = icp_fine.transformation
-    
-    return transformation_icp
-
-
 def load_finetuned_extrinsics():
     extrinsics_finetuned = {}
     for path in glob.glob(os.path.join(DIR_PARMAS_GLOBAL, '*')):
