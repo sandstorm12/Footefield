@@ -37,7 +37,7 @@ def filter_sort(people_keypoints, num_select=2, invert=False):
         person = person['keypoints']
         horizontal_position.append(person[0][0])
 
-    indecies = np.argsort(horizontal_position)
+    indecies = np.argsort(horizontal_position)[::-1]
     if invert:
         indecies = indecies[::-1]
     people_keypoints = [people_keypoints[indecies[idx]]
@@ -90,12 +90,16 @@ def extract_poses(dir, camera, model, max_people=2, invert=False):
 
 
 def visualize_keypoints(image, keypoints):
-    for person in keypoints:
+    for idx_person, person in enumerate(keypoints):
         for point in person:
             cv2.circle(image, (int(point[0]), int(point[1])),
                     5, (0, 255, 0), -1)
+            cv2.putText(image, str(idx_person), 
+                (int(point[0]), int(point[1])), 
+                cv2.FONT_HERSHEY_SIMPLEX,
+                1, (255, 255, 255), 1, 2)
         
-    cv2.imshow("Detected", image)
+    cv2.imshow("Detected", cv2.resize(image, (1280, 720)))
     cv2.waitKey(1)
 
 

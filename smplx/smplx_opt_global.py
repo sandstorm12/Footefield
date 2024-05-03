@@ -2,6 +2,7 @@ import sys
 sys.path.append('../')
 
 import os
+import cv2
 import time
 import smplx
 import torch
@@ -12,18 +13,24 @@ import torch.nn.functional as F
 
 from tqdm import tqdm
 from utils import data_loader
+from pytorch3d.loss import chamfer_distance
 
 
 DIR_SKELETONS = '../pose_estimation/keypoints_3d_pose2smpl_x'
-DIR_OUTPUT = './params_smplx'
+DIR_OUTPUT = './params_smplx_mask'
+DIR_ORG = '../pose_estimation/keypoints_3d_ba_x'
+DIR_SMPLX = './params_smplx'
 
 EXPERIMENTS = ['a1', 'a2']
 SUBJECTS = [0, 1]
 EPOCHS = 500
 VISUALIZE = False
-PARAM_COEFF_POSE = .1
-PARAM_COEFF_DET = .01
+VISUALIZE_PROJ = False
 PATH_MODEL = 'models'
+PARAM_SCALE_MASK = 8
+
+PARAM_WEIGHT_CHMF = 1e-8
+PARAM_WEIGHT_DIST = 1
 
 COEFF_NORM = 1
 COEFF_MINI = .5
@@ -134,24 +141,31 @@ def calc_distance(joints, skeleton):
     return loss
 
 
-# TODO: Shorten
-def optimize_beta(smpl_layer, skeletons, epochs):
-    device = 'cuda' if torch.cuda.is_available() else 'cpu'
-    smpl_layer.to(device)
+def get_mask_image(cam_name, experiment, idx):
+    cam_num = cam_name[12:15]
+    img_depth = '/home/hamid/Documents/phd/footefield/data/AzureKinectRecord_0729/{}/azure_kinect{}/mask/mask{:05d}.jpg'.format(experiment, cam_num, idx)
 
-    global_orient = (torch.zeros([skeletons.shape[0], 1, 3], dtype=torch.float32)).to(device)
-    jaw_pose = (torch.zeros([skeletons.shape[0], 1, 3], dtype=torch.float32)).to(device)
-    leye_pose = (torch.zeros([skeletons.shape[0], 1, 3], dtype=torch.float32)).to(device)
-    reye_pose = (torch.zeros([skeletons.shape[0], 1, 3], dtype=torch.float32)).to(device)
-    body = (torch.rand([skeletons.shape[0], 21, 3], dtype=torch.float32) * .1).to(device)
-    left_hand_pose = (torch.rand([skeletons.shape[0], 15, 3], dtype=torch.float32) * .1).to(device)
-    right_hand_pose = (torch.rand([skeletons.shape[0], 15, 3], dtype=torch.float32) * .1).to(device)
-    betas = (torch.zeros([1, 10], dtype=torch.float32)).to(device)
-    expression = (torch.rand([skeletons.shape[0], 10], dtype=torch.float32) * .1).to(device)
-    translation = torch.zeros(3).to(device)
-    scale = torch.ones([1]).to(device)
+    return img_depth
 
-    batch_tensor = torch.ones((skeletons.shape[0], 1)).to(device)
+
+def load_smplx_params(experiment, subject, device):
+    path_smplx = os.path.join(
+        DIR_SMPLX,
+        f"params_smplx_{experiment}_{subject}.pkl")
+    with open(path_smplx, 'rb') as handle:
+        smplx_params = pickle.load(handle)
+    
+    global_orient = torch.from_numpy(smplx_params['global_orient']).to(device)
+    jaw_pose = torch.from_numpy(smplx_params['jaw_pose']).to(device)
+    leye_pose = torch.from_numpy(smplx_params['leye_pose']).to(device)
+    reye_pose = torch.from_numpy(smplx_params['reye_pose']).to(device)
+    body = torch.from_numpy(smplx_params['body']).to(device)
+    left_hand_pose = torch.from_numpy(smplx_params['left_hand_pose']).to(device)
+    right_hand_pose = torch.from_numpy(smplx_params['right_hand_pose']).to(device)
+    betas = torch.from_numpy(smplx_params['betas']).to(device)
+    expression = torch.from_numpy(smplx_params['expression']).to(device)
+    translation_smplx = torch.from_numpy(smplx_params['translation']).to(device)
+    scale_smplx = torch.from_numpy(smplx_params['scale']).to(device)
 
     global_orient.requires_grad = True
     jaw_pose.requires_grad = True
@@ -160,12 +174,151 @@ def optimize_beta(smpl_layer, skeletons, epochs):
     body.requires_grad = True
     left_hand_pose.requires_grad = True
     right_hand_pose.requires_grad = True
-    betas.requires_grad = False
+    betas.requires_grad = True
     expression.requires_grad = True
-    translation.requires_grad = True
-    scale.requires_grad = True
+    translation_smplx.requires_grad = True
+    scale_smplx.requires_grad = True
 
-    lr = 2e-2
+    return global_orient, jaw_pose, leye_pose, reye_pose, \
+        body, left_hand_pose, right_hand_pose, betas, expression, \
+        translation_smplx, scale_smplx
+
+
+def load_denormalize_params(experiment, subject, device):
+    # Load alignment params
+    path_params = os.path.join(
+        DIR_SKELETONS,
+        f"keypoints3d_{experiment}_ba_{subject}_params.pkl")
+    with open(path_params, 'rb') as handle:
+        params = pickle.load(handle)
+    rotation = params['rotation']
+    scale = params['scale']
+    translation = params['translation']
+    rotation_inverted = np.linalg.inv(rotation).T
+
+    translation = torch.from_numpy(translation).float().to(device)
+    rotation_inverted = torch.from_numpy(rotation_inverted).float().to(device)
+
+    return rotation_inverted, scale, translation
+
+
+def denormalize(verts, denormalize_params):
+    rotation_inverted, scale, translation = denormalize_params
+
+    verts = torch.matmul(verts, rotation_inverted)
+    verts = verts * scale
+    verts = verts + translation
+
+    return verts
+
+
+def masks_params_torch(masks, params):
+    masks_torch = []
+    params_torch = []
+    for cam in range(len(masks)):
+        masks_torch_cam = []
+        for idx_mask in range(len(masks[cam])):
+            masks_torch_cam.append(
+                torch.from_numpy(masks[cam][idx_mask]).float().unsqueeze(0).cuda())
+        masks_torch.append(masks_torch_cam)
+        
+        mtx = torch.from_numpy(params[cam]['mtx']).float().cuda().unsqueeze(0)
+        rotation = torch.from_numpy(params[cam]['rotation']).float().cuda().unsqueeze(0)
+        translation = torch.from_numpy(
+            params[cam]['translation']).float().cuda().unsqueeze(0)
+        params_torch.append(
+            {
+                'mtx': mtx,
+                'rotation': rotation,
+                'translation': translation,
+            }
+        )
+
+    return masks_torch, params_torch
+
+
+def project_points_to_camera_plane(points_3d, mtx, R, T):
+    transformation = torch.eye(4).cuda()
+    transformation[:3, :3] = R
+    transformation[:3, 3] = T
+    transformation = transformation.unsqueeze(0)
+
+    points_3d = torch.cat((
+        points_3d,
+        torch.ones(
+            points_3d.shape[0], points_3d.shape[1], 1,
+            device="cuda")), dim=2)
+    points_3d = (torch.bmm(transformation, points_3d.transpose(1, 2)))
+    points_3d = points_3d[:, :3, :] / points_3d[:, 3:, :]    
+
+    points_3d = torch.bmm(mtx, points_3d)
+
+    points_3d = points_3d[:, :2, :] / points_3d[:, 2:, :]
+    points_3d = points_3d.transpose(1, 2)
+
+    return points_3d[:, :, :2]
+
+
+def visualize_chamfer(mask, vert):
+    img = np.zeros((1080, 1920, 3), np.uint8)
+    
+    for point in mask:
+        x = int(point[0])
+        y = int(point[1])
+        if 0 < x < 1920 and 0 < y < 1080:
+            img[y, x] = (255, 255, 255)
+
+    for point in vert:
+        x = int(point[0])
+        y = int(point[1])
+        if 0 < x < 1920 and 0 < y < 1080:
+            img[y, x] = (0, 255, 0)
+
+    cv2.imshow("frame", cv2.resize(img, (960, 540)))
+    cv2.waitKey(1)
+
+
+def calc_chamfer(verts, masks, params):
+    loss = 0
+    for cam in range(len(masks)):
+        for idx_mask in range(len(masks[cam])):
+            mask_torch = masks[cam][idx_mask]
+            mtx = params[cam]['mtx']
+            rotation = params[cam]['rotation']
+            translation = params[cam]['translation']
+            pcd_proj = project_points_to_camera_plane(
+                verts[idx_mask].unsqueeze(0), mtx,
+                rotation, translation,)
+            if VISUALIZE_PROJ and cam == 0:
+                visualize_chamfer(
+                    mask_torch.squeeze().detach().cpu().numpy(),
+                    pcd_proj.squeeze().detach().cpu().numpy())
+            distances = chamfer_distance(
+                pcd_proj, mask_torch,
+                single_directional=False, norm=2,
+                point_reduction=None, batch_reduction=None)[0]
+            loss_verts = torch.mean(distances[0])
+            loss_mask = torch.mean(
+                distances[1][distances[1] < torch.max(distances[0])])
+            loss += loss_verts + loss_mask
+
+    return loss
+
+
+# TODO: Shorten
+def optimize_beta(smpl_layer, skeletons, masks, experiment, subject, epochs):
+    device = 'cuda' if torch.cuda.is_available() else 'cpu'
+    smpl_layer.to(device)
+
+    denormalize_params = load_denormalize_params(experiment, subject, device)
+
+    batch_tensor = torch.ones((skeletons.shape[0], 1)).to(device)
+
+    global_orient, jaw_pose, leye_pose, reye_pose, \
+        body, left_hand_pose, right_hand_pose, betas, expression, \
+        translation, scale = load_smplx_params(experiment, subject, device)
+
+    lr = 2e-3
     optim_params = [{'params': global_orient, 'lr': lr},
                     {'params': jaw_pose, 'lr': lr},
                     {'params': leye_pose, 'lr': lr},
@@ -178,6 +331,8 @@ def optimize_beta(smpl_layer, skeletons, epochs):
                     {'params': scale, 'lr': lr},
                     {'params': translation, 'lr': lr},]
     optimizer = torch.optim.Adam(optim_params)
+
+    masks_torch, params_torch = masks_params_torch(masks, params)
 
     skeletons_torch = torch.from_numpy(skeletons).float().to(device)
 
@@ -196,17 +351,21 @@ def optimize_beta(smpl_layer, skeletons, epochs):
             betas=betas * batch_tensor,
             expression=expression,
             return_verts=True)
-
+        
         joints = output.joints
+        verts = output.vertices
+        
+        verts = verts - joints[0, 0] + translation
+        verts = verts * scale
         joints = joints - joints[0, 0] + translation
         joints = joints * scale
 
         loss_distance = calc_distance(joints, skeletons_torch)
 
-        # loss_smooth = torch.nn.functional.mse_loss(joints[1:], joints[:-1])
-        # loss = loss_distance + loss_smooth * PARAM_COEFF_POSE
+        verts = denormalize(verts, denormalize_params)
+        loss_chamfer = calc_chamfer(verts, masks_torch, params_torch)
 
-        loss = loss_distance
+        loss = loss_distance * PARAM_WEIGHT_DIST + loss_chamfer * PARAM_WEIGHT_CHMF
 
         optimizer.zero_grad()
         loss.backward()
@@ -215,17 +374,24 @@ def optimize_beta(smpl_layer, skeletons, epochs):
         loss = loss.detach().cpu().item()
         if loss_init is None:
             loss_init = loss
+            loss_distance_init = loss_distance * PARAM_WEIGHT_DIST
+            loss_chamfer_init = loss_chamfer * PARAM_WEIGHT_CHMF
 
         bar.set_description(
-            "L: {:.4f} D: {:.4f} Si:{:.2f}".format(
+            "L: {:.2E} LD: {:.2E} LC: {:.2E} S:{:.2f}".format(
                 loss,
-                loss_distance,
-                # loss_smooth * PARAM_COEFF_POSE,
+                loss_distance * PARAM_WEIGHT_DIST,
+                loss_chamfer * PARAM_WEIGHT_CHMF,
                 scale.item(),
             )
         )
 
-    print('Loss went from {:.4f} to {:.4f}'.format(loss_init, loss))
+    print('L {:.4f} to {:.4f}\n D {:.4f} to {:.4f}\nCH {:.4f} to {:.4f}'.format(
+            loss_init, loss,
+            loss_distance_init, loss_distance  * PARAM_WEIGHT_DIST,
+            loss_chamfer_init, loss_chamfer * PARAM_WEIGHT_CHMF,
+        )
+    )
 
     return global_orient.detach().cpu().numpy(), \
         jaw_pose.detach().cpu().numpy(), \
@@ -353,6 +519,78 @@ def store_smplx_parameters(global_orient, jaw_pose, leye_pose,
     print(f'Stored results: {path}')
 
 
+def get_mask(cam, experiment, idx, params):
+    img_mask = get_mask_image(cam, experiment, idx)
+    
+    img_mask = cv2.imread(img_mask, -1)
+    kernel = np.ones((5, 5), np.uint8)
+    img_mask = cv2.erode(img_mask, kernel, iterations=2)
+
+    mtx = params[cameras.index(cam)]['mtx']
+    dist = params[cameras.index(cam)]['dist']
+    img_mask = cv2.undistort(img_mask, mtx, dist, None, None)
+
+    img_mask = cv2.resize(
+        img_mask,
+        (img_mask.shape[1] // PARAM_SCALE_MASK,
+         img_mask.shape[0] // PARAM_SCALE_MASK))
+
+    points = np.argwhere(img_mask > 0.7) * PARAM_SCALE_MASK
+    points = np.flip(points, axis=1).copy()
+
+    return points
+
+
+def get_masks(experiment, params, depth):
+    masks = [[], [], [], []]
+
+    print("Loading masks...")
+    for idx in tqdm(range(depth)):
+        mask24 = get_mask(cam24, experiment, idx, params)
+        mask15 = get_mask(cam15, experiment, idx, params)
+        # mask24 = get_mask(cam24, experiment, idx, params)
+        mask34 = get_mask(cam34, experiment, idx, params)
+        mask35 = get_mask(cam35, experiment, idx, params)
+
+        masks[0].append(
+            mask24
+        )
+        masks[1].append(
+            mask15
+        )
+        masks[2].append(
+            mask34
+        )
+        masks[3].append(
+            mask35
+        )
+
+    return masks
+
+
+def get_params_color(expriment):
+    file = f"keypoints3d_{expriment}_ba.pkl"
+    file_path = os.path.join(DIR_ORG, file)
+    with open(file_path, 'rb') as handle:
+        output = pickle.load(handle)
+
+    params = output['params']
+
+    return params
+
+
+cam24 = 'azure_kinect2_4_calib_snap'
+cam15 = 'azure_kinect1_5_calib_snap'
+cam14 = 'azure_kinect1_4_calib_snap'
+cam34 = 'azure_kinect3_4_calib_snap'
+cam35 = 'azure_kinect3_5_calib_snap'
+cameras = [
+    cam24,
+    cam15,
+    # cam14,
+    cam34,
+    cam35,   
+]
 if __name__ == '__main__':
     model = smplx.create(
         PATH_MODEL, model_type='smplx',
@@ -365,19 +603,15 @@ if __name__ == '__main__':
         for subject in SUBJECTS:
             skeletons = load_skeletons(experiment, subject)
 
+            params = get_params_color(experiment)
+            masks = get_masks(experiment, params, skeletons.shape[0])
+
             print(f'Optimizing {experiment} {subject}')
             global_orient, jaw_pose, leye_pose, \
                 reye_pose,body,left_hand_pose, \
                 right_hand_pose, betas, expression, \
                 translation, scale = optimize_beta(
-                    model, skeletons, EPOCHS)
-
-            if VISUALIZE:
-                visualize_poses(
-                    global_orient, jaw_pose, leye_pose,
-                    reye_pose,body,left_hand_pose,
-                    right_hand_pose, betas, expression,
-                    translation, scale, model.faces, skeletons)
+                    model, skeletons, masks, experiment, subject, EPOCHS)
 
             store_smplx_parameters(
                 global_orient, jaw_pose, leye_pose,
