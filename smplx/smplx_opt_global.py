@@ -23,7 +23,7 @@ DIR_SMPLX = './params_smplx'
 
 EXPERIMENTS = ['a1', 'a2']
 SUBJECTS = [0, 1]
-EPOCHS = 200
+EPOCHS = 500
 VISUALIZE = False
 VISUALIZE_PROJ = False
 PATH_MODEL = 'models'
@@ -218,12 +218,14 @@ def masks_params_torch(masks, params):
     for cam in range(len(masks)):
         masks_torch_cam = []
         for idx_mask in range(len(masks[cam])):
-            masks_torch_cam.append(torch.from_numpy(masks[cam][idx_mask]).float().unsqueeze(0).cuda())
+            masks_torch_cam.append(
+                torch.from_numpy(masks[cam][idx_mask]).float().unsqueeze(0).cuda())
         masks_torch.append(masks_torch_cam)
         
         mtx = torch.from_numpy(params[cam]['mtx']).float().cuda().unsqueeze(0)
         rotation = torch.from_numpy(params[cam]['rotation']).float().cuda().unsqueeze(0)
-        translation = torch.from_numpy(params[cam]['translation']).float().cuda().unsqueeze(0)
+        translation = torch.from_numpy(
+            params[cam]['translation']).float().cuda().unsqueeze(0)
         params_torch.append(
             {
                 'mtx': mtx,
@@ -296,7 +298,8 @@ def calc_chamfer(verts, masks, params):
                 single_directional=False, norm=2,
                 point_reduction=None, batch_reduction=None)[0]
             loss_verts = torch.mean(distances[0])
-            loss_mask = torch.mean(distances[1][distances[1] < torch.max(distances[0])])
+            loss_mask = torch.mean(
+                distances[1][distances[1] < torch.max(distances[0])])
             loss += loss_verts + loss_mask
 
     return loss
@@ -523,10 +526,6 @@ def get_mask(cam, experiment, idx, params):
     kernel = np.ones((5, 5), np.uint8)
     img_mask = cv2.erode(img_mask, kernel, iterations=2)
 
-    # cv2.imshow("before", cv2.resize(img_mask, (1280, 720)))
-    # cv2.imshow("after", cv2.resize(image, (1280, 720)))
-    # cv2.waitKey(0)
-
     mtx = params[cameras.index(cam)]['mtx']
     dist = params[cameras.index(cam)]['dist']
     img_mask = cv2.undistort(img_mask, mtx, dist, None, None)
@@ -613,13 +612,6 @@ if __name__ == '__main__':
                 right_hand_pose, betas, expression, \
                 translation, scale = optimize_beta(
                     model, skeletons, masks, experiment, subject, EPOCHS)
-
-            # if VISUALIZE:
-            #     visualize_poses(
-            #         global_orient, jaw_pose, leye_pose,
-            #         reye_pose,body,left_hand_pose,
-            #         right_hand_pose, betas, expression,
-            #         translation, scale, model.faces, skeletons)
 
             store_smplx_parameters(
                 global_orient, jaw_pose, leye_pose,
