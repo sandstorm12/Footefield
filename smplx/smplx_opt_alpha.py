@@ -26,7 +26,7 @@ PARAM_COEFF_DET = .01
 PATH_MODEL = 'models'
 
 COEFF_NORM = 1
-COEFF_MINI = 1
+COEFF_MINI = .5
 SMPLX_SKELETON_MAP = np.array([ # (SMPLX, SKELETON)
     [13, 5, COEFF_NORM],
     [14, 6, COEFF_NORM],
@@ -121,11 +121,15 @@ SMPLX_SKELETON_MAP = np.array([ # (SMPLX, SKELETON)
 ])
 
 
-def calc_distance(joints, skeleton, SMPLX_SKELETON_MAP_torch):
+def calc_distance(joints, skeleton):
     skeleton_selected = skeleton[:, SMPLX_SKELETON_MAP[:, 1]]
     output_selected = joints[:, SMPLX_SKELETON_MAP[:, 0]]
 
-    loss = F.smooth_l1_loss(output_selected, skeleton_selected, reduction='mean')
+    loss = F.smooth_l1_loss(output_selected, skeleton_selected, reduction='none')
+    
+    # Just for test, optimize
+    loss = torch.mean(loss, dim=(0, 2))
+    loss = torch.mean(loss * torch.from_numpy(SMPLX_SKELETON_MAP[:, 2]).float().cuda())
 
     return loss
 
@@ -156,7 +160,7 @@ def optimize_beta(smpl_layer, skeletons, epochs):
     body.requires_grad = True
     left_hand_pose.requires_grad = True
     right_hand_pose.requires_grad = True
-    betas.requires_grad = True
+    betas.requires_grad = False
     expression.requires_grad = True
     translation.requires_grad = True
     scale.requires_grad = True
@@ -174,9 +178,6 @@ def optimize_beta(smpl_layer, skeletons, epochs):
                     {'params': scale, 'lr': lr},
                     {'params': translation, 'lr': lr},]
     optimizer = torch.optim.Adam(optim_params)
-
-    SMPLX_SKELETON_MAP_torch = torch.from_numpy(SMPLX_SKELETON_MAP).to(device)
-    SMPLX_SKELETON_MAP_torch.requires_grad = False
 
     skeletons_torch = torch.from_numpy(skeletons).float().to(device)
 
@@ -200,11 +201,12 @@ def optimize_beta(smpl_layer, skeletons, epochs):
         joints = joints - joints[0, 0] + translation
         joints = joints * scale
 
-        loss_distance = calc_distance(joints, skeletons_torch, SMPLX_SKELETON_MAP_torch)
+        loss_distance = calc_distance(joints, skeletons_torch)
 
-        loss_smooth = torch.nn.functional.mse_loss(joints[1:], joints[:-1])
+        # loss_smooth = torch.nn.functional.mse_loss(joints[1:], joints[:-1])
+        # loss = loss_distance + loss_smooth * PARAM_COEFF_POSE
 
-        loss = loss_distance + loss_smooth * PARAM_COEFF_POSE
+        loss = loss_distance
 
         optimizer.zero_grad()
         loss.backward()
@@ -215,10 +217,10 @@ def optimize_beta(smpl_layer, skeletons, epochs):
             loss_init = loss
 
         bar.set_description(
-            "L: {:.4f} D: {:.4f} S: {:.4f} Si:{:.2f}".format(
+            "L: {:.4f} D: {:.4f} Si:{:.2f}".format(
                 loss,
                 loss_distance,
-                loss_smooth * PARAM_COEFF_POSE,
+                # loss_smooth * PARAM_COEFF_POSE,
                 scale.item(),
             )
         )
