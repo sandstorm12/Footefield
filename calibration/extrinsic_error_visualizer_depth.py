@@ -1,10 +1,12 @@
+import sys
+sys.path.append('../')
+
 import cv2
 import diskcache
 import numpy as np
 
-import detect_chessboard
-
 from tqdm import tqdm
+from utils import data_loader
 
 
 ORDER_VALID = (
@@ -17,21 +19,14 @@ ORDER_VALID = (
 
 
 def get_obj_points():
-    cols = detect_chessboard.CHESSBOARD_COLS
-    rows = detect_chessboard.CHESSBOARD_ROWS
-    square_size = detect_chessboard.CHESSBOARD_SQRS
+    cols = data_loader.CHESSBOARD_COLS
+    rows = data_loader.CHESSBOARD_ROWS
+    square_size = data_loader.CHESSBOARD_SQRS
 
     obj_points = np.zeros((cols * rows, 3), np.float32)
     obj_points[:, :2] = np.mgrid[0:cols, 0:rows].T.reshape(-1, 2) * square_size
 
     return obj_points
-
-
-def get_all_keys(cache):
-    keys_all = cache._sql('SELECT key FROM Cache').fetchall()
-    keys_all = [item[0] for item in keys_all]
-
-    return keys_all
 
 
 def load_image_points(cache, images):
@@ -46,16 +41,14 @@ def load_image_points(cache, images):
     img_points = []
     img_paths = []
     for key in tqdm(images):
-        ret, corners = images_info[key]['findchessboardcorners_rgb']
+        ret, corners = images_info[key]['findchessboardcorners_infrared']
         if not ret:
             continue
         
         img_points.append(corners)
-        width = images_info[key]['width']
-        height = images_info[key]['height']
-        img_paths.append(images_info[key]['fullpath'])
+        img_paths.append(images_info[key]['fullpath_infrared'])
 
-    return img_points, width, height, img_paths
+    return img_points, img_paths
 
 
 def find_matching_images(images_info, cam_1, cam_2):
@@ -68,8 +61,8 @@ def find_matching_images(images_info, cam_1, cam_2):
         cam_2_img = f"{cam_2}/{img_name}"
         if images_info.__contains__(cam_1_img) \
             and images_info.__contains__(cam_2_img):
-            points_found_1, _ = images_info[cam_1_img]['findchessboardcorners_rgb']
-            points_found_2, _ = images_info[cam_2_img]['findchessboardcorners_rgb']
+            points_found_1, _ = images_info[cam_1_img]['findchessboardcorners_infrared']
+            points_found_2, _ = images_info[cam_2_img]['findchessboardcorners_infrared']
             if points_found_1 and points_found_2:
                 matching_pairs[img_name] = {
                     "cam_1_img": cam_1_img,
@@ -80,8 +73,12 @@ def find_matching_images(images_info, cam_1, cam_2):
 
 
 def visualize_points(img_paths_1, img_paths_2, imgpoints1_projected, imgpoints2_projected):
-    image_1 = cv2.imread(img_paths_1[i])
-    image_2 = cv2.imread(img_paths_2[i])
+    image_1 = cv2.imread(img_paths_1[i], -1)
+    image_2 = cv2.imread(img_paths_2[i], -1)
+
+    image_1 = np.clip(image_1.astype(np.float32) * .8, 0, 255).astype('uint8')
+    image_2 = np.clip(image_2.astype(np.float32) * .8, 0, 255).astype('uint8')
+
     for idx_point, point in enumerate(imgpoints1_projected):
         x = int(point[0][0])
         y = int(point[0][1])
@@ -113,8 +110,6 @@ def visualize_points(img_paths_1, img_paths_2, imgpoints1_projected, imgpoints2_
 if __name__ == "__main__":
     cache = diskcache.Cache('cache')
 
-    print("Cache keys:", get_all_keys(cache))
-
     obj_points = get_obj_points()
     intrinsics = cache['intrinsics']
 
@@ -127,27 +122,29 @@ if __name__ == "__main__":
             if f"{cam_1}/{cam_2}" not in ORDER_VALID:
                 continue
             
-            print(f"Calibrating... {cameras[cam1_idx]}"
+            print(f"Visualizing reprojection error for {cameras[cam1_idx]}"
                   f" vs {cameras[cam2_idx]}")
 
             matching_pairs = find_matching_images(cache['images_info'], cam_1, cam_2)
 
             print(f"Matching pairs: {len(matching_pairs)}")
+            if len(matching_pairs) == 0:
+                continue
 
-            img_points_1, width, height, img_paths_1 = load_image_points(
+            img_points_1, img_paths_1 = load_image_points(
                 cache, images=[item['cam_1_img'] for item in matching_pairs.values()])
-            img_points_2, width, height, img_paths_2 = load_image_points(
+            img_points_2, img_paths_2 = load_image_points(
                 cache, images=[item['cam_2_img'] for item in matching_pairs.values()])
 
-            mtx_1 = intrinsics[cam_1]['mtx']
-            dist_1 = intrinsics[cam_1]['dist']
-            rvecs_1 = intrinsics[cam_1]['rvecs']
-            tvecs_1 = intrinsics[cam_1]['tvecs']
+            # mtx_1 = intrinsics[cam_1 + '_infrared']['mtx']
+            # dist_1 = intrinsics[cam_1 + '_infrared']['dist']
+            # rvecs_1 = intrinsics[cam_1 + '_infrared']['rvecs']
+            # tvecs_1 = intrinsics[cam_1 + '_infrared']['tvecs']
 
-            mtx_2 = intrinsics[cam_2]['mtx']
-            dist_2 = intrinsics[cam_2]['dist']
-            rvecs_2 = intrinsics[cam_2]['rvecs']
-            tvecs_2 = intrinsics[cam_2]['tvecs']
+            # mtx_2 = intrinsics[cam_2 + '_infrared']['mtx']
+            # dist_2 = intrinsics[cam_2 + '_infrared']['dist']
+            # rvecs_2 = intrinsics[cam_2 + '_infrared']['rvecs']
+            # tvecs_2 = intrinsics[cam_2 + '_infrared']['tvecs']
 
             stereocalibration_criteria = (cv2.TERM_CRITERIA_MAX_ITER + cv2.TERM_CRITERIA_EPS, 1000, 1e-6)
             
@@ -155,7 +152,8 @@ if __name__ == "__main__":
             ret, mtx_1, dist_1, mtx_2, dist_2, R, T, E, F = cv2.stereoCalibrate(
                 np.tile(obj_points, (len(img_points_1), 1, 1)),
                 img_points_1, img_points_2,
-                mtx_1, dist_1, mtx_2, dist_2, (width, height),
+                None, None, None, None,
+                (data_loader.IMAGE_INFRARED_WIDTH, data_loader.IMAGE_INFRARED_HEIGHT),
                 criteria=stereocalibration_criteria, flags=0)
 
             total_error = 0
@@ -175,12 +173,11 @@ if __name__ == "__main__":
                 image_l, image_r = visualize_points(
                     img_paths_1, img_paths_2,
                     imgpoints1_projected, imgpoints2_projected)
-
-                cv2.imshow("image1", cv2.resize(image_l, (960, 1080)))
-                cv2.imshow("image2", cv2.resize(image_r, (960, 1080)))
+                
+                cv2.imshow("image1", image_l)
+                cv2.imshow("image2", image_r)
                 key = cv2.waitKey(0)
                 if key == ord('q'):
                     break
 
-            # Print the average projection error
             print("Average projection error: ", total_error / len(img_points_1))

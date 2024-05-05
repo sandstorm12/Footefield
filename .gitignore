@@ -1,3 +1,41 @@
+# Images for my reference
+coco_wholebody.png
+
+# SMPL-X models
+smplx/models/
+smplx/params_smplx/
+
+# SMPL models
+smpl/models/
+
+# VSCode
+.vscode
+
+# Temporary IO files
+**/keypoints_3d_x/
+**/keypoints_3d/
+**/keypoints_3d_ba_x/
+**/keypoints_3d_ba/
+**/keypoints_3d_pose2smpl/
+**/keypoints_3d_pose2smpl_x/
+**/extrinsics_finetuned/
+**/extrinsics_global/
+**/extrinsics_mask/
+**/pointcloud_normalized/
+**/smpl/params_smpl/
+**/smpl/params_smpl_mask/
+**/smplx/params_smplx_mask/
+
+# Pose to SMPL input files
+*.npy
+
+# Model files
+*.pt
+
+# Videos
+*.avi
+*.mp4
+
 # Mediapipe
 *.task
 
