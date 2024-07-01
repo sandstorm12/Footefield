@@ -20,6 +20,7 @@ For SMPL-X fitting:
 
 1. Feature: Implement 3D open3D full-scene SMPL-X visualizer.
 1. Feature: Find a way to record open3d visualizations.
+1. Feature: Implement FFT visualizer for denoising
 
 
 ## Known issues
