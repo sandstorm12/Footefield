@@ -12,6 +12,7 @@ import open3d as o3d
 import torch.nn.functional as F
 
 from tqdm import tqdm
+from torch import fft
 from utils import data_loader
 from pytorch3d.loss import chamfer_distance
 
@@ -30,6 +31,7 @@ PATH_MODEL = 'models'
 PARAM_SCALE_MASK = 8
 
 PARAM_WEIGHT_CHMF = 1e-8
+PARAM_WEIGHT_SMTH = 1e-4
 PARAM_WEIGHT_DIST = 1
 
 COEFF_NORM = 1
@@ -138,6 +140,18 @@ def calc_distance(joints, skeleton):
     loss = torch.mean(loss, dim=(0, 2))
     loss = torch.mean(loss * torch.from_numpy(SMPLX_SKELETON_MAP[:, 2]).float().cuda())
 
+    return loss
+
+
+def calc_smooth(joints):
+    target = joints[:, SMPLX_SKELETON_MAP[:, 0]]
+
+    target = target.transpose(1, 2).reshape((target.shape[0] * target.shape[2], target.shape[1]))
+
+    fft_target = fft.rfft(target)
+    
+    loss = torch.mean(torch.abs(fft_target[:, 10:]) ** 2)
+    
     return loss
 
 
@@ -365,7 +379,9 @@ def optimize_beta(smpl_layer, skeletons, masks, experiment, subject, epochs):
         verts = denormalize(verts, denormalize_params)
         loss_chamfer = calc_chamfer(verts, masks_torch, params_torch)
 
-        loss = loss_distance * PARAM_WEIGHT_DIST + loss_chamfer * PARAM_WEIGHT_CHMF
+        loss_smooth = calc_smooth(joints)
+
+        loss = loss_distance * PARAM_WEIGHT_DIST + loss_chamfer * PARAM_WEIGHT_CHMF + loss_smooth * PARAM_WEIGHT_SMTH
 
         optimizer.zero_grad()
         loss.backward()
@@ -376,20 +392,23 @@ def optimize_beta(smpl_layer, skeletons, masks, experiment, subject, epochs):
             loss_init = loss
             loss_distance_init = loss_distance * PARAM_WEIGHT_DIST
             loss_chamfer_init = loss_chamfer * PARAM_WEIGHT_CHMF
+            loss_smooth_init = loss_smooth * PARAM_WEIGHT_SMTH
 
         bar.set_description(
-            "L: {:.2E} LD: {:.2E} LC: {:.2E} S:{:.2f}".format(
+            "L: {:.2E} LD: {:.2E} LC: {:.2E} STH: {:.2E} S:{:.2f}".format(
                 loss,
                 loss_distance * PARAM_WEIGHT_DIST,
                 loss_chamfer * PARAM_WEIGHT_CHMF,
+                loss_smooth * PARAM_WEIGHT_SMTH,
                 scale.item(),
             )
         )
 
-    print('L {:.4f} to {:.4f}\n D {:.4f} to {:.4f}\nCH {:.4f} to {:.4f}'.format(
+    print('L {:.2E} to {:.2E}\n D {:.2E} to {:.2E}\nCH {:.2E} to {:.2E}\nSTH {:.2E} to {:.2E}'.format(
             loss_init, loss,
             loss_distance_init, loss_distance  * PARAM_WEIGHT_DIST,
             loss_chamfer_init, loss_chamfer * PARAM_WEIGHT_CHMF,
+            loss_smooth_init, loss_smooth * PARAM_WEIGHT_SMTH,
         )
     )
 
