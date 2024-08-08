@@ -110,6 +110,7 @@ def detect_chessboards():
     calculate_total_success_dets(cache)
 
 
+# Just for test
 if __name__ == "__main__":
     detect_chessboards()
     
