@@ -33,9 +33,12 @@ Run the scripts in this order:
 1. ~~`data_loader.downsample_keep_aspect_ratio` doesn't work correctly if the image size and the requested size are the same~~
 1. ~~Cannot find matching pairs for some camera pairs for extrinsic parameter calculation~~
 1. In display mode, the detect chessboard depth and rgb scipts do not go to next camera
+1. Feature: Make the calibration scripts more generalizable to work with custom images
+1. Feature: Move to video format
+1. Refactor: Add descriptions to each of the scripts
 
 
 ## Contributors
 
-- Shihao Zou: szou2@ualberta.ca
 - Hamid Mohammadi: hamid4@ualberta.ca
+- Shihao Zou: szou2@ualberta.ca
