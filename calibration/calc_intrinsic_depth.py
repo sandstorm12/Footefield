@@ -34,8 +34,6 @@ def _load_configs(path):
     with open(path, 'r') as yaml_file:
         configs = yaml.safe_load(yaml_file)
 
-    print(configs)
-
     return configs
 
 
