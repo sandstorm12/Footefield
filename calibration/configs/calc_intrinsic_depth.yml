@@ -1,0 +1,2 @@
+chessboards: "/home/hamid/Documents/phd/footefield/footefield/calibration/artifacts/chessboards_depth.yml"
+output_dir: "artifacts/intrinsic_depth.yml"

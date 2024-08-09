@@ -6,20 +6,42 @@ import sys
 sys.path.append('../')
 
 import cv2
+import yaml
+import argparse
 import diskcache
 import numpy as np
-
-import detect_chessboard
 
 from tqdm import tqdm
 from utils import data_loader
 
 
-def load_image_points(cache):
-    images_info = cache['images_info']
+def _get_arguments():
+    parser = argparse.ArgumentParser()
 
-    if not images_info:
-        print("'images_info' not found.")
+    parser.add_argument(
+        '-c', '--config',
+        help='Path to the config file',
+        type=str,
+        default='configs/calc_intrinsic_depth.yml',
+    )
+
+    args = parser.parse_args()
+
+    return args
+
+
+def _load_configs(path):
+    with open(path, 'r') as yaml_file:
+        configs = yaml.safe_load(yaml_file)
+
+    print(configs)
+
+    return configs
+
+
+def load_image_points(configs):
+    with open(configs['chessboards']) as handler:
+        images_info = yaml.safe_load(handler)
 
     if len(images_info.keys()) == 0:
         print("No images in images_info. Please run detect_chessboard first.")
@@ -41,7 +63,7 @@ def load_image_points(cache):
     return cameras
 
 
-def calculate_intrinsics(cameras_info, cache):
+def calculate_intrinsics(cameras_info, configs):
     cols = data_loader.CHESSBOARD_COLS
     rows = data_loader.CHESSBOARD_ROWS
     square_size = data_loader.CHESSBOARD_SQRS
@@ -49,9 +71,10 @@ def calculate_intrinsics(cameras_info, cache):
     obj_points = np.zeros((cols * rows, 3), np.float32)
     obj_points[:, :2] = np.mgrid[0:cols, 0:rows].T.reshape(-1, 2) * square_size
 
-    intrinsics = cache.get('intrinsics', {})
+    intrinsics = {}
     for key in tqdm(cameras_info.keys()):
-        img_points = cameras_info[key]['img_points']
+        img_points = np.array(cameras_info[key]['img_points'],
+                              dtype=np.float32)
 
         width = data_loader.IMAGE_INFRARED_WIDTH
         height = data_loader.IMAGE_INFRARED_HEIGHT
@@ -61,24 +84,37 @@ def calculate_intrinsics(cameras_info, cache):
                 np.tile(obj_points, (len(img_points), 1, 1)),
                 img_points,
                 (width, height), None, None, flags=cv2.CALIB_FIX_K3)
+        
+        mtx = mtx.tolist()
+        dist = dist.tolist()
+        # rvecs = [item.tolist() for item in rvecs]
+        # tvecs = [item.tolist() for item in tvecs]
 
-        intrinsics[key + '_infrared'] = {
+        intrinsics[key] = {
             "ret": ret,
             "mtx": mtx,
             "dist": dist,
-            "rvecs": rvecs,
-            "tvecs": tvecs,
+            # "rvecs": rvecs,
+            # "tvecs": tvecs,
         }
 
-    cache['intrinsics'] = intrinsics
+    _store_artifacts(intrinsics, configs)
 
 
-def calc_intrinsic():
-    cache = diskcache.Cache('cache')
+def _store_artifacts(artifact, configs):
+    with open(configs['output_dir'], 'w') as handle:
+        yaml.dump(artifact, handle)
 
-    cameras_info = load_image_points(cache)
-    calculate_intrinsics(cameras_info, cache)
+
+def calc_intrinsic(configs):
+    cameras_info = load_image_points(configs)
+    calculate_intrinsics(cameras_info, configs)
 
 
 if __name__ == "__main__":
-    calc_intrinsic()    
+    args = _get_arguments()
+    configs = _load_configs(args.config)
+
+    print(f"Config loaded: {configs}")
+
+    calc_intrinsic(configs)
