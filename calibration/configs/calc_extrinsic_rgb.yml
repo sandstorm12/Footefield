@@ -1,0 +1,8 @@
+chessboards: "/home/hamid/Documents/phd/footefield/footefield/calibration/artifacts/chessboards_rgb.yml"
+output_dir: "artifacts/extrinsic_rgb.yml"
+cameras:
+  - "cam1_5"
+  - "cam1_4"
+  - "cam3_4"
+  - "cam3_5"
+  - "cam2_4"

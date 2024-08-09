@@ -2,7 +2,8 @@ import sys
 sys.path.append('../')
 
 import cv2
-import diskcache
+import yaml
+import argparse
 import numpy as np
 
 from tqdm import tqdm
@@ -10,16 +11,38 @@ from utils import data_loader
 
 
 ORDER_VALID = (
-    'azure_kinect1_5_calib_snap/azure_kinect1_4_calib_snap',
-    'azure_kinect1_4_calib_snap/azure_kinect3_4_calib_snap',
-    'azure_kinect3_4_calib_snap/azure_kinect3_5_calib_snap',
-    'azure_kinect3_5_calib_snap/azure_kinect2_4_calib_snap',
-    'azure_kinect2_4_calib_snap/azure_kinect1_5_calib_snap',
+    'cam1_5/cam1_4',
+    'cam1_4/cam3_4',
+    'cam3_4/cam3_5',
+    # 'cam3_5/cam2_4', # No matches found
+    'cam2_4/cam1_5',
 )
 
 STEREO_CALIBRATION_CRITERIA = (
     cv2.TERM_CRITERIA_MAX_ITER + cv2.TERM_CRITERIA_EPS,
     1000, 1e-6)
+
+
+def _get_arguments():
+    parser = argparse.ArgumentParser()
+
+    parser.add_argument(
+        '-c', '--config',
+        help='Path to the config file',
+        type=str,
+        default='configs/calc_extrinsic_depth.yml',
+    )
+
+    args = parser.parse_args()
+
+    return args
+
+
+def _load_configs(path):
+    with open(path, 'r') as yaml_file:
+        configs = yaml.safe_load(yaml_file)
+
+    return configs
 
 
 def get_obj_points():
@@ -33,19 +56,7 @@ def get_obj_points():
     return obj_points
 
 
-def get_all_keys(cache):
-    keys_all = cache._sql('SELECT key FROM Cache').fetchall()
-    keys_all = [item[0] for item in keys_all]
-
-    return keys_all
-
-
-def load_image_points(cache, images):
-    images_info = cache['images_info']
-
-    if not images_info:
-        print("'images_info' not found.")
-
+def load_image_points(images_info, images):
     if len(images_info.keys()) == 0:
         print("No images in images_info. Please run detect_chessboard first.")
 
@@ -56,6 +67,8 @@ def load_image_points(cache, images):
             continue
         
         img_points.append(corners)
+
+    img_points = np.array(img_points, dtype=np.float32)
 
     return img_points
 
@@ -81,20 +94,20 @@ def find_matching_images(images_info, cam_1, cam_2):
     return matching_pairs
 
 
-def calc_extrinsics(cam_1, cam_2, obj_points, cache):
+def calc_extrinsics(cam_1, cam_2, obj_points, extrinsics, configs):
     print(f"Calibrating... {cam_1} vs {cam_2}")
 
-    matching_pairs = find_matching_images(cache['images_info'], cam_1, cam_2)
+    with open(configs['chessboards']) as handler:
+        images_info = yaml.safe_load(handler)
+
+    matching_pairs = find_matching_images(images_info, cam_1, cam_2)
 
     print(f"Matching pairs: {len(matching_pairs)}")
-    if len(matching_pairs) == 0:
-        print(f"Found no matching paris for {cam_1} & {cam_2}")
-        return
-    
+
     img_points_1 = load_image_points(
-        cache, images=[item['cam_1_img'] for item in matching_pairs.values()])
+        images_info, images=[item['cam_1_img'] for item in matching_pairs.values()])
     img_points_2 = load_image_points(
-        cache, images=[item['cam_2_img'] for item in matching_pairs.values()])
+        images_info, images=[item['cam_2_img'] for item in matching_pairs.values()])
 
     _, mtx_1, dist_1, mtx_2, dist_2, R, T, _, _ = cv2.stereoCalibrate(
         np.tile(obj_points, (len(img_points_1), 1, 1)),
@@ -103,47 +116,40 @@ def calc_extrinsics(cam_1, cam_2, obj_points, cache):
         (data_loader.IMAGE_INFRARED_WIDTH,
          data_loader.IMAGE_INFRARED_HEIGHT),
         criteria=STEREO_CALIBRATION_CRITERIA, flags=0)
-    
-    if not cache.__contains__('extrinsics'):
-        cache['extrinsics'] = {}
 
-    extrinsics = cache['extrinsics']
-    extrinsics[cam_1 + 'infrared'] = {
+    extrinsics[cam_1] = {
+        'left_cam': cam_1,
         'right_cam': cam_2,
-        'mtx_l': mtx_1,
-        'dist_l': dist_1,
-        'mtx_r': mtx_2,
-        'dist_r': dist_2,
-        'rotation': R,
-        'transition': T,
+        'mtx_l': mtx_1.tolist(),
+        'dist_l': dist_1.tolist(),
+        'mtx_r': mtx_2.tolist(),
+        'dist_r': dist_2.tolist(),
+        'rotation': R.tolist(),
+        'transition': T.tolist(),
     }
-    cache['extrinsics'] = extrinsics
 
 
-def calc_reprojection_error(cam_1, cam_2, obj_points, cache):
-    print(f"Calculating reprojection error... {cam_1} vs {cam_2}")
+def calc_reprojection_error(cam_1, cam_2, obj_points, extrinsics, configs):
+    print(f"Calculating error... {cam_1} vs {cam_2}")
 
-    matching_pairs = find_matching_images(cache['images_info'], cam_1, cam_2)
+    with open(configs['chessboards']) as handler:
+        images_info = yaml.safe_load(handler)
+
+    matching_pairs = find_matching_images(images_info, cam_1, cam_2)
 
     print(f"Matching pairs: {len(matching_pairs)}")
-    if len(matching_pairs) == 0:
-        print(f"Found no matching paris for {cam_1} & {cam_2}")
-        return
 
     img_points_1 = load_image_points(
-        cache, images=[item['cam_1_img'] for item in matching_pairs.values()])
+        images_info, images=[item['cam_1_img'] for item in matching_pairs.values()])
     img_points_2 = load_image_points(
-        cache, images=[item['cam_2_img'] for item in matching_pairs.values()])
-
-    if not cache.__contains__('extrinsics'):
-        raise Exception('Extrinsics not cached.')
+        images_info, images=[item['cam_2_img'] for item in matching_pairs.values()])
     
-    mtx_1 = cache['extrinsics'][cam_1 + 'infrared']['mtx_l']
-    dist_1 = cache['extrinsics'][cam_1 + 'infrared']['dist_l']
-    mtx_2 = cache['extrinsics'][cam_1 + 'infrared']['mtx_r']
-    dist_2 = cache['extrinsics'][cam_1 + 'infrared']['dist_r']
-    R = cache['extrinsics'][cam_1 + 'infrared']['rotation']
-    T = cache['extrinsics'][cam_1 + 'infrared']['transition']
+    mtx_1 = np.array(extrinsics[cam_1]['mtx_l'], dtype=np.float32)
+    dist_1 = np.array(extrinsics[cam_1]['dist_l'], dtype=np.float32)
+    mtx_2 = np.array(extrinsics[cam_1]['mtx_r'], dtype=np.float32)
+    dist_2 = np.array(extrinsics[cam_1]['dist_r'], dtype=np.float32)
+    R = np.array(extrinsics[cam_1]['rotation'], dtype=np.float32)
+    T = np.array(extrinsics[cam_1]['transition'], dtype=np.float32)
     
     total_error = 0
     for i in range(len(img_points_1)):
@@ -163,18 +169,16 @@ def calc_reprojection_error(cam_1, cam_2, obj_points, cache):
                 / len(imgpoints2_projected)
         total_error += (error1 + error2) / 2
 
+    # Print the average projection error
     print("Average projection error: ", total_error / len(img_points_1))
 
 
-def calc_extrinsic():
-    cache = diskcache.Cache('cache')
-
-    print("Cache keys:", get_all_keys(cache))
-
+def calc_extrinsic(configs):
     obj_points = get_obj_points()
-    intrinsics = cache['intrinsics']
 
-    cameras = list(intrinsics.keys())
+    extrinsics = {}
+
+    cameras = configs['cameras']
     for cam1_idx in range(len(cameras)):
         for cam2_idx in range(len(cameras)):
             cam_1 = cameras[cam1_idx]
@@ -183,9 +187,21 @@ def calc_extrinsic():
             if f"{cam_1}/{cam_2}" not in ORDER_VALID:
                 continue
                     
-            calc_extrinsics(cam_1, cam_2, obj_points, cache)
-            calc_reprojection_error(cam_1, cam_2, obj_points, cache)
+            calc_extrinsics(cam_1, cam_2, obj_points, extrinsics, configs)
+            calc_reprojection_error(cam_1, cam_2, obj_points, extrinsics, configs)
+
+    _store_artifacts(extrinsics, configs)
+
+
+def _store_artifacts(artifact, configs):
+    with open(configs['output_dir'], 'w') as handle:
+        yaml.dump(artifact, handle)
 
 
 if __name__ == "__main__":
-    calc_extrinsic()    
+    args = _get_arguments()
+    configs = _load_configs(args.config)
+
+    print(f"Config loaded: {configs}")
+
+    calc_extrinsic(configs)   
