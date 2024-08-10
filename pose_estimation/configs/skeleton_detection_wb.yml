@@ -1,0 +1,16 @@
+model: "rtmw-x_8xb320-270e_cocktail14-384x288"
+output: "artifacts/detected_skeletons_wb_a1.yml"
+intrinsics: "/home/hamid/Documents/phd/footefield/footefield/calibration/artifacts/intrinsic_rgb.yml"
+visualize: True
+experiment_length: 100
+calibration_folders:
+    - camera_name: "cam2_4"
+      path: "/home/hamid/Documents/phd/footefield/data/AzureKinectRecord_0729/a1/azure_kinect2_4/color"
+    - camera_name: "cam3_4"
+      path: "/home/hamid/Documents/phd/footefield/data/AzureKinectRecord_0729/a1/azure_kinect3_4/color"
+    - camera_name: "cam3_5"
+      path: "/home/hamid/Documents/phd/footefield/data/AzureKinectRecord_0729/a1/azure_kinect3_5/color"
+    - camera_name: "cam1_4"
+      path: "/home/hamid/Documents/phd/footefield/data/AzureKinectRecord_0729/a1/azure_kinect1_4/color"
+    - camera_name: "cam1_5"
+      path: "/home/hamid/Documents/phd/footefield/data/AzureKinectRecord_0729/a1/azure_kinect1_5/color"
