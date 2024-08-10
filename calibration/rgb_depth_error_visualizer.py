@@ -2,16 +2,38 @@ import sys
 sys.path.append('../')
 
 import cv2
-import diskcache
+import yaml
+import argparse
 import numpy as np
 
-from tqdm import tqdm
 from utils import data_loader
 
 
 STEREO_CALIBRATION_CRITERIA = (
     cv2.TERM_CRITERIA_MAX_ITER + cv2.TERM_CRITERIA_EPS,
     1000, 1e-6)
+
+
+def _get_arguments():
+    parser = argparse.ArgumentParser()
+
+    parser.add_argument(
+        '-c', '--config',
+        help='Path to the config file',
+        type=str,
+        default='configs/rgb_depth_error_visualizer.yml',
+    )
+
+    args = parser.parse_args()
+
+    return args
+
+
+def _load_configs(path):
+    with open(path, 'r') as yaml_file:
+        configs = yaml.safe_load(yaml_file)
+
+    return configs
 
 
 def get_obj_points():
@@ -25,52 +47,53 @@ def get_obj_points():
     return obj_points
 
 
-def find_rgb_depth_images(images_info, cam_1):
-    images_info = cache['images_info']
-
+def find_rgb_depth_images(images_info_rgb, images_info_depth, cam_1):
     image_paths_rgb = []
     image_paths_infrared = []
     image_points_rgb = []
     image_points_infrared = []
-    for key in images_info.keys():
+    for key in images_info_rgb.keys():
         if key.split("/")[0] == cam_1:
             points_found_rgb, points_rgb = \
-                images_info[key]['findchessboardcorners_rgb']
+                images_info_rgb[key]['findchessboardcorners_rgb']
             points_found_infrared, points_infrared = \
-                images_info[key]['findchessboardcorners_infrared']
+                images_info_depth[key]['findchessboardcorners_infrared']
             if points_found_rgb and points_found_infrared:
-                image_paths_rgb.append(images_info[key]['fullpath_rgb'])
+                image_paths_rgb.append(images_info_rgb[key]['fullpath_rgb'])
                 image_paths_infrared.append(
-                    images_info[key]['fullpath_infrared'])
+                    images_info_depth[key]['fullpath_infrared'])
                 image_points_rgb.append(points_rgb)
                 image_points_infrared.append(points_infrared)
 
     rgb_depth_pairs = {
         "image_paths_rgb": image_paths_rgb,
         "image_paths_infrared": image_paths_infrared,
-        "image_points_rgb": image_points_rgb,
-        "image_points_infrared": image_points_infrared,
+        "image_points_rgb": np.array(image_points_rgb, np.float32),
+        "image_points_infrared": np.array(image_points_infrared, np.float32),
     }
             
     return rgb_depth_pairs
 
 
-def calc_reprojection_error(cam_1, obj_points, cache):
+def calc_reprojection_error(cam_1, obj_points, depth_extrinsics, configs):
     print(f"Calibrating... {cam_1}")
 
-    rgb_depth_pairs = find_rgb_depth_images(cache['images_info'], cam_1)
+    with open(configs['chessboards_rgb']) as handler:
+        images_info_rgb = yaml.safe_load(handler)
+    with open(configs['chessboards_depth']) as handler:
+        images_info_depth = yaml.safe_load(handler)
+
+    rgb_depth_pairs = find_rgb_depth_images(
+        images_info_rgb, images_info_depth, cam_1)
 
     print(f"Matching pairs: {len(rgb_depth_pairs['image_points_rgb'])}")
-
-    if not cache.__contains__('extrinsics'):
-        raise Exception('Extrinsics not cached.')
     
-    mtx_1 = cache['depth_matching'][cam_1]['mtx_l']
-    dist_1 = cache['depth_matching'][cam_1]['dist_l']
-    mtx_2 = cache['depth_matching'][cam_1]['mtx_r']
-    dist_2 = cache['depth_matching'][cam_1]['dist_r']
-    R = cache['depth_matching'][cam_1]['rotation']
-    T = cache['depth_matching'][cam_1]['transition']
+    mtx_1 = np.array(depth_extrinsics[cam_1]['mtx_l_rgb'], np.float32)
+    dist_1 = np.array(depth_extrinsics[cam_1]['dist_l_rgb'], np.float32)
+    mtx_2 = np.array(depth_extrinsics[cam_1]['mtx_r_depth'], np.float32)
+    dist_2 = np.array(depth_extrinsics[cam_1]['dist_r_depth'], np.float32)
+    R = np.array(depth_extrinsics[cam_1]['rotation'], np.float32)
+    T = np.array(depth_extrinsics[cam_1]['transition'], np.float32)
     
     for idx in range(len(rgb_depth_pairs['image_points_rgb'])):
         _, rvec_l, tvec_l = cv2.solvePnP(
@@ -109,15 +132,17 @@ def calc_reprojection_error(cam_1, obj_points, cache):
 
 
 if __name__ == "__main__":
-    cache = diskcache.Cache('cache')
+    args = _get_arguments()
+    configs = _load_configs(args.config)
 
+    print(f"Config loaded: {configs}")
+    
     obj_points = get_obj_points()
-    intrinsics = cache['intrinsics']
+    with open(configs['rgb_depth_extrinsic']) as handler:
+        depth_extrinsics = yaml.safe_load(handler)
 
-    # TODO: Not very clean
-    cameras = [camera for camera in intrinsics.keys()
-               if '_infrared' not in camera]
+    cameras = configs['cameras']
     for cam1_idx in range(len(cameras)):
         cam_1 = cameras[cam1_idx]
 
-        calc_reprojection_error(cam_1, obj_points, cache)
+        calc_reprojection_error(cam_1, obj_points, depth_extrinsics, configs)
