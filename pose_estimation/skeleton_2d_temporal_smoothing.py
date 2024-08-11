@@ -142,7 +142,7 @@ if __name__ == "__main__":
                 point_smooth_x = np.sum(point_motion_window[:, 0] * gaussian_kernel_window)
                 point_smooth_y = np.sum(point_motion_window[:, 1] * gaussian_kernel_window)
 
-                smoothness_weight = (1 / confidence_motion[t]) ** beta
+                smoothness_weight = (1 - confidence_motion[t]) * beta
                 pose_smooth[t, point_idx, 0] = (point_motion[t][0] + smoothness_weight * point_smooth_x) / (1 + smoothness_weight)
                 pose_smooth[t, point_idx, 1] = (point_motion[t][1] + smoothness_weight * point_smooth_y) / (1 + smoothness_weight)
 
