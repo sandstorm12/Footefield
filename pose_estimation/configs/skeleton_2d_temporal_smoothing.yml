@@ -1,0 +1,7 @@
+skeletons: "artifacts/detected_skeletons_a1.yml"
+output: "artifacts/detected_skeletons_a1_smooth.yml"
+temporal_depth: 5
+sigma: .5
+confidence_weight: 1
+uncertainty_weight: 1
+visualize: False
