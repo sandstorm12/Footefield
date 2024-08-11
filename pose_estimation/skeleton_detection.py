@@ -11,10 +11,6 @@ from utils import data_loader
 from mmpose.apis import MMPoseInferencer
 
 
-EXP_LENGTH = 100
-DIR_STORE = "./keypoints_3d"
-
-
 def _get_arguments():
     parser = argparse.ArgumentParser()
 

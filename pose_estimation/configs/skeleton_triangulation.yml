@@ -1,0 +1,5 @@
+skeletons: "artifacts/detected_skeletons_a1_smooth.yml"
+intrinsics: "/home/hamid/Documents/phd/footefield/footefield/calibration/artifacts/intrinsic_rgb.yml"
+extrinsics: "/home/hamid/Documents/phd/footefield/footefield/calibration/artifacts/extrinsic_rgb.yml"
+visualize: True
+output: "artifacts/3d_skeletons_a1.yml"
