@@ -37,6 +37,7 @@ Run the scripts in this order:
 1. Feature: Move to video format
 1. Refactor: Add descriptions to each of the scripts
 1. Refactor: Intrinsics calculator for rgb abd depth images can be merged
+1. Refactor: Move tests to the tests subfolder
 
 
 ## Contributors
