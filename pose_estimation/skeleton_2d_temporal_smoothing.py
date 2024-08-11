@@ -36,53 +36,6 @@ def _load_configs(path):
     return configs
 
 
-def get_video_writer(camera, dir, fps, size):
-    fourcc = cv2.VideoWriter_fourcc(*'XVID')
-    writer = cv2.VideoWriter(
-        os.path.join(
-            dir,
-            f'visualizer_skeleton_detection_{camera}.avi'
-        ),
-        fourcc,
-        5,
-        (1920, 1080)
-    )
-    
-    return writer
-
-
-def write_video(poses, camera, intrinsics, configs):
-    dir = configs['calibration_folders'][camera]
-    img_rgb_paths = data_loader.list_rgb_images(dir)
-
-    if not os.path.exists(configs['output_dir']):
-        os.makedirs(configs['output_dir'])
-
-    mtx = np.array(intrinsics[camera]['mtx'], np.float32)
-    dist = np.array(intrinsics[camera]['dist'], np.float32)
-
-    writer = get_video_writer(camera, configs['output_dir'], configs['fps'], configs['size'])
-    for idx, t in enumerate(poses.reshape(poses.shape[0], -1, 2)):
-        img_rgb = cv2.imread(img_rgb_paths[idx])
-
-        img_rgb = cv2.undistort(img_rgb, mtx, dist, None, None)
-        for point in t:
-            cv2.circle(img_rgb, (int(point[0]), int(point[1])),
-                       3, (0, 255, 0), -1)
-
-        connections = np.concatenate(
-            [np.array(data_loader.HALPE_EDGES) + i * 26
-             for i in range(poses.shape[1])]
-        )
-        for connection in connections:
-            cv2.line(img_rgb,
-                    (int(t[connection[0]][0]), int(t[connection[0]][1])),
-                    (int(t[connection[1]][0]), int(t[connection[1]][1])),
-                    (255, 255, 255), 1)
-
-        writer.write(img_rgb)
-
-
 def gaussian_filter(size, sigma):
     r = range(-1 * size // 2, size // 2 + 1)
     

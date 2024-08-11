@@ -1,0 +1,6 @@
+skeletons: "artifacts/3d_skeletons_a1_wb.yml"
+output: "artifacts/3d_skeletons_a1_wb_smooth.yml"
+temporal_depth: 10
+sigma: 2
+smoothness_weight: 10
+visualize: False
