@@ -1,7 +1,8 @@
 model: "rtmpose-x_8xb256-700e_body8-halpe26-384x288"
 output: "artifacts/detected_skeletons_a1.yml"
 intrinsics: "/home/hamid/Documents/phd/footefield/footefield/calibration/artifacts/intrinsic_rgb.yml"
-visualize: True
+visualize: False
+confidence_coeff: 1
 experiment_length: 100
 calibration_folders:
     - camera_name: "cam2_4"

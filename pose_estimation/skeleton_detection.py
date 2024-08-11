@@ -61,7 +61,7 @@ def filter_sort(people_keypoints, num_select=2, invert=False):
     return people_keypoints
 
 
-def _get_skeleton(image, inferencer, max_people=2, invert=False):
+def _get_skeleton(image, inferencer, max_people, invert, configs):
     result_generator = inferencer(image)
     
     detected_keypoints = []
@@ -72,7 +72,10 @@ def _get_skeleton(image, inferencer, max_people=2, invert=False):
                                        invert=invert)
         for predictions in poeple_keypoints:
             keypoints = predictions['keypoints']
-            confidences = predictions['keypoint_scores']
+            # Divided by 10 to normalize between 0 and 1
+            # TODO: Clear the mess here
+            confidences = (np.array(predictions['keypoint_scores']) \
+                           / configs['confidence_coeff']).tolist()
             detected_keypoints.append(keypoints)
             detected_confidences.append(confidences)
 
@@ -94,7 +97,7 @@ def extract_poses(dir, camera, model, intrinsics, max_people, invert,
         img_rgb = cv2.undistort(img_rgb, mtx, dist, None, None)
 
         people_keypoints, confidences = _get_skeleton(
-            img_rgb, model, max_people, invert)
+            img_rgb, model, max_people, invert, configs)
         if configs['visualize']:
             visualize_keypoints(img_rgb, people_keypoints)
 

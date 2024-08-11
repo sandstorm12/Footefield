@@ -1,21 +1,44 @@
 import sys
 sys.path.append('../')
 
-import os
 import time
-import pickle
+import yaml
+import argparse
 import numpy as np
 import open3d as o3d
 
 from utils import data_loader
 
 
-DIR_INPUT = './keypoints_3d'
+# TODO: Move to the config file
 HALPE_LINES = np.array(
     [(0, 1), (0, 2), (1, 3), (2, 4), (5, 18), (6, 18), (5, 7),
      (7, 9), (6, 8), (8, 10), (17, 18), (18, 19), (19, 11),
      (19, 12), (11, 13), (12, 14), (13, 15), (14, 16), (20, 24),
      (21, 25), (23, 25), (22, 24), (15, 24), (16, 25)])
+
+
+def _get_arguments():
+    parser = argparse.ArgumentParser()
+
+    parser.add_argument(
+        '-c', '--config',
+        help='Path to the config file',
+        type=str,
+        default='configs/visualizer_skeleton_triangulation_a1.yml',
+    )
+
+    args = parser.parse_args()
+
+    return args
+
+
+def _load_configs(path):
+    with open(path, 'r') as yaml_file:
+        configs = yaml.safe_load(yaml_file)
+
+    return configs
+
 
 def visualize_poses(poses):
     vis = o3d.visualization.VisualizerWithKeyCallback()
@@ -56,12 +79,17 @@ def visualize_poses(poses):
             
 
 if __name__ == "__main__":
-    files = [file for file in os.listdir(DIR_INPUT) if 'ba' not in file]
-    for file in files:
-        file_path = os.path.join(DIR_INPUT, file)
-        print(f"Visualizing {file_path}")
+    args = _get_arguments()
+    configs = _load_configs(args.config)
 
-        with open(file_path, 'rb') as handle:
-            poses = pickle.load(handle)
+    print(f"Config loaded: {configs}")
 
-        visualize_poses(poses.reshape(-1, 26*2, 3))
+    file_path = configs['path']
+    print(f"Visualizing {file_path}")
+
+    with open(file_path) as handler:
+        poses = yaml.safe_load(handler)
+
+    poses = np.array(poses, np.float32)
+
+    visualize_poses(poses.reshape(poses.shape[0], -1, 3))

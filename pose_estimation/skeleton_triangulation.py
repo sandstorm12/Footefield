@@ -121,8 +121,12 @@ def calc_3d_skeleton(poses, configs):
             points_2d = []
             parameters = []
             for camera in cameras:
-                points_timestep = np.array(poses[camera]['pose'][timestep]).reshape(-1, 2)
-                if point_idx < len(points_timestep):
+                points_timestep = np.array(
+                    poses[camera]['pose'][timestep]).reshape(-1, 2)
+                confidences_timestep = np.array(
+                    poses[camera]['pose_confidence'][timestep]).reshape(-1)
+                if point_idx < len(points_timestep) and \
+                        confidences_timestep[point_idx] > configs['threshold']:
                     points_2d.append(points_timestep[point_idx])
                     
                     cam_mtx = np.array(intrinsics[camera]['mtx'], np.float32)
