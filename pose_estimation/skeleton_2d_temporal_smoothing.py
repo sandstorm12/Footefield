@@ -95,6 +95,7 @@ def _store_artifacts(artifact, output):
         yaml.dump(artifact, handle)
 
 
+# TODO: Make shorter
 if __name__ == "__main__":
     args = _get_arguments()
     configs = _load_configs(args.config)
