@@ -69,6 +69,7 @@ Now you can fit the SMPL-X parameters using the scripts in the `smplx` folder.
 1. ~~Refactor: Move away from visualizing keypoints in matplotlib. Open3D visualizationq results in better understanding and easier development.~~
 1. ~~Refactor: Remove redundant scripts~~
 1. Feature: Add tracking id to the recorded poses
+1. Refactor: Merge wholebody scripts with the normal ones
 
 
 ## Known issues
