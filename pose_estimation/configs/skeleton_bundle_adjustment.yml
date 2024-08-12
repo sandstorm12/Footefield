@@ -1,4 +1,7 @@
 skeletons_2d: "/home/hamid/Documents/phd/footefield/footefield/pose_estimation/artifacts/detected_skeletons_a1_smooth.yml"
-skeletons_3d: "/home/hamid/Documents/phd/footefield/footefield/pose_estimation/artifacts/3d_skeletons_a1_smooth.yml"
+skeletons_3d: "/home/hamid/Documents/phd/footefield/footefield/pose_estimation/artifacts/3d_skeletons_a1.yml"
 params: "/home/hamid/Documents/phd/footefield/footefield/pose_estimation/artifacts/params_global_a1.yml"
-calibration_parameters_size: 21
+calib_param_size: 12
+conf_threshold: .9
+output_skeleton_3d: "artifacts/3d_skeletons_a1_ba.yml"
+output_params: "artifacts/params_global_a1_ba.yml"

@@ -1,6 +1,6 @@
-skeletons: "artifacts/detected_skeletons_a1_smooth.yml"
-intrinsics: "/home/hamid/Documents/phd/footefield/footefield/calibration/artifacts/intrinsic_rgb.yml"
-output_dir: "videos/visualizer_skeleton_2d_smooth/a1/"
+skeletons: "artifacts/3d_skeletons_a1_ba.yml"
+params: "artifacts/params_global_a1_ba.yml"
+output_dir: "videos/visualizer_skeleton_3d_ba/a1/"
 fps: 5
 size:
   - 1920
