@@ -59,30 +59,29 @@ def _calc_extrinsics(cam, extrinsics):
     T3 = np.array(extrinsics["cam1_4"]['transition'], np.float32)
     R4 = np.array(extrinsics["cam3_4"]['rotation'], np.float32)
     T4 = np.array(extrinsics["cam3_4"]['transition'], np.float32)
-    
-    extrinsics = np.zeros((3, 4), dtype=float)
+
     if cam == "cam2_4":
         r = np.array([[1, 0, 0],
                      [0, 1, 0],
                      [0, 0, 1]])
         t = np.array([0, 0, 0])
-        extrinsics[:3, :3] = r
-        extrinsics[:3, 3] = t.reshape(3)
+        R_global = r
+        T_global = t.reshape(3)
     elif cam == "cam1_5":
-        extrinsics[:3, :3] = R
-        extrinsics[:3, 3] = T.reshape(3)
+        R_global = R
+        T_global = T.reshape(3)
     elif cam == "cam1_4":
         R2_com = np.dot(R2, R)
         T2_com = (np.dot(R2, T).reshape(3, 1) + T2).reshape(3,)
-        extrinsics[:3, :3] = R2_com
-        extrinsics[:3, 3] = T2_com
+        R_global = R2_com
+        T_global = T2_com
     elif cam == "cam3_4":
         R2_com = np.dot(R2, R)
         T2_com = (np.dot(R2, T).reshape(3, 1) + T2).reshape(3,)
         R3_com = np.dot(R3, R2_com)
         T3_com = (np.dot(R3, T2_com).reshape(3, 1) + T3).reshape(3,)
-        extrinsics[:3, :3] = R3_com
-        extrinsics[:3, 3] = T3_com
+        R_global = R3_com
+        T_global = T3_com
     elif cam == "cam3_5":
         R2_com = np.dot(R2, R)
         T2_com = (np.dot(R2, T).reshape(3, 1) + T2).reshape(3,)
@@ -90,23 +89,18 @@ def _calc_extrinsics(cam, extrinsics):
         T3_com = (np.dot(R3, T2_com).reshape(3, 1) + T3).reshape(3,)
         R4_com = np.dot(R4, R3_com)
         T4_com = (np.dot(R4, T3_com).reshape(3, 1) + T4).reshape(3,)
-        extrinsics[:3, :3] = R4_com
-        extrinsics[:3, 3] = T4_com
+        R_global = R4_com
+        T_global = T4_com
 
-    return extrinsics
+    return R_global.tolist(), T_global.tolist()
 
 
-# TODO: Too long
-def calc_3d_skeleton(poses, configs):
+def calc_3d_skeleton(poses, params, configs):
     cameras = poses.keys()
     length = len(poses[list(cameras)[0]]['pose'])
 
-    intrinsics = _get_intrinsics(configs)
-    extrinsics = _get_extrinsics(configs)
-
     num_people = 0
     num_points = 0
-    
     for camera in cameras:
         points = np.array(poses[camera]['pose']).shape[1:3]
         num_points = points[1]
@@ -129,9 +123,13 @@ def calc_3d_skeleton(poses, configs):
                         confidences_timestep[point_idx] > configs['threshold']:
                     points_2d.append(points_timestep[point_idx])
                     
-                    cam_mtx = np.array(intrinsics[camera]['mtx'], np.float32)
-                    cam_extrinsics = _calc_extrinsics(camera, extrinsics)
-                    parameters.append(cam_mtx @ cam_extrinsics)
+                    cam_mtx = np.array(params[camera]['mtx'], np.float32)
+                    extrinsics = np.zeros((3, 4), dtype=float)
+                    extrinsics[:3, :3] = np.array(
+                        params[camera]['rotation'], np.float32)
+                    extrinsics[:3, 3] = np.array(
+                        params[camera]['translation'], np.float32)
+                    parameters.append(cam_mtx @ extrinsics)
 
             points_2d = np.expand_dims(np.array(points_2d), 1)
             parameters = np.array(parameters)
@@ -144,6 +142,26 @@ def calc_3d_skeleton(poses, configs):
     points_3d = np.array(points_3d).reshape(length, num_people, num_points, 3)
 
     return points_3d
+
+
+def _calc_params(configs):
+    intrinsics = _get_intrinsics(configs)
+    print(intrinsics.keys())
+    extrinsics = _get_extrinsics(configs)
+    print(extrinsics.keys())
+
+    params_global = {}
+    for camera in intrinsics.keys():
+        rotation, translation = _calc_extrinsics(camera, extrinsics)
+
+        params_global[camera] = {
+            'mtx': intrinsics[camera]['mtx'],
+            'dist': intrinsics[camera]['dist'],
+            'rotation': rotation,
+            'translation': translation,
+        }
+
+    return params_global
 
 
 def _store_artifacts(artifact, output):
@@ -160,6 +178,8 @@ if __name__ == "__main__":
     with open(configs['skeletons']) as handler:
         poses = yaml.safe_load(handler)
         
-    poses_3d = calc_3d_skeleton(poses, configs)
+    params = _calc_params(configs)
+    poses_3d = calc_3d_skeleton(poses, params, configs)
 
+    _store_artifacts(params, configs['output_params'])
     _store_artifacts(poses_3d.tolist(), configs['output'])

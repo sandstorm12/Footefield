@@ -3,3 +3,4 @@ intrinsics: "/home/hamid/Documents/phd/footefield/footefield/calibration/artifac
 extrinsics: "/home/hamid/Documents/phd/footefield/footefield/calibration/artifacts/extrinsic_rgb.yml"
 threshold: .6
 output: "artifacts/3d_skeletons_a1.yml"
+output_params: "artifacts/params_global_a1.yml"

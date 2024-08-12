@@ -1,0 +1,13 @@
+skeletons: "artifacts/3d_skeletons_a1.yml"
+params: "artifacts/params_global_a1.yml"
+output_dir: "videos/visualizer_skeleton_3d/a1/"
+fps: 5
+size:
+  - 1920
+  - 1080
+calibration_folders:
+  cam2_4: "/home/hamid/Documents/phd/footefield/data/AzureKinectRecord_0729/a1/azure_kinect2_4/color"
+  cam3_4: "/home/hamid/Documents/phd/footefield/data/AzureKinectRecord_0729/a1/azure_kinect3_4/color"
+  cam3_5: "/home/hamid/Documents/phd/footefield/data/AzureKinectRecord_0729/a1/azure_kinect3_5/color"
+  cam1_4: "/home/hamid/Documents/phd/footefield/data/AzureKinectRecord_0729/a1/azure_kinect1_4/color"
+  cam1_5: "/home/hamid/Documents/phd/footefield/data/AzureKinectRecord_0729/a1/azure_kinect1_5/color"

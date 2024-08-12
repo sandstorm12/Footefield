@@ -41,8 +41,8 @@ def get_video_writer(camera, dir, fps, size):
             f'visualizer_skeleton_detection_{camera}.avi'
         ),
         fourcc,
-        5,
-        (1920, 1080)
+        fps,
+        size,
     )
     
     return writer
