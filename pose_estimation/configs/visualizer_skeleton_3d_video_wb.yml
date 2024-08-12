@@ -1,6 +1,6 @@
-skeletons: "artifacts/3d_skeletons_a1_smooth.yml"
+skeletons: "artifacts/3d_skeletons_a1_wb_smooth.yml"
 params: "artifacts/params_global_a1.yml"
-output_dir: "videos/visualizer_skeleton_3d/a1/"
+output_dir: "videos/visualizer_skeleton_3d_wb/a1/"
 fps: 5
 size:
   - 1920

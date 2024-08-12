@@ -34,19 +34,6 @@ def _load_configs(path):
     return configs
 
 
-def get_parameters(params):
-    mtx = params['mtx']
-    dist = params['dist']
-    rotation = params['rotation']
-    translation = params['translation']
-
-    extrinsics = np.identity(4, dtype=float)
-    extrinsics[:3, :3] = rotation
-    extrinsics[:3, 3] = translation
-
-    return mtx, dist, extrinsics
-
-
 # By Gemini
 def project_3d_to_2d(camera_matrix, dist_coeffs, rvec, tvec, object_points):
     image_points, _ = cv2.projectPoints(object_points, rvec, tvec,

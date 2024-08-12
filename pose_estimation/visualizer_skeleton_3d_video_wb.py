@@ -3,18 +3,13 @@ sys.path.append('../')
 
 import os
 import cv2
-import pickle
-import diskcache
+import yaml
+import argparse
 import numpy as np
 
 from tqdm import tqdm
 from utils import data_loader
 
-
-DIR_INPUT = "./keypoints_3d_ba_x"
-DIR_OUTPUT = "./videos_skeleton_ba_x"
-PARAM_OUTPUT_SIZE = (1920, 1080)
-PARAM_OUTPUT_FPS = 5.0
 
 body_foot_skeleton = [
     (16, 14), (14, 12), (17, 15), (15, 13), (12, 13), (6, 12), (7, 13),
@@ -51,21 +46,29 @@ righthand_skeleton = [
 WHOLEBODY_SKELETON = body_foot_skeleton + face_skeleton + lefthand_skeleton + righthand_skeleton
 HALPE_LINES = np.array(WHOLEBODY_SKELETON) - 1
 
+def _get_arguments():
+    parser = argparse.ArgumentParser()
 
-def get_parameters(params):
-    mtx = params['mtx']
-    dist = params['dist']
-    rotation = params['rotation']
-    translation = params['translation']
+    parser.add_argument(
+        '-c', '--config',
+        help='Path to the config file',
+        type=str,
+        default='configs/visualizer_skeleton_3d_video_wb.yml',
+    )
 
-    extrinsics = np.identity(4, dtype=float)
-    extrinsics[:3, :3] = rotation
-    extrinsics[:3, 3] = translation
+    args = parser.parse_args()
 
-    return mtx, dist, extrinsics
+    return args
 
 
-# Implemented by Gemini
+def _load_configs(path):
+    with open(path, 'r') as yaml_file:
+        configs = yaml.safe_load(yaml_file)
+
+    return configs
+
+
+# By Gemini
 def project_3d_to_2d(camera_matrix, dist_coeffs, rvec, tvec, object_points):
     image_points, _ = cv2.projectPoints(object_points, rvec, tvec,
                                         camera_matrix, dist_coeffs)
@@ -75,30 +78,31 @@ def project_3d_to_2d(camera_matrix, dist_coeffs, rvec, tvec, object_points):
     return image_points
 
 
-def get_video_writer(experiment, camera):
-    if not os.path.exists(DIR_OUTPUT):
-        os.mkdir(DIR_OUTPUT)
+def get_video_writer(camera, configs):
+    if not os.path.exists(configs['output_dir']):
+        os.makedirs(configs['output_dir'])
 
     fourcc = cv2.VideoWriter_fourcc(*'XVID')
     writer = cv2.VideoWriter(
         os.path.join(
-            DIR_OUTPUT,
-            f'visualizer_skeleton_video_{experiment}_{camera}.avi'
+            configs['output_dir'],
+            f'visualizer_skeleton_video_{camera}.avi'
         ),
         fourcc,
-        PARAM_OUTPUT_FPS,
-        PARAM_OUTPUT_SIZE
+        configs['fps'],
+        configs['size']
     )
     
     return writer
 
 
-def write_video(poses_2d, experiment, camera, params, cache):
-    img_rgb_paths = data_loader.list_rgb_images(os.path.join(dir, "color"))
+def write_video(poses_2d, camera, params, configs):
+    img_rgb_paths = data_loader.list_rgb_images(dir)
 
-    mtx, dist, _ = get_parameters(params)
+    mtx = np.array(params['mtx'], np.float32)
+    dist = np.array(params['dist'], np.float32)
 
-    writer = get_video_writer(experiment, camera)
+    writer = get_video_writer(camera, configs)
     for idx, t in enumerate(poses_2d.reshape(poses_2d.shape[0], -1, 2)):
         img_rgb = cv2.imread(img_rgb_paths[idx])
 
@@ -123,55 +127,40 @@ def poses_3d_2_2d(poses_3d, params):
     poses_shape = list(poses_3d.shape)
     poses_shape[-1] = 2
     
-    mtx = params['mtx']
-    dist = params['dist']
-    rotation = params['rotation']
-    translation = params['translation']
+    mtx = np.array(params['mtx'], np.float64)
+    # dist = np.array(params['dist'], np.float64)
+    rotation = np.array(params['rotation'], np.float64)
+    translation = np.array(params['translation'], np.float64)
     poses_2d = project_3d_to_2d(
         mtx, None,
         rotation,
         translation,
-        poses_3d.reshape(-1, 3))
+        poses_3d.reshape(-1, 3).astype(np.float32))
     poses_2d[:, 1] = poses_2d[:, 1]
     poses_2d = poses_2d.reshape(poses_shape)
 
     return poses_2d
 
 
-# TODO: Move the cameras somewhere else
-cam24 = 'azure_kinect2_4_calib_snap'
-cam15 = 'azure_kinect1_5_calib_snap'
-cam14 = 'azure_kinect1_4_calib_snap'
-cam34 = 'azure_kinect3_4_calib_snap'
-cam35 = 'azure_kinect3_5_calib_snap'
-# TODO: Too long
 if __name__ == "__main__":
-    cache = diskcache.Cache('../calibration/cache')
+    args = _get_arguments()
+    configs = _load_configs(args.config)
 
-    cameras = [
-        cam24,
-        cam15,
-        # cam14,
-        cam34,
-        cam35
-    ]
+    print(f"Config loaded: {configs}")
+    
+    with open(configs['skeletons']) as handler:
+        poses = yaml.safe_load(handler)
 
-    for file in os.listdir(DIR_INPUT):
-        experiment = file.split('.')[-2].split('_')[-2]
+    with open(configs['params']) as handler:
+        params = yaml.safe_load(handler)
 
-        file_path = os.path.join(DIR_INPUT, file)
-        print(f"Visualizing {file_path}")
-        
-        with open(file_path, 'rb') as handle:
-            output = pickle.load(handle)
+    poses = np.array(poses)
+    cameras = list(configs['calibration_folders'].keys())
+    for idx_cam, camera in enumerate(tqdm(cameras)):
+        dir = configs['calibration_folders'][camera]
 
-        poses = output['points_3d'].reshape(-1, 2, 133, 3)
-        params = output['params']
-        for idx_cam, camera in enumerate(tqdm(cameras)):
-            dir = data_loader.EXPERIMENTS[experiment][camera]
+        poses_2d = poses_3d_2_2d(
+            poses,
+            params[camera])
 
-            poses_2d = poses_3d_2_2d(
-                poses,
-                params[idx_cam])
-
-            write_video(poses_2d, experiment, camera, params[idx_cam], cache)
+        write_video(poses_2d, camera, params[camera], configs)
