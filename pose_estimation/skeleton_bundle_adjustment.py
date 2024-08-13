@@ -1,5 +1,3 @@
-from __future__ import print_function
-
 import os
 import cv2
 import glob
@@ -38,51 +36,52 @@ def _load_configs(path):
     return configs
 
 
-def project(points, params, params_org):
+def project(points, xxx, points_indices,
+            points_cam_indices, params, params_org):
     rotation = params[:, :9].reshape(-1, 3, 3)
     translation = params[:, 9:12]
 
+    cameras = list(params_org.keys())
+
     points_proj = []
-    for cam_idx, camera in enumerate(params_org):
+    for point_idx, point_global_idx in enumerate(points_indices):
         points_proj.append(
             cv2.projectPoints(
-                points, rotation[cam_idx], translation[cam_idx],
-                np.array(params_org[camera]['mtx'], np.float32),
+                points[point_global_idx],
+                rotation[points_cam_indices[point_idx]],
+                translation[points_cam_indices[point_idx]],
+                np.array(params_org[cameras[points_cam_indices[point_idx]]]['mtx'], np.float32),
                 None)[0]
         )
+
+    points_proj = np.array(points_proj).squeeze()
 
     return points_proj
 
 
-def fun(params, n_cameras, n_depth, n_points, points_2d, params_org, configs):
+def fun(params, n_cameras, n_points, params_org,
+        points_2d, points_2d_conf, points_indices, points_cam_indices, configs):
     camera_params = params[:n_cameras * configs['calib_param_size']].reshape(
         (n_cameras, configs['calib_param_size']))
     points_3d = params[n_cameras * configs['calib_param_size']:].reshape((n_points, 3))
     
     points_proj = project(
         points_3d,
+        points_2d,
+        points_indices,
+        points_cam_indices,
         camera_params,
         params_org)
-    
-    error = []
-    for cam_idx, camera in enumerate(points_2d.keys()):
-        points_proj_cam = points_proj[cam_idx].reshape(n_depth, -1, 26, 2)
-        points_2d_cam = np.array(points_2d[camera]['pose'])
-        points_2d_conf_cam = np.array(points_2d[camera]['pose_confidence'])
 
-        # print(points_2d_conf_cam.shape)
-        # print(np.sum(points_2d_conf_cam < configs['conf_threshold']))
+    # print("points_2d", points_2d.shape)
+    # print("points_proj", points_proj.shape)
 
-        diff = points_proj_cam[:, :points_2d_cam.shape[1], :, :] - points_2d_cam
-        # diff[:, :, :, 0] *= points_2d_conf_cam ** 2
-        # diff[:, :, :, 1] *= points_2d_conf_cam ** 2
-        diff[points_2d_conf_cam < configs['conf_threshold']] = 0
-        diff = np.array(diff).ravel()
-        error.extend(diff)
+    diff = (points_2d - points_proj)
+    diff[:, 0] = diff[:, 0] * points_2d_conf ** configs['conf_power']
+    diff[:, 1] = diff[:, 1] * points_2d_conf ** configs['conf_power']
+    diff = diff.ravel()
 
-    error = np.array(error)
-
-    return error
+    return diff
 
 
 def bundle_adjustment_sparsity(n_cameras, n_depth, n_points, camera_indices,
@@ -116,23 +115,27 @@ def ravel(params, configs):
     return params_ravel.ravel()
 
 
-def visualize_error(x0, n_cameras, n_depth, n_points, points_2d, param_org, configs):
-    f0 = fun(x0, n_cameras, n_depth, n_points, points_2d, param_org, configs)
+def visualize_error(x0, n_cameras, n_points, param_org, 
+                    points_2d, points_2d_conf, points_indices, points_cam_indices, configs):
+    f0 = fun(x0, n_cameras, n_points, param_org, 
+             points_2d, points_2d_conf, points_indices, points_cam_indices, configs)
     
     plt.plot(f0)
     plt.show()
 
 
-def optimize(n_cameras, n_depth, n_points, poses_2d, camera_indices,
-             point_indices, params_org, configs):
+def optimize(n_cameras, n_depth, n_points, params_org,
+             points_2d, points_2d_conf, points_indices, points_cam_indices, configs):
     jac_sparsity = bundle_adjustment_sparsity(
-        n_cameras, n_depth, n_points, camera_indices, point_indices, configs)
+        n_cameras, n_depth, n_points, points_cam_indices,
+        points_indices, configs)
 
     res = least_squares(
         fun, x0, jac_sparsity=jac_sparsity, verbose=2,
-        x_scale='jac', ftol=1e-12, xtol=1e-20, gtol=1e-12,
-        method='trf', args=(n_cameras, n_depth, n_points, poses_2d, params_org,
-                            configs))
+        x_scale='jac', ftol=1e-8, xtol=1e-8, gtol=1e-8,
+        method='trf', args=(n_cameras, n_points, params_org,
+                            points_2d, points_2d_conf, points_indices,
+                            points_cam_indices, configs))
 
     return res
 
@@ -196,36 +199,51 @@ def _load_inputs(configs):
     return poses_2d, poses_3d, params
 
 
-def _get_camera_indices(poses_2d):
-    camera_indices = [
-        [cam_idx] * (len(np.array(poses_2d[camera]['pose']).ravel()) // 2)
-        for cam_idx, camera in enumerate(poses_2d.keys())]
-    camera_indices = np.concatenate(camera_indices)
-
-    return camera_indices
-
-
-def _get_point_indices(poses_2d):
-    point_indices = []
-    for camera in poses_2d.keys():
-        point_indices_cam = []
-        for t in range(len(poses_2d[camera]['pose'])):
-            num_points = np.array(poses_2d[camera]['pose'][t]).shape[:2]
-            point_indices_cam.append(np.arange(num_points[0] * num_points[1]))
-
-        point_indices.append(np.array(point_indices_cam).ravel())
-
-    point_indices = np.concatenate(point_indices)
-
-    return point_indices
-
-
 def _contruct_optimization_params(params, poses_3d, configs):
     params_ravel = ravel(params, configs)
     
     x0 = np.hstack((params_ravel, poses_3d.ravel()))
 
     return x0
+
+
+def _format_points(poses_3d, poses_2d, params_org):
+    points_3d = []
+    points_2d = []
+    points_2d_conf = []
+    points_indices = []
+    points_cam_indices = []
+
+    poses_3d_scene = poses_3d.reshape(poses_3d.shape[0], -1, 3)
+    for timestep in range(poses_3d_scene.shape[0]):
+        for point_idx_scene in range(poses_3d_scene.shape[1]):
+            points_3d.append(poses_3d_scene[timestep, point_idx_scene])
+            
+            for idx_cam, camera in enumerate(params_org.keys()):
+                points_2d_cam_time = np.array(
+                    poses_2d[camera]['pose'][timestep]).reshape(-1, 2)
+                points_2d_cam_time_conf = np.array(
+                    poses_2d[camera]['pose_confidence'][timestep]).reshape(-1)
+                if point_idx_scene < len(points_2d_cam_time) \
+                        and points_2d_cam_time_conf[point_idx_scene] \
+                            > configs['conf_threshold']:
+                    points_2d.append(points_2d_cam_time[point_idx_scene])
+                    points_2d_conf.append(points_2d_cam_time_conf[point_idx_scene])
+                    points_indices.append(len(points_3d) - 1)
+                    points_cam_indices.append(idx_cam)
+
+    points_3d = np.array(points_3d)
+    points_2d = np.array(points_2d)
+    points_2d_conf = np.array(points_2d_conf)
+    points_indices = np.array(points_indices)
+    points_cam_indices = np.array(points_cam_indices)
+
+    print(points_3d.shape, '--> all cams:', points_3d.shape[0] * 5)
+    print(points_2d.shape)
+    print("point ids", points_indices.shape)
+    print("cam ids", points_cam_indices.shape)
+
+    return points_3d, points_2d, points_2d_conf, points_indices, points_cam_indices
 
 
 if __name__ == '__main__':
@@ -240,18 +258,21 @@ if __name__ == '__main__':
     n_depth = poses_3d.shape[0]
     n_points = poses_3d.reshape(-1, 3).shape[0]
 
-    camera_indices = _get_camera_indices(poses_2d)
-    point_indices = _get_point_indices(poses_2d)
+    points_3d, points_2d, points_2d_conf, points_indices, points_cam_indices = \
+        _format_points(poses_3d, poses_2d, params_org)
 
-    x0 = _contruct_optimization_params(params_org, poses_3d, configs)
+    x0 = _contruct_optimization_params(params_org, points_3d, configs)
 
-    visualize_error(x0, n_cameras, n_depth, n_points, poses_2d,
-                    params_org, configs)
+    visualize_error(x0, n_cameras, n_points,
+                    params_org, points_2d, points_2d_conf, points_indices,
+                    points_cam_indices, configs)
 
-    results = optimize(n_cameras, n_depth, n_points, poses_2d, camera_indices,
-                       point_indices, params_org, configs)
+    results = optimize(n_cameras, n_depth, n_points,
+                       params_org, points_2d, points_2d_conf, points_indices,
+                       points_cam_indices, configs)
 
-    visualize_error(results['x'], n_cameras, n_depth, n_points, poses_2d,
-                    params_org, configs)
+    visualize_error(results['x'], n_cameras, n_points,
+                    params_org, points_2d, points_2d_conf, points_indices,
+                    points_cam_indices, configs)
 
     store_results(results, poses_2d, poses_3d, params_org, configs)
