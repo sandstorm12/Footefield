@@ -1,16 +1,15 @@
 import sys
 sys.path.append('../')
 
-import os
-import glob
 import time
+import yaml
+import argparse
 import numpy as np
 import open3d as o3d
 
 from utils import data_loader
 
 
-STORE_DIR = './keypoints_3d_pose2smpl_x'
 body_foot_skeleton = [
     (16, 14), (14, 12), (17, 15), (15, 13), (12, 13), (6, 12), (7, 13),
     (6, 7), (6, 8), (7, 9), (8, 10), (9, 11), (2, 3), (1, 2), (1, 3),
@@ -46,6 +45,28 @@ righthand_skeleton = [
 WHOLEBODY_SKELETON = body_foot_skeleton + face_skeleton + lefthand_skeleton + righthand_skeleton
 HALPE_LINES = np.array(WHOLEBODY_SKELETON) - 1
 
+
+def _get_arguments():
+    parser = argparse.ArgumentParser()
+
+    parser.add_argument(
+        '-c', '--config',
+        help='Path to the config file',
+        type=str,
+    )
+
+    args = parser.parse_args()
+
+    return args
+
+
+def _load_configs(path):
+    with open(path, 'r') as yaml_file:
+        configs = yaml.safe_load(yaml_file)
+
+    return configs
+
+
 def visualize_poses(poses):
     vis = o3d.visualization.VisualizerWithKeyCallback()
     vis.create_window()
@@ -80,16 +101,18 @@ def visualize_poses(poses):
             vis.poll_events()
             vis.update_renderer()
             time.sleep(.01)
-
-        print(f"Update {idx}: {time.time()}")
             
 
 if __name__ == "__main__":
-    files = glob.glob(os.path.join(STORE_DIR, "*.npy"))
-    for file in files:
-        print(f"Visualizing {file}")
+    args = _get_arguments()
+    configs = _load_configs(args.config)
 
-        with open(file, 'rb') as handle:
-            poses = np.load(handle)
+    print(f"Config loaded: {configs}")
+
+    with open(configs['skeletons'], 'rb') as handle:
+        bundles = yaml.safe_load(handle)
+
+    for bundle in bundles:
+        poses = np.array(bundle['pose_normalized'])
 
         visualize_poses(poses)
