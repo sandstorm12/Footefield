@@ -1,6 +1,4 @@
-import os
 import cv2
-import glob
 import yaml
 import argparse
 import numpy as np
@@ -8,10 +6,6 @@ import matplotlib.pyplot as plt
 
 from scipy.sparse import lil_matrix
 from scipy.optimize import least_squares
-
-
-DIR_INPUT = './keypoints_3d'
-DIR_STORE = './keypoints_3d_ba'
 
 
 def _get_arguments():
@@ -36,8 +30,16 @@ def _load_configs(path):
     return configs
 
 
-def project(points, xxx, points_indices,
+def project(points, points_indices,
             points_cam_indices, params, params_org):
+    # camera_matrix = np.zeros((params.shape[0], 3, 3), dtype=np.float32)
+    # camera_matrix[:, 0, 0] = params[:, 12]
+    # camera_matrix[:, 1, 1] = params[:, 13]
+    # camera_matrix[:, 0, 2] = params[:, 14]
+    # camera_matrix[:, 1, 2] = params[:, 15]
+    # camera_matrix[:, 2, 2] = 1.0
+    # dist = params[:, 16:]
+
     rotation = params[:, :9].reshape(-1, 3, 3)
     translation = params[:, 9:12]
 
@@ -50,7 +52,9 @@ def project(points, xxx, points_indices,
                 points[point_global_idx],
                 rotation[points_cam_indices[point_idx]],
                 translation[points_cam_indices[point_idx]],
-                np.array(params_org[cameras[points_cam_indices[point_idx]]]['mtx'], np.float32),
+                np.array(
+                    params_org[cameras[points_cam_indices[point_idx]]]['mtx'],
+                    np.float32),
                 None)[0]
         )
 
@@ -67,14 +71,10 @@ def fun(params, n_cameras, n_points, params_org,
     
     points_proj = project(
         points_3d,
-        points_2d,
         points_indices,
         points_cam_indices,
         camera_params,
         params_org)
-
-    # print("points_2d", points_2d.shape)
-    # print("points_proj", points_proj.shape)
 
     diff = (points_2d - points_proj)
     diff[:, 0] = diff[:, 0] * points_2d_conf ** configs['conf_power']
@@ -84,7 +84,7 @@ def fun(params, n_cameras, n_points, params_org,
     return diff
 
 
-def bundle_adjustment_sparsity(n_cameras, n_depth, n_points, camera_indices,
+def bundle_adjustment_sparsity(n_cameras, n_points, camera_indices,
                                point_indices, configs):
     m = camera_indices.size * 2
     n = n_cameras * configs['calib_param_size'] + n_points * 3
@@ -111,6 +111,11 @@ def ravel(params, configs):
     for i, camera in enumerate(params.keys()):
         params_ravel[i, :9] = np.array(params[camera]['rotation'], np.float32).ravel()
         params_ravel[i, 9:12] = np.array(params[camera]['translation'], np.float32).ravel()
+        # params_ravel[i, 12] = params[camera]['mtx'][0][0]
+        # params_ravel[i, 13] = params[camera]['mtx'][1][1]
+        # params_ravel[i, 14] = params[camera]['mtx'][0][2]
+        # params_ravel[i, 15] = params[camera]['mtx'][1][2]
+        # params_ravel[i, 16:] = np.array(params[camera]['dist'], np.float32).ravel()
 
     return params_ravel.ravel()
 
@@ -124,10 +129,10 @@ def visualize_error(x0, n_cameras, n_points, param_org,
     plt.show()
 
 
-def optimize(n_cameras, n_depth, n_points, params_org,
+def optimize(n_cameras, n_points, params_org,
              points_2d, points_2d_conf, points_indices, points_cam_indices, configs):
     jac_sparsity = bundle_adjustment_sparsity(
-        n_cameras, n_depth, n_points, points_cam_indices,
+        n_cameras, n_points, points_cam_indices,
         points_indices, configs)
 
     res = least_squares(
@@ -149,6 +154,12 @@ def reconstruct_params(results, cameras, params_org, configs):
     params_reconstructed = {}
     for idx, camera in enumerate(cameras):
         camera_matrix = params_org[camera]['mtx']
+        # camera_matrix = np.zeros((3, 3), dtype=np.float32)
+        # camera_matrix[0, 0] = params[idx, 12]
+        # camera_matrix[1, 1] = params[idx, 13]
+        # camera_matrix[0, 2] = params[idx, 14]
+        # camera_matrix[1, 2] = params[idx, 15]
+        # camera_matrix[2, 2] = 1.0
         dist = params_org[camera]['dist']
         rotation = params[idx, :9].reshape(3, 3)
         translation = params[idx, 9:12]
@@ -255,7 +266,6 @@ if __name__ == '__main__':
     poses_2d, poses_3d, params_org = _load_inputs(configs)
 
     n_cameras = len(list(params_org.keys()))
-    n_depth = poses_3d.shape[0]
     n_points = poses_3d.reshape(-1, 3).shape[0]
 
     points_3d, points_2d, points_2d_conf, points_indices, points_cam_indices = \
@@ -267,7 +277,7 @@ if __name__ == '__main__':
                     params_org, points_2d, points_2d_conf, points_indices,
                     points_cam_indices, configs)
 
-    results = optimize(n_cameras, n_depth, n_points,
+    results = optimize(n_cameras, n_points,
                        params_org, points_2d, points_2d_conf, points_indices,
                        points_cam_indices, configs)
 
