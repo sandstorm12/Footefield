@@ -99,7 +99,7 @@ def extract_poses(dir, camera, model, intrinsics, max_people, invert,
         people_keypoints, confidences = _get_skeleton(
             img_rgb, model, max_people, invert, configs)
         if configs['visualize']:
-            visualize_keypoints(img_rgb, people_keypoints)
+            visualize_keypoints(img_rgb, people_keypoints, confidences)
 
         poses.append(people_keypoints)
         poses_confidence.append(confidences)
@@ -107,15 +107,19 @@ def extract_poses(dir, camera, model, intrinsics, max_people, invert,
     return poses, poses_confidence
 
 
-def visualize_keypoints(image, keypoints):
+def visualize_keypoints(image, keypoints, confidences):
     for idx_person, person in enumerate(keypoints):
-        for point in person:
+        for idx_point, point in enumerate(person):
             cv2.circle(image, (int(point[0]), int(point[1])),
                     5, (0, 255, 0), -1)
-            cv2.putText(image, str(idx_person), 
-                (int(point[0]), int(point[1])), 
+            cv2.putText(image, str(idx_person),
+                (int(point[0]), int(point[1])),
                 cv2.FONT_HERSHEY_SIMPLEX,
                 1, (255, 255, 255), 1, 2)
+            # cv2.putText(image, str(round(confidences[idx_person][idx_point], 2)),
+            #     (int(point[0]), int(point[1])),
+            #     cv2.FONT_HERSHEY_SIMPLEX,
+            #     1, (255, 255, 255), 1, 2)
         
     cv2.imshow("Detected", cv2.resize(image, (1280, 720)))
     cv2.waitKey(1)
