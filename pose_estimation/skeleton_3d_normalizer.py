@@ -1,11 +1,29 @@
-import os
+import yaml
 import math
-import pickle
+import argparse
 import numpy as np
 
 
-DIR_INPUT = './keypoints_3d_ba_x'
-DIR_OUTPUT = './keypoints_3d_pose2smpl_x'
+def _get_arguments():
+    parser = argparse.ArgumentParser()
+
+    parser.add_argument(
+        '-c', '--config',
+        help='Path to the config file',
+        type=str,
+        default='configs/skeleton_3d_normalizer.yml',
+    )
+
+    args = parser.parse_args()
+
+    return args
+
+
+def _load_configs(path):
+    with open(path, 'r') as yaml_file:
+        configs = yaml.safe_load(yaml_file)
+
+    return configs
 
 
 def rotation_matrix_from_axis_angle(axis, angle):
@@ -24,14 +42,14 @@ def get_normalize_rotation_matrix(skeleton):
     skeleton = np.copy(skeleton)
 
     # Rotation for torso plane
-    p1 = (skeleton[5] + skeleton[6]) / 2
-    p2 = skeleton[11]
-    p3 = skeleton[12]
+    p1 = skeleton[19]
+    p2 = skeleton[5]
+    p3 = skeleton[6]
     facing_normal = np.cross(p2 - p1, p3 - p1)
     facing_normal /= np.linalg.norm(facing_normal)
     desired_normal = np.array([math.radians(0),
                                math.radians(0),
-                               math.radians(-90)])
+                               math.radians(90)])
     desired_normal = desired_normal / np.linalg.norm(desired_normal)
     axis = np.cross(facing_normal, desired_normal)
     cos_theta = np.dot(facing_normal, desired_normal)
@@ -40,12 +58,12 @@ def get_normalize_rotation_matrix(skeleton):
     skeleton = skeleton.dot(R1.T)
 
     # Rotation for standing axis
-    p1 = skeleton[11]
-    p2 = skeleton[12]
+    p1 = skeleton[19]
+    p2 = skeleton[18]
     facing_normal2 = p1 - p2
     facing_normal2 /= np.linalg.norm(facing_normal2)
-    desired_normal2 = np.array([math.radians(90),
-                                math.radians(0),
+    desired_normal2 = np.array([math.radians(0),
+                                math.radians(-90),
                                 math.radians(0)])
     desired_normal2 = desired_normal2 / np.linalg.norm(desired_normal2)
     axis2 = np.cross(facing_normal2, desired_normal2)
@@ -86,17 +104,16 @@ def _calculate_angle(point, axis):
     return angle
 
 
-def skeleton_2_numpypkl(path_input, dir_output, name):
-    with open(path_input, 'rb') as handle:
-        output = pickle.load(handle)
-
-    skeleton_all = output['points_3d'].reshape(-1, 2, 133, 3)
+def normalize_skeleton(path_input, path_output):
+    with open(path_input) as handler:
+        poses = np.array(yaml.safe_load(handler))
     
-    for idx_person in range(skeleton_all.shape[1]):
-        skeleton = skeleton_all[:, idx_person]
+    poses_normalized = []
+    for idx_person in range(poses.shape[1]):
+        skeleton = poses[:, idx_person]
 
         rotation = get_normalize_rotation_matrix(skeleton[0])
-        translation = np.copy((skeleton[0, 11] + skeleton[0, 12]) / 2)
+        translation = np.copy(skeleton[0, 19])
         for i in range(len(skeleton)):
             skeleton[i] = skeleton[i] - translation
 
@@ -106,33 +123,47 @@ def skeleton_2_numpypkl(path_input, dir_output, name):
         for i in range(len(skeleton)):
             skeleton[i] = skeleton[i] / scale
 
-        output_path_skeleton = os.path.join(
-            dir_output,
-            f'{name}_{idx_person}_normalized.npy')
-        with open(output_path_skeleton, 'wb') as handle:
-            np.save(handle, skeleton)
+        skeleton_aug = []
+        for i in range(len(skeleton)):
+            augmentation = np.append(
+                skeleton[i],
+                ((skeleton[i, 19] + skeleton[i, 18]) / 2).reshape(1, -1),
+                axis=0)
+            augmentation = np.append(
+                augmentation,
+                ((skeleton[i, 20] + skeleton[i, 22]) / 2).reshape(1, -1),
+                axis=0)
+            augmentation = np.append(
+                augmentation,
+                ((skeleton[i, 21] + skeleton[i, 23]) / 2).reshape(1, -1),
+                axis=0)
+            skeleton_aug.append(
+                augmentation
+            )
+        skeleton = np.array(skeleton_aug)
 
-        output_path_params = os.path.join(
-            dir_output,
-            f'{name}_{idx_person}_params.pkl')
-        with open(output_path_params, 'wb') as handle:
-            params = {
-                'rotation': rotation,
-                'translation': translation,
-                'scale': scale,
-            }
-            pickle.dump(params, handle, protocol=pickle.HIGHEST_PROTOCOL)
+        bundle = {
+            'pose_normalized': skeleton.tolist(),
+            'rotation': rotation.tolist(),
+            'translation': translation.tolist(),
+            'scale': scale.item(),
+        }
+        poses_normalized.append(bundle)
+
+    _store_artifacts(poses_normalized, path_output)
+
+
+def _store_artifacts(artifact, output):
+    with open(output, 'w') as handle:
+        yaml.dump(artifact, handle)
 
 
 if __name__ == "__main__":
-    if not os.path.exists(DIR_OUTPUT):
-        os.makedirs(DIR_OUTPUT)
+    args = _get_arguments()
+    configs = _load_configs(args.config)
 
-    names = os.listdir(DIR_INPUT)
-    for name in names:
-        path = os.path.join(DIR_INPUT, name)
+    print(f"Config loaded: {configs}")
 
-        print('Processing: {}'.format(path))
-    
-        skeleton_2_numpypkl(path, DIR_OUTPUT,
-                            name.split('.')[0])
+    normalize_skeleton(
+        configs['skeletons_3d'],
+        configs['output'])
