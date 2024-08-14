@@ -55,7 +55,7 @@ def _get_arguments():
         '-c', '--config',
         help='Path to the config file',
         type=str,
-        default='configs/visualizer_skeleton_detection_video_wb.yml',
+        default='configs/visualizer_skeleton_2d_video_wb.yml',
     )
 
     args = parser.parse_args()
@@ -75,7 +75,7 @@ def get_video_writer(camera, dir, fps, size):
     writer = cv2.VideoWriter(
         os.path.join(
             dir,
-            f'visualizer_skeleton_detection_{camera}.avi'
+            f'visualizer_skeleton_2d_wb_{camera}.avi'
         ),
         fourcc,
         5,

@@ -52,7 +52,7 @@ def get_video_writer(camera, configs):
     writer = cv2.VideoWriter(
         os.path.join(
             configs['output_dir'],
-            f'visualizer_skeleton_video_{camera}.avi'
+            f'visualizer_skeleton_3d_video_{camera}.avi'
         ),
         fourcc,
         configs['fps'],
