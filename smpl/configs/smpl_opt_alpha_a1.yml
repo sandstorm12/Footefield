@@ -2,5 +2,7 @@ skeletons: "/home/hamid/Documents/phd/footefield/footefield/pose_estimation/arti
 gender: "neutral"
 models_root: "models"
 visualize: False
+visualize_mesh: True
+learning_rate: .002
 epochs: 2000
 output: "artifacts/smpl_opt_alpha_a1.yml"

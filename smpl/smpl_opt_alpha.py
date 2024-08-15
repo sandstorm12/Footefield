@@ -1,12 +1,9 @@
 import sys
 sys.path.append('../')
 
-import os
-import cv2
 import time
 import yaml
 import torch
-import pickle
 import argparse
 import numpy as np
 import open3d as o3d
@@ -17,20 +14,7 @@ from utils import data_loader
 from smplpytorch.pytorch.smpl_layer import SMPL_Layer
 
 
-DIR_SKELETONS = '../pose_estimation/keypoints_3d_pose2smpl'
-DIR_ORG = '../pose_estimation/keypoints_3d_ba'
-DIR_OUTPUT = './params_smpl'
-DIR_SMPL = 'params_smpl'
-DIR_PARAMS = '../pose_estimation/keypoints_3d_pose2smpl/'
-
-EXPERIMENTS = ['a1', 'a2']
-SUBJECTS = [0, 1]
-EPOCHS = 2000
-VISUALIZE = True
-VISUALIZE_MESH = True
-PARAM_COEFF_POSE = 0 #1e-2
 PARAM_LR = 2e-3
-PATH_MODEL = 'models'
 
 SMPL_SKELETON_MAP = np.array([ # (SMPL, SKELETON)
     [0, 19, 1.],
@@ -97,22 +81,6 @@ def calc_smoothness(joints):
     return loss
 
 
-def load_smpl(experiment, subject):
-    name = "params_smpl_{}_{}.pkl".format(
-        experiment, subject
-    )
-    path_smpl = os.path.join(DIR_SMPL, name)
-    with open(path_smpl, 'rb') as handle:
-        smpl = pickle.load(handle)
-
-    alphas = np.array(smpl['alphas'])
-    betas = np.array(smpl['betas'])
-    scale = np.array(smpl['scale'])
-    translation = np.array(smpl['translation'])
-
-    return alphas, betas, scale, translation
-
-
 def init_torch_params(skeletons, device):
     alphas = (
         torch.rand(
@@ -134,12 +102,12 @@ def init_torch_params(skeletons, device):
     return alphas, betas, translation, scale, batch_tensor
 
 
-def get_optimizer(alphas, betas, translation, scale):
+def get_optimizer(alphas, betas, translation, scale, learning_rate):
     optim_params = [
-        {'params': alphas, 'lr': PARAM_LR},
-        {'params': betas, 'lr': PARAM_LR},
-        {'params': scale, 'lr': PARAM_LR},
-        {'params': translation, 'lr': PARAM_LR},]
+        {'params': alphas, 'lr': learning_rate},
+        {'params': betas, 'lr': learning_rate},
+        {'params': scale, 'lr': learning_rate},
+        {'params': translation, 'lr': learning_rate},]
     optimizer = torch.optim.Adam(optim_params)
 
     return optimizer
@@ -151,7 +119,8 @@ def optimize(smpl_layer, skeletons, configs):
 
     alphas, betas, translation, scale, batch_tensor = \
         init_torch_params(skeletons, device)
-    optimizer = get_optimizer(alphas, betas, translation, scale)
+    optimizer = get_optimizer(alphas, betas, translation, scale,
+                              configs['learning_rate'])
     skeletons_torch = torch.from_numpy(skeletons).float().to(device)
 
     loss_init = None
@@ -188,7 +157,7 @@ def optimize(smpl_layer, skeletons, configs):
 # TODO: Shorten
 def visualize_poses(alphas, betas,
                     translation, scale,
-                    faces, skeletons):
+                    faces, skeletons, configs):
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
 
     alphas = torch.from_numpy(alphas).to(device)
@@ -231,7 +200,7 @@ def visualize_poses(alphas, betas,
         else:
             vis.update_geometry(pcd_joints)
 
-        if VISUALIZE_MESH:
+        if configs['visualize_mesh']:
             mesh.vertices = o3d.utility.Vector3dVector(
                 verts[idx])
             mesh_line_temp = o3d.geometry.LineSet.create_from_triangle_mesh(
@@ -248,48 +217,6 @@ def visualize_poses(alphas, betas,
             vis.poll_events()
             vis.update_renderer()
             time.sleep(.01)
-
-
-def get_params_color(expriment):
-    file = f"keypoints3d_{expriment}_ba.pkl"
-    file_path = os.path.join(DIR_ORG, file)
-    with open(file_path, 'rb') as handle:
-        output = pickle.load(handle)
-
-    params = output['params']
-
-    return params
-
-
-def load_skeletons(experiment, subject):
-    path = os.path.join(DIR_SKELETONS,
-                        f'keypoints3d_{experiment}_ba_{subject}_normalized.npy')
-    skeletons = np.load(path)
-
-    return skeletons
-
-
-def store_smpl_parameters(alphas, betas,
-        translation, scale, experiment, subject):
-    if not os.path.exists(DIR_OUTPUT):
-        os.mkdir(DIR_OUTPUT)
-
-    path = os.path.join(
-        DIR_OUTPUT,
-        f'params_smpl_{experiment}_{subject}.pkl')
-    
-    params = {
-        'alphas': alphas,
-        'betas': betas,
-        'translation': translation,
-        'scale': scale,
-    }
-
-    with open(path, 'wb') as handle:
-        pickle.dump(params, handle,
-                    protocol=pickle.HIGHEST_PROTOCOL)
-        
-    print(f'Stored results: {path}')
 
 
 def _store_artifacts(artifact, output):
