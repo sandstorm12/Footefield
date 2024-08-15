@@ -71,6 +71,7 @@ Now you can fit the SMPL-X parameters using the scripts in the `smplx` folder.
 1. Feature: Add tracking id to the recorded poses
 1. Refactor: Merge wholebody scripts with the normal ones
 1. Refactor: Separate global param calculation from the triangulation script
+1. Bug: Make the config path mandatory when the default path is not given
 
 
 ## Known issues
