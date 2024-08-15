@@ -4,8 +4,10 @@ sys.path.append('../')
 import os
 import cv2
 import time
+import yaml
 import torch
 import pickle
+import argparse
 import numpy as np
 import open3d as o3d
 import torch.nn.functional as F
@@ -52,6 +54,28 @@ SMPL_SKELETON_MAP = np.array([ # (SMPL, SKELETON)
 ])
 
 
+def _get_arguments():
+    parser = argparse.ArgumentParser()
+
+    parser.add_argument(
+        '-c', '--config',
+        help='Path to the config file',
+        type=str,
+        required=True,
+    )
+
+    args = parser.parse_args()
+
+    return args
+
+
+def _load_configs(path):
+    with open(path, 'r') as yaml_file:
+        configs = yaml.safe_load(yaml_file)
+
+    return configs
+
+
 def calc_distance(joints, skeleton):
     skeleton_selected = skeleton[:, SMPL_SKELETON_MAP[:, 1]]
     output_selected = joints[:, SMPL_SKELETON_MAP[:, 0]]
@@ -89,7 +113,7 @@ def load_smpl(experiment, subject):
     return alphas, betas, scale, translation
 
 
-def init_torch_params(device):
+def init_torch_params(skeletons, device):
     alphas = (
         torch.rand(
             skeletons.shape[0],
@@ -121,16 +145,17 @@ def get_optimizer(alphas, betas, translation, scale):
     return optimizer
 
 
-def optimize(smpl_layer, skeletons, epochs):
+def optimize(smpl_layer, skeletons, configs):
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
     smpl_layer.to(device)
 
-    alphas, betas, translation, scale, batch_tensor = init_torch_params(device)
+    alphas, betas, translation, scale, batch_tensor = \
+        init_torch_params(skeletons, device)
     optimizer = get_optimizer(alphas, betas, translation, scale)
     skeletons_torch = torch.from_numpy(skeletons).float().to(device)
 
     loss_init = None
-    bar = tqdm(range(epochs))
+    bar = tqdm(range(configs['epochs']))
     for _ in bar:
         _, joints = model(
             alphas,
@@ -267,41 +292,44 @@ def store_smpl_parameters(alphas, betas,
     print(f'Stored results: {path}')
 
 
-cam24 = 'azure_kinect2_4_calib_snap'
-cam15 = 'azure_kinect1_5_calib_snap'
-cam14 = 'azure_kinect1_4_calib_snap'
-cam34 = 'azure_kinect3_4_calib_snap'
-cam35 = 'azure_kinect3_5_calib_snap'
-cameras = [
-    cam24,
-    cam15,
-    # cam14,
-    cam34,
-    cam35,   
-]
+def _store_artifacts(artifact, output):
+    with open(output, 'w') as handle:
+        yaml.dump(artifact, handle)
+
+
 if __name__ == '__main__':
+    args = _get_arguments()
+    configs = _load_configs(args.config)
+
+    print(f"Config loaded: {configs}")
+
     model = SMPL_Layer(
         center_idx=0,
-        gender='neutral',
-        model_root='models')
+        gender=configs['gender'],
+        model_root=configs['models_root'])
+    
+    with open(configs['skeletons'], 'rb') as handle:
+        bundles = yaml.safe_load(handle)
 
-    for experiment in EXPERIMENTS:
-        for subject in SUBJECTS:
-            print(f'Optimizing {experiment} {subject}')
+    params_smpl = []
+    for bundle in bundles:
+        poses = np.array(bundle['pose_normalized'])
 
-            skeletons = load_skeletons(experiment, subject)
+        alphas, betas, translation, scale = optimize(
+            model, poses, configs)
+        
+        # Do we need to add a rotation parameter as well?
+        params_smpl_person = {
+            'alphas': alphas.tolist(),
+            'betas': betas.tolist(),
+            'translation': translation.tolist(),
+            'scale': scale.item(),
+        }
+        params_smpl.append(params_smpl_person)
 
-            params = get_params_color(experiment)
-
-            alphas, betas, translation, scale = optimize(
-                model, skeletons, EPOCHS)
-
-            if VISUALIZE:
-                visualize_poses(
-                    alphas, betas,
-                    translation, scale, model.th_faces, skeletons)
-
-            store_smpl_parameters(
+        if configs['visualize']:
+            visualize_poses(
                 alphas, betas,
-                translation, scale,
-                experiment, subject)
+                translation, scale, model.th_faces, poses)
+
+    _store_artifacts(params_smpl, configs['output'])
