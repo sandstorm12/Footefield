@@ -80,7 +80,6 @@ def write_video(poses, camera, intrinsics, configs):
         writer.write(img_rgb)
 
 
-# TODO: Too long
 if __name__ == "__main__":
     args = _get_arguments()
     configs = _load_configs(args.config)
