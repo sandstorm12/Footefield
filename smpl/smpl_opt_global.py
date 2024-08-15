@@ -1,12 +1,12 @@
-import dis
 import sys
 sys.path.append('../')
 
 import os
 import cv2
 import time
+import yaml
 import torch
-import pickle
+import argparse
 import numpy as np
 import open3d as o3d
 import torch.nn.functional as F
@@ -56,6 +56,28 @@ SMPL_SKELETON_MAP = np.array([ # (SMPL, SKELETON)
     [20, 9, 1.],
     [21, 10, 1.],
 ])
+
+
+def _get_arguments():
+    parser = argparse.ArgumentParser()
+
+    parser.add_argument(
+        '-c', '--config',
+        help='Path to the config file',
+        type=str,
+        required=True,
+    )
+
+    args = parser.parse_args()
+
+    return args
+
+
+def _load_configs(path):
+    with open(path, 'r') as yaml_file:
+        configs = yaml.safe_load(yaml_file)
+
+    return configs
 
 
 def project_points_to_camera_plane(points_3d, mtx, R, T):
@@ -138,22 +160,6 @@ def visualize_chamfer(mask, vert):
     cv2.waitKey(1)
 
 
-def load_smpl(experiment, subject):
-    name = "params_smpl_{}_{}.pkl".format(
-        experiment, subject
-    )
-    path_smpl = os.path.join(DIR_SMPL, name)
-    with open(path_smpl, 'rb') as handle:
-        smpl = pickle.load(handle)
-
-    alphas = np.array(smpl['alphas'])
-    betas = np.array(smpl['betas'])
-    scale = np.array(smpl['scale'])
-    translation = np.array(smpl['translation'])
-
-    return alphas, betas, scale, translation
-
-
 def denormalize(verts, denormalize_params):
     rotation_inverted, scale, translation = denormalize_params
 
@@ -164,13 +170,13 @@ def denormalize(verts, denormalize_params):
     return verts
 
 
-def load_denormalize_params():
-    path_params = os.path.join(DIR_PARAMS, f"keypoints3d_{experiment}_ba_{subject}_params.pkl")
-    with open(path_params, 'rb') as handle:
-        params = pickle.load(handle)
-    rotation = params['rotation']
-    scale = params['scale']
-    translation = params['translation']
+def load_denormalize_params(subject, configs):
+    with open(configs['skeletons'], 'rb') as handle:
+        params = yaml.safe_load(handle)
+
+    rotation = np.array(params[subject]['rotation'])
+    scale = np.array(params[subject]['scale'])
+    translation = np.array(params[subject]['translation'])
 
     rotation_inverted = np.linalg.inv(rotation).T
 
@@ -183,15 +189,24 @@ def load_denormalize_params():
 def masks_params_torch(masks, params):
     masks_torch = []
     params_torch = []
-    for cam in range(len(masks)):
+    for cam in masks.keys():
         masks_torch_cam = []
         for idx_mask in range(len(masks[cam])):
-            masks_torch_cam.append(torch.from_numpy(masks[cam][idx_mask]).float().unsqueeze(0).cuda())
+            masks_torch_cam.append(
+                torch.from_numpy(
+                    np.array(masks[cam][idx_mask])
+                ).float().unsqueeze(0).cuda())
         masks_torch.append(masks_torch_cam)
         
-        mtx = torch.from_numpy(params[cam]['mtx']).float().cuda().unsqueeze(0)
-        rotation = torch.from_numpy(params[cam]['rotation']).float().cuda().unsqueeze(0)
-        translation = torch.from_numpy(params[cam]['translation']).float().cuda().unsqueeze(0)
+        mtx = torch.from_numpy(
+            np.array(params[cam]['mtx'])
+        ).float().cuda().unsqueeze(0)
+        rotation = torch.from_numpy(
+            np.array(params[cam]['rotation'])
+        ).float().cuda().unsqueeze(0)
+        translation = torch.from_numpy(
+            np.array(params[cam]['translation'])
+        ).float().cuda().unsqueeze(0)
         params_torch.append(
             {
                 'mtx': mtx,
@@ -203,22 +218,21 @@ def masks_params_torch(masks, params):
     return masks_torch, params_torch
 
 
-# TODO: Shorten
-def optimize(smpl_layer, masks, skeletons, params_smpl, params, experiment, subject, epochs):
+def optimize(smpl_layer, masks, skeletons, alphas, betas, scale, translation, params, subject, configs):
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
     smpl_layer.to(device)
 
-    denormalize_params = load_denormalize_params()
+    denormalize_params = load_denormalize_params(subject, configs)
 
-    depth = len(masks[0])
+    length = len(alphas[0])
 
-    alphas = torch.from_numpy(params_smpl[0]).to(device)
-    betas = torch.from_numpy(params_smpl[1]).to(device)
-    scale = torch.from_numpy(params_smpl[2]).to(device)
-    translation = torch.from_numpy(params_smpl[3]).to(device)
+    alphas = torch.from_numpy(alphas).to(device)
+    betas = torch.from_numpy(betas).to(device)
+    scale = torch.tensor(scale).to(device)
+    translation = torch.from_numpy(translation).to(device)
     skeletons_torch = torch.from_numpy(skeletons).float().to(device)
 
-    batch_tensor = torch.ones((depth, 1)).to(device)
+    batch_tensor = torch.ones((length, 1)).to(device)
 
     alphas.requires_grad = True
     betas.requires_grad = True
@@ -239,7 +253,7 @@ def optimize(smpl_layer, masks, skeletons, params_smpl, params, experiment, subj
     loss_init = None
     loss_distance_init = None
     loss_chamfer_init = None
-    bar = tqdm(range(epochs))
+    bar = tqdm(range(configs['epochs']))
     for _ in bar:
         verts, joints = model(
             alphas,
@@ -345,9 +359,11 @@ def visualize_poses(alphas, betas,
             time.sleep(.01)
 
 
-def get_mask_image(cam_name, experiment, idx):
-    cam_num = cam_name[12:15]
-    img_depth = '/home/hamid/Documents/phd/footefield/data/AzureKinectRecord_0729/{}/azure_kinect{}/mask/mask{:05d}.jpg'.format(experiment, cam_num, idx)
+def get_mask_image(camera, idx, configs):
+    img_depth = os.path.join(
+        configs['images_mask'][camera],
+        'mask{:05d}.jpg'.format(idx)
+    )
 
     return img_depth
 
@@ -363,19 +379,15 @@ def get_params_color(expriment):
     return params
 
 
-def get_mask(cam, experiment, idx, params):
-    img_mask = get_mask_image(cam, experiment, idx)
+def get_mask(cam, idx, params, configs):
+    img_mask = get_mask_image(cam, idx, configs)
     
     img_mask = cv2.imread(img_mask, -1)
     kernel = np.ones((5, 5), np.uint8)
     img_mask = cv2.erode(img_mask, kernel, iterations=5)
 
-    # cv2.imshow("before", cv2.resize(img_mask, (1280, 720)))
-    # cv2.imshow("after", cv2.resize(image, (1280, 720)))
-    # cv2.waitKey(0)
-
-    mtx = params[cameras.index(cam)]['mtx']
-    dist = params[cameras.index(cam)]['dist']
+    mtx = np.array(params[cam]['mtx'], np.float32)
+    dist = np.array(params[cam]['dist'], np.float32)
     img_mask = cv2.undistort(img_mask, mtx, dist, None, None)
 
     img_mask = cv2.resize(
@@ -389,29 +401,16 @@ def get_mask(cam, experiment, idx, params):
     return points
 
 
-def get_masks(experiment, params, depth):
-    masks = [[], [], [], []]
+def get_masks(cameras, params, length, configs):
+    masks = {camera: [] for camera in cameras}
 
     print("Loading masks...")
-    for idx in tqdm(range(depth)):
-        mask24 = get_mask(cam24, experiment, idx, params)
-        mask15 = get_mask(cam15, experiment, idx, params)
-        # mask24 = get_mask(cam24, experiment, idx, params)
-        mask34 = get_mask(cam34, experiment, idx, params)
-        mask35 = get_mask(cam35, experiment, idx, params)
-
-        masks[0].append(
-            mask24
-        )
-        masks[1].append(
-            mask15
-        )
-        masks[2].append(
-            mask34
-        )
-        masks[3].append(
-            mask35
-        )
+    for idx in tqdm(range(length)):
+        for camera in cameras:
+            mask = get_mask(camera, idx, params, configs)
+            masks[camera].append(
+                mask
+            )
 
     return masks
 
@@ -463,43 +462,59 @@ def load_skeletons(experiment, subject):
     return skeletons
 
 
+def load_smpl(subject, configs):
+    with open(configs['params_smpl'], 'rb') as handle:
+        params_smpl = yaml.safe_load(handle)
 
-cam24 = 'azure_kinect2_4_calib_snap'
-cam15 = 'azure_kinect1_5_calib_snap'
-cam14 = 'azure_kinect1_4_calib_snap'
-cam34 = 'azure_kinect3_4_calib_snap'
-cam35 = 'azure_kinect3_5_calib_snap'
-cameras = [
-    cam24,
-    cam15,
-    # cam14,
-    cam34,
-    cam35,   
-]
+    alphas = np.array(params_smpl[subject]['alphas'], np.float32)
+    betas = np.array(params_smpl[subject]['betas'], np.float32)
+    translation = np.array(params_smpl[subject]['translation'], np.float32)    
+    scale = params_smpl[subject]['scale']
+    
+    return alphas, betas, scale, translation
+
+
 if __name__ == '__main__':
+    args = _get_arguments()
+    configs = _load_configs(args.config)
+
+    print(f"Config loaded: {configs}")
+
     model = SMPL_Layer(
         center_idx=0,
-        gender='neutral',
-        model_root='models')
+        gender=configs['gender'],
+        model_root=configs['models_root'])
+    
+    with open(configs['skeletons'], 'rb') as handle:
+        bundles = yaml.safe_load(handle)
 
-    for experiment in EXPERIMENTS:
-        for subject in SUBJECTS:
-            print(f'Optimizing {experiment} {subject}')
+    with open(configs['params'], 'rb') as handle:
+        params = yaml.safe_load(handle)
 
-            skeletons = load_skeletons(experiment, subject)
-            params_smpl = load_smpl_params(experiment, subject)
-            params = get_params_color(experiment)
-            masks = get_masks(experiment, params, params_smpl[0].shape[0])
+    cameras = list(params.keys())
 
-            alphas, betas, translation, scale = optimize(
-                model, masks, skeletons, params_smpl, params, experiment, subject, EPOCHS)
+    fparams_smpl = []
+    for subject, bundle in enumerate(bundles):
+        poses = np.array(bundle['pose_normalized'])
 
-            if VISUALIZE:
-                visualize_poses(
-                    alphas, betas,
-                    translation, scale, model.th_faces)
+        alphas, betas, scale, translation = \
+            load_smpl(subject, configs)
 
-            store_smpl_parameters(
+        # skeletons = load_skeletons(experiment, subject)
+        # params_smpl = load_smpl_params(experiment, subject)
+        # params = get_params_color(experiment)
+        masks = get_masks(cameras, params, poses.shape[0], configs)
+
+        alphas, betas, translation, scale = optimize(
+            model, masks, poses, alphas, betas, scale, translation,
+            params, subject, configs)
+
+        if VISUALIZE:
+            visualize_poses(
                 alphas, betas,
-                translation, scale,
-                experiment, subject)
+                translation, scale, model.th_faces)
+
+        store_smpl_parameters(
+            alphas, betas,
+            translation, scale,
+            experiment, subject)
