@@ -2,7 +2,8 @@ import sys
 sys.path.append('../')
 
 import cv2
-import diskcache
+import yaml
+import argparse
 import numpy as np
 
 from tqdm import tqdm
@@ -10,12 +11,33 @@ from utils import data_loader
 
 
 ORDER_VALID = (
-    'azure_kinect1_5_calib_snap/azure_kinect1_4_calib_snap',
-    'azure_kinect1_4_calib_snap/azure_kinect3_4_calib_snap',
-    'azure_kinect3_4_calib_snap/azure_kinect3_5_calib_snap',
-    'azure_kinect3_5_calib_snap/azure_kinect2_4_calib_snap',
-    'azure_kinect2_4_calib_snap/azure_kinect1_5_calib_snap',
+    'cam1_5/cam1_4',
+    'cam1_4/cam3_4',
+    'cam3_4/cam3_5',
+    'cam3_5/cam2_4',
+    'cam2_4/cam1_5',
 )
+
+def _get_arguments():
+    parser = argparse.ArgumentParser()
+
+    parser.add_argument(
+        '-c', '--config',
+        help='Path to the config file',
+        type=str,
+        default='configs/stereo_chessboard_visualizer.yml',
+    )
+
+    args = parser.parse_args()
+
+    return args
+
+
+def _load_configs(path):
+    with open(path, 'r') as yaml_file:
+        configs = yaml.safe_load(yaml_file)
+
+    return configs
 
 
 def get_obj_points():
@@ -36,12 +58,7 @@ def get_all_keys(cache):
     return keys_all
 
 
-def load_image_points(cache, images):
-    images_info = cache['images_info']
-
-    if not images_info:
-        print("'images_info' not found.")
-
+def load_image_points(images_info, images):
     if len(images_info.keys()) == 0:
         print("No images in images_info. Please run detect_chessboard first.")
 
@@ -57,8 +74,6 @@ def load_image_points(cache, images):
 
 
 def find_matching_images(images_info, cam_1, cam_2):
-    images_info = cache['images_info']
-
     matching_pairs = {}
     for image in images_info.keys():
         img_name = image.split("/")[1]
@@ -79,15 +94,16 @@ def find_matching_images(images_info, cam_1, cam_2):
 
 # This is too long. trim this function.
 if __name__ == "__main__":
-    cache = diskcache.Cache('cache')
+    args = _get_arguments()
+    configs = _load_configs(args.config)
 
-    print("Cache keys:", get_all_keys(cache))
+    print(f"Config loaded: {configs}")
 
     obj_points = get_obj_points()
-    intrinsics = cache['intrinsics']
-    images_info = cache['images_info']
+    with open(configs['chessboards_rgb']) as handler:
+        images_info = yaml.safe_load(handler)
 
-    cameras = list(intrinsics.keys())
+    cameras = configs['cameras']
     for cam1_idx in range(len(cameras)):
         for cam2_idx in range(len(cameras)):
             cam_1 = cameras[cam1_idx]
@@ -99,16 +115,16 @@ if __name__ == "__main__":
             print(f"Calibrating... {cameras[cam1_idx]}"
                   f" vs {cameras[cam2_idx]}")
 
-            matching_pairs = find_matching_images(cache['images_info'], cam_1, cam_2)
+            matching_pairs = find_matching_images(images_info, cam_1, cam_2)
 
             print(f"Matching pairs: {len(matching_pairs)}")
             if len(matching_pairs) == 0:
                 continue
             
             img_points_1 = load_image_points(
-                cache, images=[item['cam_1_img'] for item in matching_pairs.values()])
+                images_info, images=[item['cam_1_img'] for item in matching_pairs.values()])
             img_points_2 = load_image_points(
-                cache, images=[item['cam_2_img'] for item in matching_pairs.values()])
+                images_info, images=[item['cam_2_img'] for item in matching_pairs.values()])
 
             for idx, key in enumerate(matching_pairs.keys()):
                 image_1_addr = images_info[matching_pairs[key]['cam_1_img']]['fullpath_rgb']

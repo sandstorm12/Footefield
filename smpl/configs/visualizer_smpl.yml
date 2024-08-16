@@ -1,0 +1,3 @@
+params_smpl: "artifacts/smpl_opt_alpha_a1.yml"
+gender: "neutral"
+models_root: "models"

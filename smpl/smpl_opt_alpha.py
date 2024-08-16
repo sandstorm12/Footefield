@@ -1,11 +1,10 @@
 import sys
 sys.path.append('../')
 
-import os
-import cv2
 import time
+import yaml
 import torch
-import pickle
+import argparse
 import numpy as np
 import open3d as o3d
 import torch.nn.functional as F
@@ -15,20 +14,7 @@ from utils import data_loader
 from smplpytorch.pytorch.smpl_layer import SMPL_Layer
 
 
-DIR_SKELETONS = '../pose_estimation/keypoints_3d_pose2smpl'
-DIR_ORG = '../pose_estimation/keypoints_3d_ba'
-DIR_OUTPUT = './params_smpl'
-DIR_SMPL = 'params_smpl'
-DIR_PARAMS = '../pose_estimation/keypoints_3d_pose2smpl/'
-
-EXPERIMENTS = ['a1', 'a2']
-SUBJECTS = [0, 1]
-EPOCHS = 2000
-VISUALIZE = True
-VISUALIZE_MESH = True
-PARAM_COEFF_POSE = 0 #1e-2
 PARAM_LR = 2e-3
-PATH_MODEL = 'models'
 
 SMPL_SKELETON_MAP = np.array([ # (SMPL, SKELETON)
     [0, 19, 1.],
@@ -52,7 +38,29 @@ SMPL_SKELETON_MAP = np.array([ # (SMPL, SKELETON)
 ])
 
 
-def calc_distance(joints, skeleton):
+def _get_arguments():
+    parser = argparse.ArgumentParser()
+
+    parser.add_argument(
+        '-c', '--config',
+        help='Path to the config file',
+        type=str,
+        required=True,
+    )
+
+    args = parser.parse_args()
+
+    return args
+
+
+def _load_configs(path):
+    with open(path, 'r') as yaml_file:
+        configs = yaml.safe_load(yaml_file)
+
+    return configs
+
+
+def calc_distance(joints, skeleton, skeleton_weights):
     skeleton_selected = skeleton[:, SMPL_SKELETON_MAP[:, 1]]
     output_selected = joints[:, SMPL_SKELETON_MAP[:, 0]]
 
@@ -60,7 +68,7 @@ def calc_distance(joints, skeleton):
     
     # Just for test, optimize
     loss = torch.mean(loss, dim=(0, 2))
-    loss = torch.mean(loss * torch.from_numpy(SMPL_SKELETON_MAP[:, 2]).float().cuda())
+    loss = torch.mean(loss * skeleton_weights)
 
     return loss
 
@@ -73,23 +81,7 @@ def calc_smoothness(joints):
     return loss
 
 
-def load_smpl(experiment, subject):
-    name = "params_smpl_{}_{}.pkl".format(
-        experiment, subject
-    )
-    path_smpl = os.path.join(DIR_SMPL, name)
-    with open(path_smpl, 'rb') as handle:
-        smpl = pickle.load(handle)
-
-    alphas = np.array(smpl['alphas'])
-    betas = np.array(smpl['betas'])
-    scale = np.array(smpl['scale'])
-    translation = np.array(smpl['translation'])
-
-    return alphas, betas, scale, translation
-
-
-def init_torch_params(device):
+def init_torch_params(skeletons, device):
     alphas = (
         torch.rand(
             skeletons.shape[0],
@@ -110,34 +102,38 @@ def init_torch_params(device):
     return alphas, betas, translation, scale, batch_tensor
 
 
-def get_optimizer(alphas, betas, translation, scale):
+def get_optimizer(alphas, betas, translation, scale, learning_rate):
     optim_params = [
-        {'params': alphas, 'lr': PARAM_LR},
-        {'params': betas, 'lr': PARAM_LR},
-        {'params': scale, 'lr': PARAM_LR},
-        {'params': translation, 'lr': PARAM_LR},]
+        {'params': alphas, 'lr': learning_rate},
+        {'params': betas, 'lr': learning_rate},
+        {'params': scale, 'lr': learning_rate},
+        {'params': translation, 'lr': learning_rate},]
     optimizer = torch.optim.Adam(optim_params)
 
     return optimizer
 
 
-def optimize(smpl_layer, skeletons, epochs):
+def optimize(smpl_layer, skeletons, configs):
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
     smpl_layer.to(device)
 
-    alphas, betas, translation, scale, batch_tensor = init_torch_params(device)
-    optimizer = get_optimizer(alphas, betas, translation, scale)
+    alphas, betas, translation, scale, batch_tensor = \
+        init_torch_params(skeletons, device)
+    optimizer = get_optimizer(alphas, betas, translation, scale,
+                              configs['learning_rate'])
     skeletons_torch = torch.from_numpy(skeletons).float().to(device)
 
+    skeleton_weights = torch.from_numpy(SMPL_SKELETON_MAP[:, 2]).float().to(device)
+
     loss_init = None
-    bar = tqdm(range(epochs))
+    bar = tqdm(range(configs['epochs']))
     for _ in bar:
         _, joints = model(
             alphas,
             th_betas=betas * batch_tensor)
         joints = joints * scale + translation
 
-        loss = calc_distance(joints, skeletons_torch)
+        loss = calc_distance(joints, skeletons_torch, skeleton_weights)
 
         optimizer.zero_grad()
         loss.backward()
@@ -163,7 +159,7 @@ def optimize(smpl_layer, skeletons, epochs):
 # TODO: Shorten
 def visualize_poses(alphas, betas,
                     translation, scale,
-                    faces, skeletons):
+                    faces, skeletons, configs):
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
 
     alphas = torch.from_numpy(alphas).to(device)
@@ -206,7 +202,7 @@ def visualize_poses(alphas, betas,
         else:
             vis.update_geometry(pcd_joints)
 
-        if VISUALIZE_MESH:
+        if configs['visualize_mesh']:
             mesh.vertices = o3d.utility.Vector3dVector(
                 verts[idx])
             mesh_line_temp = o3d.geometry.LineSet.create_from_triangle_mesh(
@@ -225,83 +221,44 @@ def visualize_poses(alphas, betas,
             time.sleep(.01)
 
 
-def get_params_color(expriment):
-    file = f"keypoints3d_{expriment}_ba.pkl"
-    file_path = os.path.join(DIR_ORG, file)
-    with open(file_path, 'rb') as handle:
-        output = pickle.load(handle)
-
-    params = output['params']
-
-    return params
+def _store_artifacts(artifact, output):
+    with open(output, 'w') as handle:
+        yaml.dump(artifact, handle)
 
 
-def load_skeletons(experiment, subject):
-    path = os.path.join(DIR_SKELETONS,
-                        f'keypoints3d_{experiment}_ba_{subject}_normalized.npy')
-    skeletons = np.load(path)
-
-    return skeletons
-
-
-def store_smpl_parameters(alphas, betas,
-        translation, scale, experiment, subject):
-    if not os.path.exists(DIR_OUTPUT):
-        os.mkdir(DIR_OUTPUT)
-
-    path = os.path.join(
-        DIR_OUTPUT,
-        f'params_smpl_{experiment}_{subject}.pkl')
-    
-    params = {
-        'alphas': alphas,
-        'betas': betas,
-        'translation': translation,
-        'scale': scale,
-    }
-
-    with open(path, 'wb') as handle:
-        pickle.dump(params, handle,
-                    protocol=pickle.HIGHEST_PROTOCOL)
-        
-    print(f'Stored results: {path}')
-
-
-cam24 = 'azure_kinect2_4_calib_snap'
-cam15 = 'azure_kinect1_5_calib_snap'
-cam14 = 'azure_kinect1_4_calib_snap'
-cam34 = 'azure_kinect3_4_calib_snap'
-cam35 = 'azure_kinect3_5_calib_snap'
-cameras = [
-    cam24,
-    cam15,
-    # cam14,
-    cam34,
-    cam35,   
-]
 if __name__ == '__main__':
+    args = _get_arguments()
+    configs = _load_configs(args.config)
+
+    print(f"Config loaded: {configs}")
+
     model = SMPL_Layer(
         center_idx=0,
-        gender='neutral',
-        model_root='models')
+        gender=configs['gender'],
+        model_root=configs['models_root'])
+    
+    with open(configs['skeletons'], 'rb') as handle:
+        bundles = yaml.safe_load(handle)
 
-    for experiment in EXPERIMENTS:
-        for subject in SUBJECTS:
-            print(f'Optimizing {experiment} {subject}')
+    params_smpl = []
+    for bundle in bundles:
+        poses = np.array(bundle['pose_normalized'])
 
-            skeletons = load_skeletons(experiment, subject)
+        alphas, betas, translation, scale = optimize(
+            model, poses, configs)
+        
+        # Do we need to add a rotation parameter as well?
+        params_smpl_person = {
+            'alphas': alphas.tolist(),
+            'betas': betas.tolist(),
+            'translation': translation.tolist(),
+            'scale': scale.item(),
+        }
+        params_smpl.append(params_smpl_person)
 
-            params = get_params_color(experiment)
-
-            alphas, betas, translation, scale = optimize(
-                model, skeletons, EPOCHS)
-
-            if VISUALIZE:
-                visualize_poses(
-                    alphas, betas,
-                    translation, scale, model.th_faces, skeletons)
-
-            store_smpl_parameters(
+        if configs['visualize']:
+            visualize_poses(
                 alphas, betas,
-                translation, scale,
-                experiment, subject)
+                translation, scale, model.th_faces, poses)
+
+    _store_artifacts(params_smpl, configs['output'])

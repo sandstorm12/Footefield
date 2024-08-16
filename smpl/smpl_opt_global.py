@@ -1,12 +1,12 @@
-import dis
 import sys
 sys.path.append('../')
 
 import os
 import cv2
 import time
+import yaml
 import torch
-import pickle
+import argparse
 import numpy as np
 import open3d as o3d
 import torch.nn.functional as F
@@ -17,45 +17,48 @@ from pytorch3d.loss import chamfer_distance
 from smplpytorch.pytorch.smpl_layer import SMPL_Layer
 
 
-DIR_SKELETONS = '../pose_estimation/keypoints_3d_pose2smpl'
-DIR_ORG = '../pose_estimation/keypoints_3d_ba'
-DIR_OUTPUT = './params_smpl_mask'
-DIR_SMPL = 'params_smpl'
-DIR_PARAMS = '../pose_estimation/keypoints_3d_pose2smpl/'
-
-EXPERIMENTS = ['a1', 'a2']
-SUBJECTS = [0, 1]
-EPOCHS = 100
-VISUALIZE = False
-VISUALIZE_MESH = True
-VISUALIZE_PROJ = False
-PARAM_SCALE_MASK = 8
-PATH_MODEL = 'models'
-
-PARAM_WEIGHT_CHMF = 1e-8
-PARAM_WEIGHT_DIST = 1
-
-
-SMPL_SKELETON_MAP = np.array([ # (SMPL, SKELETON)
-    [0, 19, 1.],
-    [1, 11, 1.],
-    [2, 12, 1.],
-    [4, 13, 1.],
-    [5, 14, 1.],
+SMPL_SKELETON_MAP = np.array([ # (SMPL, HALPE+AUG)
+    [0, 19, 10.],
+    [1, 11, 10.],
+    [2, 12, 10.],
+    [4, 13, 10.],
+    [5, 14, 10.],
     [6, 26, .25],
-    [7, 15, 1.],
-    [8, 16, 1.],
+    [7, 15, 10.],
+    [8, 16, 10.],
     [10, 27, 1.],
     [11, 28, 1.],
     [12, 18, 1.],
-    [16, 5, 1.],
-    [17, 6, 1.],
+    [16, 5, 10.],
+    [17, 6, 10.],
     [15, 0, .25],
-    [18, 7, 1.],
-    [19, 8, 1.],
-    [20, 9, 1.],
-    [21, 10, 1.],
+    [18, 7, 10.],
+    [19, 8, 10.],
+    [20, 9, 10.],
+    [21, 10, 10.],
 ])
+
+
+def _get_arguments():
+    parser = argparse.ArgumentParser()
+
+    parser.add_argument(
+        '-c', '--config',
+        help='Path to the config file',
+        type=str,
+        required=True,
+    )
+
+    args = parser.parse_args()
+
+    return args
+
+
+def _load_configs(path):
+    with open(path, 'r') as yaml_file:
+        configs = yaml.safe_load(yaml_file)
+
+    return configs
 
 
 def project_points_to_camera_plane(points_3d, mtx, R, T):
@@ -80,7 +83,7 @@ def project_points_to_camera_plane(points_3d, mtx, R, T):
     return points_3d[:, :, :2]
 
 
-def calc_distance(joints, skeleton):
+def calc_distance(joints, skeleton, skeleton_weights):
     skeleton_selected = skeleton[:, SMPL_SKELETON_MAP[:, 1]]
     output_selected = joints[:, SMPL_SKELETON_MAP[:, 0]]
 
@@ -88,12 +91,12 @@ def calc_distance(joints, skeleton):
     
     # Just for test, optimize
     loss = torch.mean(loss, dim=(0, 2))
-    loss = torch.mean(loss * torch.from_numpy(SMPL_SKELETON_MAP[:, 2]).float().cuda())
+    loss = torch.mean(loss * skeleton_weights)
 
     return loss
 
 
-def calc_chamfer(verts, masks, params):
+def calc_chamfer(verts, masks, params, configs):
     loss = 0
     for cam in range(len(masks)):
         for idx_mask in range(len(masks[cam])):
@@ -104,7 +107,7 @@ def calc_chamfer(verts, masks, params):
             pcd_proj = project_points_to_camera_plane(
                 verts[idx_mask].unsqueeze(0), mtx,
                 rotation, translation,)
-            if VISUALIZE_PROJ and cam == 0:
+            if configs['visualize_chamfer_projection'] and cam == 1:
                 visualize_chamfer(
                     mask_torch.squeeze().detach().cpu().numpy(),
                     pcd_proj.squeeze().detach().cpu().numpy())
@@ -113,7 +116,8 @@ def calc_chamfer(verts, masks, params):
                 single_directional=False, norm=2,
                 point_reduction=None, batch_reduction=None)[0]
             loss_verts = torch.mean(distances[0])
-            loss_mask = torch.mean(distances[1][distances[1] < torch.max(distances[0])])
+            loss_mask = torch.mean(distances[1][distances[1] \
+                                                < torch.max(distances[0])])
             loss += loss_verts + loss_mask
 
     return loss
@@ -138,22 +142,6 @@ def visualize_chamfer(mask, vert):
     cv2.waitKey(1)
 
 
-def load_smpl(experiment, subject):
-    name = "params_smpl_{}_{}.pkl".format(
-        experiment, subject
-    )
-    path_smpl = os.path.join(DIR_SMPL, name)
-    with open(path_smpl, 'rb') as handle:
-        smpl = pickle.load(handle)
-
-    alphas = np.array(smpl['alphas'])
-    betas = np.array(smpl['betas'])
-    scale = np.array(smpl['scale'])
-    translation = np.array(smpl['translation'])
-
-    return alphas, betas, scale, translation
-
-
 def denormalize(verts, denormalize_params):
     rotation_inverted, scale, translation = denormalize_params
 
@@ -164,18 +152,19 @@ def denormalize(verts, denormalize_params):
     return verts
 
 
-def load_denormalize_params():
-    path_params = os.path.join(DIR_PARAMS, f"keypoints3d_{experiment}_ba_{subject}_params.pkl")
-    with open(path_params, 'rb') as handle:
-        params = pickle.load(handle)
-    rotation = params['rotation']
-    scale = params['scale']
-    translation = params['translation']
+def load_denormalize_params(subject, device, configs):
+    with open(configs['skeletons'], 'rb') as handle:
+        params = yaml.safe_load(handle)
+
+    rotation = np.array(params[subject]['rotation'])
+    scale = np.array(params[subject]['scale'])
+    translation = np.array(params[subject]['translation'])
 
     rotation_inverted = np.linalg.inv(rotation).T
 
-    rotation_inverted = torch.from_numpy(rotation_inverted).float().to('cuda')
-    translation = torch.from_numpy(translation).float().to('cuda')
+    rotation_inverted = torch.from_numpy(rotation_inverted).float().to(device)
+    scale = torch.from_numpy(scale).float().to(device)
+    translation = torch.from_numpy(translation).float().to(device)
 
     return rotation_inverted, scale, translation
 
@@ -183,15 +172,24 @@ def load_denormalize_params():
 def masks_params_torch(masks, params):
     masks_torch = []
     params_torch = []
-    for cam in range(len(masks)):
+    for cam in masks.keys():
         masks_torch_cam = []
         for idx_mask in range(len(masks[cam])):
-            masks_torch_cam.append(torch.from_numpy(masks[cam][idx_mask]).float().unsqueeze(0).cuda())
+            masks_torch_cam.append(
+                torch.from_numpy(
+                    np.array(masks[cam][idx_mask])
+                ).float().unsqueeze(0).cuda())
         masks_torch.append(masks_torch_cam)
         
-        mtx = torch.from_numpy(params[cam]['mtx']).float().cuda().unsqueeze(0)
-        rotation = torch.from_numpy(params[cam]['rotation']).float().cuda().unsqueeze(0)
-        translation = torch.from_numpy(params[cam]['translation']).float().cuda().unsqueeze(0)
+        mtx = torch.from_numpy(
+            np.array(params[cam]['mtx'])
+        ).float().cuda().unsqueeze(0)
+        rotation = torch.from_numpy(
+            np.array(params[cam]['rotation'])
+        ).float().cuda().unsqueeze(0)
+        translation = torch.from_numpy(
+            np.array(params[cam]['translation'])
+        ).float().cuda().unsqueeze(0)
         params_torch.append(
             {
                 'mtx': mtx,
@@ -203,22 +201,23 @@ def masks_params_torch(masks, params):
     return masks_torch, params_torch
 
 
-# TODO: Shorten
-def optimize(smpl_layer, masks, skeletons, params_smpl, params, experiment, subject, epochs):
+def optimize(smpl_layer, masks, skeletons, alphas, betas, scale, translation, params, subject, configs):
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
     smpl_layer.to(device)
 
-    denormalize_params = load_denormalize_params()
+    denormalize_params = load_denormalize_params(subject, device, configs)
 
-    depth = len(masks[0])
+    skeleton_weights = torch.from_numpy(SMPL_SKELETON_MAP[:, 2]).float().to(device)
 
-    alphas = torch.from_numpy(params_smpl[0]).to(device)
-    betas = torch.from_numpy(params_smpl[1]).to(device)
-    scale = torch.from_numpy(params_smpl[2]).to(device)
-    translation = torch.from_numpy(params_smpl[3]).to(device)
+    length = len(alphas)
+
+    alphas = torch.from_numpy(alphas).to(device)
+    betas = torch.from_numpy(betas).to(device)
+    scale = torch.tensor(scale).to(device)
+    translation = torch.from_numpy(translation).to(device)
     skeletons_torch = torch.from_numpy(skeletons).float().to(device)
 
-    batch_tensor = torch.ones((depth, 1)).to(device)
+    batch_tensor = torch.ones((length, 1), dtype=torch.float32).to(device)
 
     alphas.requires_grad = True
     betas.requires_grad = True
@@ -239,7 +238,7 @@ def optimize(smpl_layer, masks, skeletons, params_smpl, params, experiment, subj
     loss_init = None
     loss_distance_init = None
     loss_chamfer_init = None
-    bar = tqdm(range(epochs))
+    bar = tqdm(range(configs['epochs']))
     for _ in bar:
         verts, joints = model(
             alphas,
@@ -248,12 +247,12 @@ def optimize(smpl_layer, masks, skeletons, params_smpl, params, experiment, subj
         verts = verts * scale + translation
         joints = joints * scale + translation
 
-        loss_distance = calc_distance(joints, skeletons_torch)
+        loss_distance = calc_distance(joints, skeletons_torch, skeleton_weights)
         
         verts = denormalize(verts, denormalize_params)
-        loss_chamfer = calc_chamfer(verts, masks_torch, params_torch)
+        loss_chamfer = calc_chamfer(verts, masks_torch, params_torch, configs)
 
-        loss = loss_distance * PARAM_WEIGHT_DIST + loss_chamfer * PARAM_WEIGHT_CHMF
+        loss = loss_distance * configs['weight_distance'] + loss_chamfer * configs['weight_chamfer']
 
         optimizer.zero_grad()
         loss.backward()
@@ -262,22 +261,22 @@ def optimize(smpl_layer, masks, skeletons, params_smpl, params, experiment, subj
         loss = loss.detach().cpu().item()
         if loss_init is None:
             loss_init = loss
-            loss_distance_init = loss_distance * PARAM_WEIGHT_DIST
-            loss_chamfer_init = loss_chamfer * PARAM_WEIGHT_CHMF
+            loss_distance_init = loss_distance * configs['weight_distance']
+            loss_chamfer_init = loss_chamfer * configs['weight_chamfer']
 
         bar.set_description(
             "L: {:.2E} LD: {:.2E} LC: {:.2E} S:{:.2f}".format(
                 loss,
-                loss_distance * PARAM_WEIGHT_DIST,
-                loss_chamfer * PARAM_WEIGHT_CHMF,
+                loss_distance * configs['weight_distance'],
+                loss_chamfer * configs['weight_chamfer'],
                 scale.item(),
             )
         )
 
-    print('L {:.4f} to {:.4f}\n D {:.4f} to {:.4f}\nCH {:.4f} to {:.4f}'.format(
+    print('L {:.5f} to {:.5f}\n D {:.5f} to {:.5f}\nCH {:.5f} to {:.5f}'.format(
             loss_init, loss,
-            loss_distance_init, loss_distance  * PARAM_WEIGHT_DIST,
-            loss_chamfer_init, loss_chamfer * PARAM_WEIGHT_CHMF,
+            loss_distance_init, loss_distance  * configs['weight_distance'],
+            loss_chamfer_init, loss_chamfer * configs['weight_chamfer'],
         )
     )
 
@@ -290,7 +289,7 @@ def optimize(smpl_layer, masks, skeletons, params_smpl, params, experiment, subj
 # TODO: Shorten
 def visualize_poses(alphas, betas,
                     translation, scale,
-                    faces):
+                    faces, configs):
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
 
     alphas = torch.from_numpy(alphas).to(device)
@@ -313,7 +312,6 @@ def visualize_poses(alphas, betas,
     joints = ((joints + translation) * scale).squeeze()
     verts = ((verts + translation) * scale).squeeze()
 
-    pcd_skeleton_org = o3d.geometry.PointCloud()
     pcd_joints = o3d.geometry.PointCloud()
     mesh = o3d.geometry.TriangleMesh()
     mesh.triangles = o3d.utility.Vector3iVector(faces)
@@ -326,7 +324,7 @@ def visualize_poses(alphas, betas,
         else:
             vis.update_geometry(pcd_joints)
 
-        if VISUALIZE_MESH:
+        if configs['visualize_mesh']:
             mesh.vertices = o3d.utility.Vector3dVector(
                 verts[idx])
             mesh_line_temp = o3d.geometry.LineSet.create_from_triangle_mesh(
@@ -345,161 +343,112 @@ def visualize_poses(alphas, betas,
             time.sleep(.01)
 
 
-def get_mask_image(cam_name, experiment, idx):
-    cam_num = cam_name[12:15]
-    img_depth = '/home/hamid/Documents/phd/footefield/data/AzureKinectRecord_0729/{}/azure_kinect{}/mask/mask{:05d}.jpg'.format(experiment, cam_num, idx)
+def get_mask_image(camera, idx, configs):
+    img_depth = os.path.join(
+        configs['images_mask'][camera],
+        'mask{:05d}.jpg'.format(idx)
+    )
 
     return img_depth
 
 
-def get_params_color(expriment):
-    file = f"keypoints3d_{expriment}_ba.pkl"
-    file_path = os.path.join(DIR_ORG, file)
-    with open(file_path, 'rb') as handle:
-        output = pickle.load(handle)
-
-    params = output['params']
-
-    return params
-
-
-def get_mask(cam, experiment, idx, params):
-    img_mask = get_mask_image(cam, experiment, idx)
+def get_mask(cam, idx, params, configs):
+    img_mask = get_mask_image(cam, idx, configs)
     
     img_mask = cv2.imread(img_mask, -1)
     kernel = np.ones((5, 5), np.uint8)
     img_mask = cv2.erode(img_mask, kernel, iterations=5)
 
-    # cv2.imshow("before", cv2.resize(img_mask, (1280, 720)))
-    # cv2.imshow("after", cv2.resize(image, (1280, 720)))
-    # cv2.waitKey(0)
-
-    mtx = params[cameras.index(cam)]['mtx']
-    dist = params[cameras.index(cam)]['dist']
+    mtx = np.array(params[cam]['mtx'], np.float32)
+    dist = np.array(params[cam]['dist'], np.float32)
     img_mask = cv2.undistort(img_mask, mtx, dist, None, None)
 
     img_mask = cv2.resize(
         img_mask,
-        (img_mask.shape[1] // PARAM_SCALE_MASK,
-         img_mask.shape[0] // PARAM_SCALE_MASK))
+        (img_mask.shape[1] // configs['scale_mask'],
+         img_mask.shape[0] // configs['scale_mask']))
 
-    points = np.argwhere(img_mask > 0.7) * PARAM_SCALE_MASK
+    points = np.argwhere(img_mask > 0.7) * configs['scale_mask']
     points = np.flip(points, axis=1).copy()
 
     return points
 
 
-def get_masks(experiment, params, depth):
-    masks = [[], [], [], []]
+def get_masks(cameras, params, length, configs):
+    masks = {camera: [] for camera in cameras}
 
     print("Loading masks...")
-    for idx in tqdm(range(depth)):
-        mask24 = get_mask(cam24, experiment, idx, params)
-        mask15 = get_mask(cam15, experiment, idx, params)
-        # mask24 = get_mask(cam24, experiment, idx, params)
-        mask34 = get_mask(cam34, experiment, idx, params)
-        mask35 = get_mask(cam35, experiment, idx, params)
-
-        masks[0].append(
-            mask24
-        )
-        masks[1].append(
-            mask15
-        )
-        masks[2].append(
-            mask34
-        )
-        masks[3].append(
-            mask35
-        )
+    for idx in tqdm(range(length)):
+        for camera in cameras:
+            mask = get_mask(camera, idx, params, configs)
+            masks[camera].append(
+                mask
+            )
 
     return masks
 
 
-def store_smpl_parameters(alphas, betas,
-        translation, scale, experiment, subject):
-    if not os.path.exists(DIR_OUTPUT):
-        os.mkdir(DIR_OUTPUT)
+def load_smpl(subject, configs):
+    with open(configs['params_smpl'], 'rb') as handle:
+        params_smpl = yaml.safe_load(handle)
 
-    path = os.path.join(
-        DIR_OUTPUT,
-        f'params_smpl_{experiment}_{subject}.pkl')
+    alphas = np.array(params_smpl[subject]['alphas'], np.float32)
+    betas = np.array(params_smpl[subject]['betas'], np.float32)
+    translation = np.array(params_smpl[subject]['translation'], np.float32)    
+    scale = params_smpl[subject]['scale']
     
-    params = {
-        'alphas': alphas,
-        'betas': betas,
-        'translation': translation,
-        'scale': scale,
-    }
-
-    with open(path, 'wb') as handle:
-        pickle.dump(params, handle,
-                    protocol=pickle.HIGHEST_PROTOCOL)
-        
-    print(f'Stored results: {path}')
-
-
-def load_smpl_params(experiment, subject):
-    name = "params_smpl_{}_{}.pkl".format(
-        experiment, subject
-    )
-    path_smpl = os.path.join(DIR_SMPL, name)
-    with open(path_smpl, 'rb') as handle:
-        smpl = pickle.load(handle)
-
-    alphas = np.array(smpl['alphas'])
-    betas = np.array(smpl['betas'])
-    scale = np.array(smpl['scale'])
-    translation = np.array(smpl['translation'])
-
     return alphas, betas, scale, translation
 
 
-def load_skeletons(experiment, subject):
-    path = os.path.join(DIR_SKELETONS,
-                        f'keypoints3d_{experiment}_ba_{subject}_normalized.npy')
-    skeletons = np.load(path)
-
-    return skeletons
+def _store_artifacts(artifact, output):
+    with open(output, 'w') as handle:
+        yaml.dump(artifact, handle)
 
 
-
-cam24 = 'azure_kinect2_4_calib_snap'
-cam15 = 'azure_kinect1_5_calib_snap'
-cam14 = 'azure_kinect1_4_calib_snap'
-cam34 = 'azure_kinect3_4_calib_snap'
-cam35 = 'azure_kinect3_5_calib_snap'
-cameras = [
-    cam24,
-    cam15,
-    # cam14,
-    cam34,
-    cam35,   
-]
 if __name__ == '__main__':
+    args = _get_arguments()
+    configs = _load_configs(args.config)
+
+    print(f"Config loaded: {configs}")
+
     model = SMPL_Layer(
         center_idx=0,
-        gender='neutral',
-        model_root='models')
+        gender=configs['gender'],
+        model_root=configs['models_root'])
+    
+    with open(configs['skeletons'], 'rb') as handle:
+        bundles = yaml.safe_load(handle)
 
-    for experiment in EXPERIMENTS:
-        for subject in SUBJECTS:
-            print(f'Optimizing {experiment} {subject}')
+    with open(configs['params'], 'rb') as handle:
+        params = yaml.safe_load(handle)
 
-            skeletons = load_skeletons(experiment, subject)
-            params_smpl = load_smpl_params(experiment, subject)
-            params = get_params_color(experiment)
-            masks = get_masks(experiment, params, params_smpl[0].shape[0])
+    cameras = list(params.keys())
 
-            alphas, betas, translation, scale = optimize(
-                model, masks, skeletons, params_smpl, params, experiment, subject, EPOCHS)
+    params_smpl = []
+    for subject, bundle in enumerate(bundles):
+        poses = np.array(bundle['pose_normalized'])
 
-            if VISUALIZE:
-                visualize_poses(
-                    alphas, betas,
-                    translation, scale, model.th_faces)
+        alphas, betas, scale, translation = \
+            load_smpl(subject, configs)
 
-            store_smpl_parameters(
+        masks = get_masks(cameras, params, poses.shape[0], configs)
+
+        alphas, betas, translation, scale = optimize(
+            model, masks, poses, alphas, betas, scale, translation,
+            params, subject, configs)
+        
+        # Do we need to add a rotation parameter as well?
+        params_smpl_person = {
+            'alphas': alphas.tolist(),
+            'betas': betas.tolist(),
+            'translation': translation.tolist(),
+            'scale': scale.item(),
+        }
+        params_smpl.append(params_smpl_person)
+
+        if configs['visualize']:
+            visualize_poses(
                 alphas, betas,
-                translation, scale,
-                experiment, subject)
+                translation, scale, model.th_faces, configs)
+
+        _store_artifacts(params_smpl, configs['output'])

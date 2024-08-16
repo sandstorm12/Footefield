@@ -1,12 +1,11 @@
-from shlex import join
 import sys
 sys.path.append('../')
 
 import os
 import cv2
+import yaml
 import torch
-import pickle
-import diskcache
+import argparse
 import numpy as np
 
 from tqdm import tqdm
@@ -14,36 +13,38 @@ from utils import data_loader
 from smplpytorch.pytorch.smpl_layer import SMPL_Layer
 
 
-VIS_MESH = True
-VIS_ORG = False
-VIS_JTR = True
-
-DIR_STORE = '/home/hamid/Documents/phd/footefield/Pose_to_SMPL/fit/output/HALPE/'
-DIR_PARAMS = '../pose_estimation/keypoints_3d_pose2smpl/'
-DIR_STORE_ORG = '../pose_estimation/keypoints_3d_ba'
-DIR_OUTPUT = "./videos_smpl"
-DIR_SMPL = 'params_smpl'
-
-PARAM_OUTPUT_SIZE = (1920, 1080)
-PARAM_OUTPUT_FPS = 5.0
-PARAM_CALIB_SIZE = 16
-
 TYPE_ORG = "org"
 TYPE_JTR = "jtr"
 TYPE_MESH = "mesh"
 
 
+def _get_arguments():
+    parser = argparse.ArgumentParser()
+
+    parser.add_argument(
+        '-c', '--config',
+        help='Path to the config file',
+        type=str,
+        required=True,
+    )
+
+    args = parser.parse_args()
+
+    return args
+
+
+def _load_configs(path):
+    with open(path, 'r') as yaml_file:
+        configs = yaml.safe_load(yaml_file)
+
+    return configs
+
+
 def get_parameters(params):
-    mtx = params['mtx']
-    dist = params['dist']
-    rotation = params['rotation']
-    translation = params['translation']
+    mtx = np.array(params['mtx'], np.float32)
+    dist = np.array(params['dist'], np.float32)
 
-    extrinsics = np.zeros((3, 4), dtype=float)
-    extrinsics[:3, :3] = rotation
-    extrinsics[:3, 3] = translation
-
-    return mtx, dist, extrinsics
+    return mtx, dist
 
 
 # Implemented by Gemini
@@ -56,19 +57,19 @@ def project_3d_to_2d(camera_matrix, dist_coeffs, rvec, tvec, object_points):
     return image_points
 
 
-def get_video_writer(experiment, camera):
-    if not os.path.exists(DIR_OUTPUT):
-        os.mkdir(DIR_OUTPUT)
+def get_video_writer(camera, configs):
+    if not os.path.exists(configs['output']):
+        os.makedirs(configs['output'])
 
     fourcc = cv2.VideoWriter_fourcc(*'XVID')
     writer = cv2.VideoWriter(
         os.path.join(
-            DIR_OUTPUT,
-            f'visualizer_skeleton_video_{experiment}_{camera}.avi'
+            configs['output'],
+            f'visualizer_skeleton_video_{camera}.avi'
         ),
         fourcc,
-        PARAM_OUTPUT_FPS,
-        PARAM_OUTPUT_SIZE
+        configs['fps'],
+        configs['size'],
     )
     
     return writer
@@ -126,16 +127,16 @@ def poses_3d_2_2d(poses_3d, params):
     poses_shape = list(poses_3d.shape)
     poses_shape[-1] = 2
     
-    mtx = params['mtx']
-    dist = params['dist']
-    rotation = params['rotation']
-    translation = params['translation']
+    mtx = np.array(params['mtx'], np.float64)
+    # dist = np.array(params['dist'], np.float64)
+    rotation = np.array(params['rotation'], np.float64)
+    translation = np.array(params['translation'], np.float64)
+
     poses_2d = project_3d_to_2d(
         mtx, None,
         rotation,
         translation,
         poses_3d.reshape(-1, 3))
-    # poses_2d[:, 1] = poses_2d[:, 1]
     poses_2d = poses_2d.reshape(poses_shape)
 
     return poses_2d
@@ -152,37 +153,32 @@ def get_corresponding_files(path):
     return files
 
 
-def load_smpl(experiment, subject):
-    name = "params_smpl_{}_{}.pkl".format(
-        experiment, subject
-    )
-    path_smpl = os.path.join(DIR_SMPL, name)
-    with open(path_smpl, 'rb') as handle:
-        smpl = pickle.load(handle)
+def load_smpl(subject, configs):
+    with open(configs['params_smpl'], 'rb') as handle:
+        params_smpl = yaml.safe_load(handle)
 
-    alphas = np.array(smpl['alphas'])
-    betas = np.array(smpl['betas'])
-    scale = np.array(smpl['scale'])
-    translation = np.array(smpl['translation'])
-
+    alphas = np.array(params_smpl[subject]['alphas'], np.float32)
+    betas = np.array(params_smpl[subject]['betas'], np.float32)
+    translation = np.array(params_smpl[subject]['translation'], np.float32)    
+    scale = params_smpl[subject]['scale']
+    
     return alphas, betas, scale, translation
 
 
 # TODO: Shorten
-def get_smpl_parameters(experiment):
+def get_smpl_parameters(configs):
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
     smpl_layer = SMPL_Layer(
         center_idx=0,
-        gender="neutral",
-        model_root='models').to(device)
+        gender=configs['gender'],
+        model_root=configs['models_root']).to(device)
         
     joints_all = []
     verts_all = []
     faces_all = []
     for subject in [0, 1]:
-        # Load SMPL data
         alphas, betas, scale_smpl, translation_smpl = \
-            load_smpl(experiment, subject)
+            load_smpl(subject, configs)
     
         alphas = torch.from_numpy(alphas).to(device)
         betas = torch.from_numpy(betas).to(device)
@@ -196,12 +192,12 @@ def get_smpl_parameters(experiment):
         faces = smpl_layer.th_faces.detach().cpu().numpy()
 
         # Load alignment params
-        path_params = os.path.join(DIR_PARAMS, f"keypoints3d_{experiment}_ba_{subject}_params.pkl")
-        with open(path_params, 'rb') as handle:
-            params = pickle.load(handle)
-        rotation = params['rotation']
-        scale = params['scale']
-        translation = params['translation']
+        with open(configs['skeletons_norm'], 'rb') as handle:
+            params = yaml.safe_load(handle)
+
+        rotation = params[subject]['rotation']
+        scale = params[subject]['scale']
+        translation = params[subject]['translation']
 
         rotation_inverted = np.linalg.inv(rotation)
 
@@ -229,70 +225,51 @@ def get_smpl_parameters(experiment):
     return joints_all, verts_all, faces_all
 
 
-# TODO: Move the cameras somewhere else
-cam24 = 'azure_kinect2_4_calib_snap'
-cam15 = 'azure_kinect1_5_calib_snap'
-cam14 = 'azure_kinect1_4_calib_snap'
-cam34 = 'azure_kinect3_4_calib_snap'
-cam35 = 'azure_kinect3_5_calib_snap'
-
-EXPERIMENTS = ['a1', 'a2']
-
-# TODO: Too long
 if __name__ == "__main__":
-    cache = diskcache.Cache('../calibration/cache')
+    args = _get_arguments()
+    configs = _load_configs(args.config)
 
-    cameras = [
-        cam24,
-        cam15,
-        # cam14,
-        cam34,
-        cam35
-    ]
+    print(f"Config loaded: {configs}")
 
-    for experiment in EXPERIMENTS:
-        print(f"Visualizing {experiment}")
+    joints_all, verts_all, faces_all = get_smpl_parameters(configs)
+
+    with open(configs['skeletons'], 'rb') as handle:
+        poses = np.array(yaml.safe_load(handle))
+
+    with open(configs['params'], 'rb') as handle:
+        params = yaml.safe_load(handle)
+
+    cameras = configs['images'].keys()
+    for idx_cam, camera in enumerate(tqdm(cameras)):
+        dir = configs['images'][camera]
+
+        img_rgb_paths = data_loader.list_rgb_images(dir)
         
-        skeleton_path = os.path.join(DIR_STORE_ORG, f"keypoints3d_{experiment}_ba.pkl")
-        with open(skeleton_path, 'rb') as handle:
-            output = pickle.load(handle)
+        poses_2d = poses_3d_2_2d(
+            poses,
+            params[camera]).reshape(poses.shape[0], -1, 2)
+        poses_2d_smpl = poses_3d_2_2d(
+            joints_all,
+            params[camera]).reshape(joints_all.shape[0], -1, 2)
+        poses_2d_verts = poses_3d_2_2d(
+            verts_all,
+            params[camera]).reshape(verts_all.shape[0], -1, 2)
 
-        poses = output['points_3d'].reshape(-1, 2, 26, 3)
-        params = output['params']
+        writer = get_video_writer(camera, configs)
+        for idx in range(joints_all.shape[0]):
+            img_rgb = cv2.imread(img_rgb_paths[idx])
+            mtx, dist = get_parameters(params[camera])
+            img_rgb = cv2.undistort(img_rgb, mtx, dist, None, None)
+            if configs['visualize_skeleton']:
+                write_frame(img_rgb, poses_2d[idx],
+                            TYPE_ORG)
 
-        joints_all, verts_all, faces_all = get_smpl_parameters(experiment)
+            if configs['visualize_joints']:
+                write_frame(img_rgb, poses_2d_smpl[idx],
+                            TYPE_JTR)
 
-        for idx_cam, camera in enumerate(tqdm(cameras)):
-            dir = data_loader.EXPERIMENTS[experiment][camera]
-
-            img_rgb_paths = data_loader.list_rgb_images(
-                os.path.join(dir, "color"))
-            
-            poses_2d = poses_3d_2_2d(
-                poses,
-                params[idx_cam]).reshape(poses.shape[0], -1, 2)
-            poses_2d_smpl = poses_3d_2_2d(
-                joints_all,
-                params[idx_cam]).reshape(poses.shape[0], -1, 2)
-            poses_2d_verts = poses_3d_2_2d(
-                verts_all,
-                params[idx_cam]).reshape(poses.shape[0], -1, 2)
-
-            writer = get_video_writer(experiment, camera)
-            for idx, t in enumerate(poses_2d.reshape(poses_2d.shape[0], -1, 2)):
-                img_rgb = cv2.imread(img_rgb_paths[idx])
-                mtx, dist, _ = get_parameters(params[idx_cam])
-                img_rgb = cv2.undistort(img_rgb, mtx, dist, None, None)
-                if VIS_ORG:
-                    write_frame(img_rgb, poses_2d[idx],
-                                TYPE_ORG)
-
-                if VIS_JTR:
-                    write_frame(img_rgb, poses_2d_smpl[idx],
-                                TYPE_JTR)
-
-                if VIS_MESH:
-                    write_frame(img_rgb, poses_2d_verts[idx],
-                                TYPE_MESH)
-                    
-                writer.write(img_rgb)
+            if configs['visualize_mesh']:
+                write_frame(img_rgb, poses_2d_verts[idx],
+                            TYPE_MESH)
+                
+            writer.write(img_rgb)

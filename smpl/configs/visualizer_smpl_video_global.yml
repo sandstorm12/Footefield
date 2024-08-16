@@ -1,0 +1,20 @@
+params_smpl: "artifacts/smpl_opt_global_a1.yml"
+params: "/home/hamid/Documents/phd/footefield/footefield/pose_estimation/artifacts/params_global_a1_ba.yml"
+skeletons: "/home/hamid/Documents/phd/footefield/footefield/pose_estimation/artifacts/3d_skeletons_a1_ba.yml"
+skeletons_norm: "/home/hamid/Documents/phd/footefield/footefield/pose_estimation/artifacts/3d_skeletons_a1_ba_norm.yml"
+gender: "neutral"
+models_root: "models"
+visualize_skeleton: True
+visualize_joints: True
+visualize_mesh: True
+fps: 5
+size:
+  - 1920
+  - 1080
+output: "videos/visualizer_smpl_global/a1/"
+images:
+  cam2_4: "/home/hamid/Documents/phd/footefield/data/AzureKinectRecord_0729/a1/azure_kinect2_4/color"
+  cam3_4: "/home/hamid/Documents/phd/footefield/data/AzureKinectRecord_0729/a1/azure_kinect3_4/color"
+  cam3_5: "/home/hamid/Documents/phd/footefield/data/AzureKinectRecord_0729/a1/azure_kinect3_5/color"
+  cam1_4: "/home/hamid/Documents/phd/footefield/data/AzureKinectRecord_0729/a1/azure_kinect1_4/color"
+  cam1_5: "/home/hamid/Documents/phd/footefield/data/AzureKinectRecord_0729/a1/azure_kinect1_5/color"

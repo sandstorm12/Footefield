@@ -39,8 +39,9 @@ smpl/models/
 # Mediapipe
 *.task
 
-# Diskcache storage
+# Diskcache storage and artifacts
 */cache/
+*/artifacts/
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

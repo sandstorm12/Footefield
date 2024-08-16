@@ -1,11 +1,11 @@
 import sys
 sys.path.append('../')
 
-import os
 import time
 import smplx
+import yaml
 import torch
-import pickle
+import argparse
 import numpy as np
 import open3d as o3d
 import torch.nn.functional as F
@@ -14,32 +14,22 @@ from tqdm import tqdm
 from utils import data_loader
 
 
-DIR_SKELETONS = '../pose_estimation/keypoints_3d_pose2smpl_x'
-DIR_OUTPUT = './params_smplx'
-
-EXPERIMENTS = ['a1', 'a2']
-SUBJECTS = [0, 1]
-EPOCHS = 500
-VISUALIZE = False
-PARAM_COEFF_POSE = .1
-PARAM_COEFF_DET = .01
-PATH_MODEL = 'models'
-
+COEFF_HGIH = 10
 COEFF_NORM = 1
-COEFF_MINI = .5
-SMPLX_SKELETON_MAP = np.array([ # (SMPLX, SKELETON)
-    [13, 5, COEFF_NORM],
-    [14, 6, COEFF_NORM],
+COEFF_MINI = .1
+SMPLX_SKELETON_MAP = np.array([ # (SMPLX, HALPE)
+    [16, 5, COEFF_NORM],
+    [17, 6, COEFF_NORM],
     [1, 11, COEFF_NORM],
     [2, 12, COEFF_NORM],
-    [4, 13, COEFF_NORM],
-    [5, 14, COEFF_NORM],
-    [7, 15, COEFF_NORM],
-    [8, 16, COEFF_NORM], # Body
-    [19, 8, COEFF_NORM],
-    [21, 10, COEFF_NORM],
-    [18, 7, COEFF_NORM],
-    [20, 9, COEFF_NORM], # Arms
+    [4, 13, COEFF_HGIH],
+    [5, 14, COEFF_HGIH],
+    [7, 15, COEFF_HGIH],
+    [8, 16, COEFF_HGIH], # Body
+    [19, 8, COEFF_HGIH],
+    [21, 10, COEFF_HGIH],
+    [18, 7, COEFF_HGIH],
+    [20, 9, COEFF_HGIH], # Arms
     [58, 24, COEFF_NORM], # Right ear
     [59, 38, COEFF_NORM], # Left ear
     [86, 50, COEFF_MINI],
@@ -121,7 +111,29 @@ SMPLX_SKELETON_MAP = np.array([ # (SMPLX, SKELETON)
 ])
 
 
-def calc_distance(joints, skeleton):
+def _get_arguments():
+    parser = argparse.ArgumentParser()
+
+    parser.add_argument(
+        '-c', '--config',
+        help='Path to the config file',
+        type=str,
+        required=True,
+    )
+
+    args = parser.parse_args()
+
+    return args
+
+
+def _load_configs(path):
+    with open(path, 'r') as yaml_file:
+        configs = yaml.safe_load(yaml_file)
+
+    return configs
+
+
+def calc_distance(joints, skeleton, skeleton_weights):
     skeleton_selected = skeleton[:, SMPLX_SKELETON_MAP[:, 1]]
     output_selected = joints[:, SMPLX_SKELETON_MAP[:, 0]]
 
@@ -129,13 +141,13 @@ def calc_distance(joints, skeleton):
     
     # Just for test, optimize
     loss = torch.mean(loss, dim=(0, 2))
-    loss = torch.mean(loss * torch.from_numpy(SMPLX_SKELETON_MAP[:, 2]).float().cuda())
+    loss = torch.mean(loss * skeleton_weights)
 
     return loss
 
 
 # TODO: Shorten
-def optimize_beta(smpl_layer, skeletons, epochs):
+def optimize_beta(smpl_layer, skeletons, configs):
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
     smpl_layer.to(device)
 
@@ -153,6 +165,8 @@ def optimize_beta(smpl_layer, skeletons, epochs):
 
     batch_tensor = torch.ones((skeletons.shape[0], 1)).to(device)
 
+    skeleton_weights = torch.from_numpy(SMPLX_SKELETON_MAP[:, 2]).float().to(device)
+
     global_orient.requires_grad = True
     jaw_pose.requires_grad = True
     leye_pose.requires_grad = True
@@ -165,7 +179,7 @@ def optimize_beta(smpl_layer, skeletons, epochs):
     translation.requires_grad = True
     scale.requires_grad = True
 
-    lr = 2e-2
+    lr = configs['learning_rate']
     optim_params = [{'params': global_orient, 'lr': lr},
                     {'params': jaw_pose, 'lr': lr},
                     {'params': leye_pose, 'lr': lr},
@@ -183,7 +197,7 @@ def optimize_beta(smpl_layer, skeletons, epochs):
 
     # TODO: maybe add transfromation term as well
     loss_init = None
-    bar = tqdm(range(epochs))
+    bar = tqdm(range(configs['epochs']))
     for _ in bar:
         output = model(
             global_orient=global_orient,
@@ -201,7 +215,7 @@ def optimize_beta(smpl_layer, skeletons, epochs):
         joints = joints - joints[0, 0] + translation
         joints = joints * scale
 
-        loss_distance = calc_distance(joints, skeletons_torch)
+        loss_distance = calc_distance(joints, skeletons_torch, skeleton_weights)
 
         # loss_smooth = torch.nn.functional.mse_loss(joints[1:], joints[:-1])
         # loss = loss_distance + loss_smooth * PARAM_COEFF_POSE
@@ -217,7 +231,7 @@ def optimize_beta(smpl_layer, skeletons, epochs):
             loss_init = loss
 
         bar.set_description(
-            "L: {:.4f} D: {:.4f} Si:{:.2f}".format(
+            "L: {:.5f} D: {:.5f} Si:{:.2f}".format(
                 loss,
                 loss_distance,
                 # loss_smooth * PARAM_COEFF_POSE,
@@ -225,7 +239,7 @@ def optimize_beta(smpl_layer, skeletons, epochs):
             )
         )
 
-    print('Loss went from {:.4f} to {:.4f}'.format(loss_init, loss))
+    print('Loss went from {:.5f} to {:.5f}'.format(loss_init, loss))
 
     return global_orient.detach().cpu().numpy(), \
         jaw_pose.detach().cpu().numpy(), \
@@ -314,74 +328,58 @@ def visualize_poses(global_orient, jaw_pose, leye_pose,
             time.sleep(.01)
 
 
-def load_skeletons(experiment, subject):
-    path = os.path.join(DIR_SKELETONS,
-                        f'keypoints3d_{experiment}_ba_{subject}_normalized.npy')
-    skeletons = np.load(path)
-
-    return skeletons
-
-
-def store_smplx_parameters(global_orient, jaw_pose, leye_pose,
-        reye_pose, body, left_hand_pose, right_hand_pose, betas,
-        expression, translation, scale, experiment, subject):
-    if not os.path.exists(DIR_OUTPUT):
-        os.mkdir(DIR_OUTPUT)
-
-    path = os.path.join(
-        DIR_OUTPUT,
-        f'params_smplx_{experiment}_{subject}.pkl')
-    
-    params = {
-        'global_orient': global_orient,
-        'jaw_pose': jaw_pose,
-        'leye_pose': leye_pose,
-        'reye_pose': reye_pose,
-        'body': body,
-        'left_hand_pose': left_hand_pose,
-        'right_hand_pose': right_hand_pose,
-        'betas': betas,
-        'expression': expression,
-        'translation': translation,
-        'scale': scale,
-    }
-
-    with open(path, 'wb') as handle:
-        pickle.dump(params, handle,
-                    protocol=pickle.HIGHEST_PROTOCOL)
-        
-    print(f'Stored results: {path}')
+def _store_artifacts(artifact, output):
+    with open(output, 'w') as handle:
+        yaml.dump(artifact, handle)
 
 
 if __name__ == '__main__':
+    args = _get_arguments()
+    configs = _load_configs(args.config)
+
+    print(f"Config loaded: {configs}")
+
     model = smplx.create(
-        PATH_MODEL, model_type='smplx',
-        gender='neutral', use_face_contour=False,
+        configs['models_root'], model_type='smplx',
+        gender=configs['gender'], use_face_contour=False,
         num_betas=10, use_pca=False,
         num_expression_coeffs=10,
         ext='npz')
+    
+    with open(configs['skeletons'], 'rb') as handle:
+        bundles = yaml.safe_load(handle)
 
-    for experiment in EXPERIMENTS:
-        for subject in SUBJECTS:
-            skeletons = load_skeletons(experiment, subject)
+    params_smplx = []
+    for bundle in bundles:
+        poses = np.array(bundle['pose_normalized'])
 
-            print(f'Optimizing {experiment} {subject}')
-            global_orient, jaw_pose, leye_pose, \
-                reye_pose,body,left_hand_pose, \
-                right_hand_pose, betas, expression, \
-                translation, scale = optimize_beta(
-                    model, skeletons, EPOCHS)
+        global_orient, jaw_pose, leye_pose, \
+            reye_pose,body,left_hand_pose, \
+            right_hand_pose, betas, expression, \
+            translation, scale = optimize_beta(
+                model, poses, configs)
+        
+        # Do we need to add a rotation parameter as well?
+        params_smplx_person = {
+            'global_orient': global_orient.tolist(),
+            'jaw_pose': jaw_pose.tolist(),
+            'leye_pose': leye_pose.tolist(),
+            'reye_pose': reye_pose.tolist(),
+            'body': body.tolist(),
+            'left_hand_pose': left_hand_pose.tolist(),
+            'right_hand_pose': right_hand_pose.tolist(),
+            'betas': betas.tolist(),
+            'expression': expression.tolist(),
+            'translation': translation.tolist(),
+            'scale': scale.item(),
+        }
+        params_smplx.append(params_smplx_person)
 
-            if VISUALIZE:
-                visualize_poses(
-                    global_orient, jaw_pose, leye_pose,
-                    reye_pose,body,left_hand_pose,
-                    right_hand_pose, betas, expression,
-                    translation, scale, model.faces, skeletons)
-
-            store_smplx_parameters(
+        if configs['visualize']:
+            visualize_poses(
                 global_orient, jaw_pose, leye_pose,
                 reye_pose,body,left_hand_pose,
                 right_hand_pose, betas, expression,
-                translation, scale,
-                experiment, subject)
+                translation, scale, model.faces, poses)
+
+        _store_artifacts(params_smplx, configs['output'])
