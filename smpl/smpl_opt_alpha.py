@@ -60,7 +60,7 @@ def _load_configs(path):
     return configs
 
 
-def calc_distance(joints, skeleton):
+def calc_distance(joints, skeleton, skeleton_weights):
     skeleton_selected = skeleton[:, SMPL_SKELETON_MAP[:, 1]]
     output_selected = joints[:, SMPL_SKELETON_MAP[:, 0]]
 
@@ -68,7 +68,7 @@ def calc_distance(joints, skeleton):
     
     # Just for test, optimize
     loss = torch.mean(loss, dim=(0, 2))
-    loss = torch.mean(loss * torch.from_numpy(SMPL_SKELETON_MAP[:, 2]).float().cuda())
+    loss = torch.mean(loss * skeleton_weights)
 
     return loss
 
@@ -123,6 +123,8 @@ def optimize(smpl_layer, skeletons, configs):
                               configs['learning_rate'])
     skeletons_torch = torch.from_numpy(skeletons).float().to(device)
 
+    skeleton_weights = torch.from_numpy(SMPL_SKELETON_MAP[:, 2]).float().to(device)
+
     loss_init = None
     bar = tqdm(range(configs['epochs']))
     for _ in bar:
@@ -131,7 +133,7 @@ def optimize(smpl_layer, skeletons, configs):
             th_betas=betas * batch_tensor)
         joints = joints * scale + translation
 
-        loss = calc_distance(joints, skeletons_torch)
+        loss = calc_distance(joints, skeletons_torch, skeleton_weights)
 
         optimizer.zero_grad()
         loss.backward()
