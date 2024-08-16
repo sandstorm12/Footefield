@@ -3,28 +3,15 @@ sys.path.append('../')
 
 import os
 import cv2
+import yaml
 import torch
 import smplx
-import pickle
-import diskcache
+import argparse
 import numpy as np
 
 from tqdm import tqdm
 from utils import data_loader
 
-
-VIS_MESH = True
-VIS_ORG = True
-VIS_JTR = True
-
-DIR_SMPLX = './params_smplx'
-DIR_PARAMS = '../pose_estimation/keypoints_3d_pose2smpl_x/'
-DIR_STORE_ORG = '../pose_estimation/keypoints_3d_ba_x'
-DIR_OUTPUT = "./output_videos"
-PATH_MODEL = 'models'
-
-PARAM_OUTPUT_SIZE = (1920, 1080)
-PARAM_OUTPUT_FPS = 5.0
 
 TYPE_ORG = "org"
 TYPE_JTR = "jtr"
@@ -97,17 +84,33 @@ JOINTS_SMPLX = np.array([
 ])
 
 
+def _get_arguments():
+    parser = argparse.ArgumentParser()
+
+    parser.add_argument(
+        '-c', '--config',
+        help='Path to the config file',
+        type=str,
+        required=True,
+    )
+
+    args = parser.parse_args()
+
+    return args
+
+
+def _load_configs(path):
+    with open(path, 'r') as yaml_file:
+        configs = yaml.safe_load(yaml_file)
+
+    return configs
+
+
 def get_parameters(params):
-    mtx = params['mtx']
-    dist = params['dist']
-    rotation = params['rotation']
-    translation = params['translation']
+    mtx = np.array(params['mtx'], np.float32)
+    dist = np.array(params['dist'], np.float32)
 
-    extrinsics = np.zeros((3, 4), dtype=float)
-    extrinsics[:3, :3] = rotation
-    extrinsics[:3, 3] = translation
-
-    return mtx, dist, extrinsics
+    return mtx, dist
 
 
 # Implemented by Gemini
@@ -120,19 +123,19 @@ def project_3d_to_2d(camera_matrix, dist_coeffs, rvec, tvec, object_points):
     return image_points
 
 
-def get_video_writer(experiment, camera):
-    if not os.path.exists(DIR_OUTPUT):
-        os.mkdir(DIR_OUTPUT)
+def get_video_writer(camera, configs):
+    if not os.path.exists(configs['output']):
+        os.makedirs(configs['output'])
 
     fourcc = cv2.VideoWriter_fourcc(*'XVID')
     writer = cv2.VideoWriter(
         os.path.join(
-            DIR_OUTPUT,
-            f'visualizer_skeleton_video_{experiment}_{camera}.avi'
+            configs['output'],
+            f'visualizer_smplx_video_{camera}.avi'
         ),
         fourcc,
-        PARAM_OUTPUT_FPS,
-        PARAM_OUTPUT_SIZE
+        configs['fps'],
+        configs['size'],
     )
     
     return writer
@@ -190,10 +193,10 @@ def poses_3d_2_2d(poses_3d, params):
     poses_shape = list(poses_3d.shape)
     poses_shape[-1] = 2
     
-    mtx = params['mtx']
-    dist = params['dist']
-    rotation = params['rotation']
-    translation = params['translation']
+    mtx = np.array(params['mtx'], np.float64)
+    # dist = np.array(params['dist'], np.float64)
+    rotation = np.array(params['rotation'], np.float64)
+    translation = np.array(params['translation'], np.float64)
     poses_2d = project_3d_to_2d(
         mtx, None,
         rotation,
@@ -215,29 +218,37 @@ def get_corresponding_files(experiment):
 
 
 # TODO: Shorten
-def get_smplx_parameters(experiment, smplx_model, device):
-    files_smpl = get_corresponding_files(experiment)
+def get_smplx_parameters(smplx_model, device):
+    with open(configs['params_smplx'], 'rb') as handle:
+        params_smpl = yaml.safe_load(handle)
+
+    with open(configs['skeletons_norm'], 'rb') as handle:
+        params = yaml.safe_load(handle)
         
     poses_smpl_all = []
     verts_all = []
     faces_all = []
-    for file_smpl in files_smpl:
-        # Load SMPL data
-        path_smplx = os.path.join(DIR_SMPLX, file_smpl[0])
-        with open(path_smplx, 'rb') as handle:
-            smplx_params = pickle.load(handle)
-        
-        global_orient = torch.from_numpy(smplx_params['global_orient']).to(device)
-        jaw_pose = torch.from_numpy(smplx_params['jaw_pose']).to(device)
-        leye_pose = torch.from_numpy(smplx_params['leye_pose']).to(device)
-        reye_pose = torch.from_numpy(smplx_params['reye_pose']).to(device)
-        body = torch.from_numpy(smplx_params['body']).to(device)
-        left_hand_pose = torch.from_numpy(smplx_params['left_hand_pose']).to(device)
-        right_hand_pose = torch.from_numpy(smplx_params['right_hand_pose']).to(device)
-        betas = torch.from_numpy(smplx_params['betas']).to(device)
-        expression = torch.from_numpy(smplx_params['expression']).to(device)
-        translation_smplx = smplx_params['translation']
-        scale_smplx = smplx_params['scale']
+    for idx_person, person in enumerate(params_smpl):
+        global_orient = torch.from_numpy(
+            np.array(person['global_orient'], np.float32)).to(device)
+        jaw_pose = torch.from_numpy(
+            np.array(person['jaw_pose'], np.float32)).to(device)
+        leye_pose = torch.from_numpy(
+            np.array(person['leye_pose'], np.float32)).to(device)
+        reye_pose = torch.from_numpy(
+            np.array(person['reye_pose'], np.float32)).to(device)
+        body = torch.from_numpy(
+            np.array(person['body'], np.float32)).to(device)
+        left_hand_pose = torch.from_numpy(
+            np.array(person['left_hand_pose'], np.float32)).to(device)
+        right_hand_pose = torch.from_numpy(
+            np.array(person['right_hand_pose'], np.float32)).to(device)
+        betas = torch.from_numpy(
+            np.array(person['betas'], np.float32)).to(device)
+        expression = torch.from_numpy(
+            np.array(person['expression'], np.float32)).to(device)
+        translation_smplx = np.array(person['translation'], np.float32)
+        scale_smplx = np.array(person['scale'], np.float32)
 
         output = smplx_model(
             global_orient=global_orient,
@@ -255,14 +266,10 @@ def get_smplx_parameters(experiment, smplx_model, device):
         joints = output.joints.detach().cpu().numpy().squeeze()
         origin = np.copy(joints[0, 0])
         faces = smplx_model.faces
-
-        # Load alignment params
-        path_params = os.path.join(DIR_PARAMS, file_smpl[1])
-        with open(path_params, 'rb') as handle:
-            params = pickle.load(handle)
-        rotation = params['rotation']
-        scale = params['scale'] * scale_smplx
-        translation = params['translation']
+        
+        rotation = params[idx_person]['rotation']
+        scale = params[idx_person]['scale'] * scale_smplx
+        translation = params[idx_person]['translation']
 
         rotation_inverted = np.linalg.inv(rotation)
         
@@ -299,69 +306,58 @@ cam35 = 'azure_kinect3_5_calib_snap'
 
 # TODO: Too long
 if __name__ == "__main__":
-    cache = diskcache.Cache('../calibration/cache')
+    args = _get_arguments()
+    configs = _load_configs(args.config)
 
-    cameras = [
-        cam24,
-        cam15,
-        # cam14,
-        cam34,
-        cam35
-    ]
+    print(f"Config loaded: {configs}")
 
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
     model = smplx.create(
-        PATH_MODEL, model_type='smplx',
-        gender='neutral', use_face_contour=False,
+        configs['models_root'], model_type='smplx',
+        gender=configs['gender'], use_face_contour=False,
         num_betas=10, use_pca=False,
         num_expression_coeffs=10,
         ext='npz').to(device)
 
-    for file in os.listdir(DIR_STORE_ORG):
-        experiment = file.split('.')[-2].split('_')[-2]
+    poses_smpl_all, verts_all, faces_all = \
+        get_smplx_parameters(model, device)
 
-        file_path = os.path.join(DIR_STORE_ORG, file)
-        print(f"Visualizing {file_path}")
+    with open(configs['skeletons'], 'rb') as handle:
+        poses = np.array(yaml.safe_load(handle))
+
+    with open(configs['params'], 'rb') as handle:
+        params = yaml.safe_load(handle)
+
+    cameras = configs['images'].keys()
+    for idx_cam, camera in enumerate(tqdm(cameras)):
+        dir = configs['images'][camera]
+        img_rgb_paths = data_loader.list_rgb_images(dir)
         
-        with open(file_path, 'rb') as handle:
-            output = pickle.load(handle)
+        poses_2d = poses_3d_2_2d(
+            poses,
+            params[camera]).reshape(poses.shape[0], -1, 2)
+        poses_2d_smpl = poses_3d_2_2d(
+            poses_smpl_all,
+            params[camera]).reshape(poses.shape[0], -1, 2)
+        poses_2d_verts = poses_3d_2_2d(
+            verts_all,
+            params[camera]).reshape(poses.shape[0], -1, 2)
 
-        poses = output['points_3d'].reshape(-1, 2, 133, 3)
-        params = output['params']
+        writer = get_video_writer(camera, configs)
+        for idx, t in enumerate(poses_2d.reshape(poses_2d.shape[0], -1, 2)):
+            img_rgb = cv2.imread(img_rgb_paths[idx])
+            mtx, dist = get_parameters(params[camera])
+            img_rgb = cv2.undistort(img_rgb, mtx, dist, None, None)
+            if configs['visualize_skeleton']:
+                write_frame(img_rgb, poses_2d[idx],
+                            TYPE_ORG)
 
-        poses_smpl_all, verts_all, faces_all = get_smplx_parameters(experiment, model, device)
+            if configs['visualize_joints']:
+                write_frame(img_rgb, poses_2d_smpl[idx],
+                            TYPE_JTR)
 
-        for idx_cam, camera in enumerate(tqdm(cameras)):
-            dir = data_loader.EXPERIMENTS[experiment][camera]
-
-            img_rgb_paths = data_loader.list_rgb_images(
-                os.path.join(dir, "color"))
-            
-            poses_2d = poses_3d_2_2d(
-                poses,
-                params[idx_cam]).reshape(poses.shape[0], -1, 2)
-            poses_2d_smpl = poses_3d_2_2d(
-                poses_smpl_all,
-                params[idx_cam]).reshape(poses.shape[0], -1, 2)
-            poses_2d_verts = poses_3d_2_2d(
-                verts_all,
-                params[idx_cam]).reshape(poses.shape[0], -1, 2)
-
-            writer = get_video_writer(experiment, camera)
-            for idx, t in enumerate(poses_2d.reshape(poses_2d.shape[0], -1, 2)):
-                img_rgb = cv2.imread(img_rgb_paths[idx])
-                mtx, dist, _ = get_parameters(params[idx_cam])
-                img_rgb = cv2.undistort(img_rgb, mtx, dist, None, None)
-                # if VIS_ORG:
-                #     write_frame(img_rgb, poses_2d[idx],
-                #                 TYPE_ORG)
-
-                if VIS_JTR:
-                    write_frame(img_rgb, poses_2d_smpl[idx],
-                                TYPE_JTR)
-
-                if VIS_MESH:
-                    write_frame(img_rgb, poses_2d_verts[idx],
-                                TYPE_MESH)
-                    
-                writer.write(img_rgb)
+            if configs['visualize_mesh']:
+                write_frame(img_rgb, poses_2d_verts[idx],
+                            TYPE_MESH)
+                
+            writer.write(img_rgb)

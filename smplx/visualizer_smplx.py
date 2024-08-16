@@ -1,23 +1,40 @@
 import sys
 sys.path.append('../')
 
-import os
 import time
+import yaml
 import torch
 import smplx
-import pickle
+import argparse
 import numpy as np
 import open3d as o3d
 
-from tqdm import tqdm
 from utils import data_loader
 
 
-# DIR_POINTCLOUD = './pointcloud_normalized'
-DIR_OPTIMIZED = './params_smplx'
-PATH_MODEL = 'models'
+def _get_arguments():
+    parser = argparse.ArgumentParser()
+
+    parser.add_argument(
+        '-c', '--config',
+        help='Path to the config file',
+        type=str,
+        required=True,
+    )
+
+    args = parser.parse_args()
+
+    return args
 
 
+def _load_configs(path):
+    with open(path, 'r') as yaml_file:
+        configs = yaml.safe_load(yaml_file)
+
+    return configs
+
+
+# TODO: Shorten
 def visualize_poses(global_orient, jaw_pose, leye_pose,
                     reye_pose, body, left_hand_pose,
                     right_hand_pose, betas, expression,
@@ -54,8 +71,6 @@ def visualize_poses(global_orient, jaw_pose, leye_pose,
     verts = output.vertices.detach().cpu().numpy().squeeze()
     joints = output.joints.detach().cpu().numpy().squeeze()
 
-    print(verts.shape, joints.shape)
-
     verts = verts - joints[0, 0] + translation
     verts = verts * scale
     verts = verts.squeeze()
@@ -83,51 +98,49 @@ def visualize_poses(global_orient, jaw_pose, leye_pose,
             time.sleep(.01)
 
 
-def load_smplx(experiment, subject):
-    path = f'params_smplx_{experiment}_{subject}.pkl'
-    
-    # Load SMPL data
-    path_smplx = os.path.join(DIR_OPTIMIZED, path)
-    with open(path_smplx, 'rb') as handle:
-        smplx_params = pickle.load(handle)
-
-    global_orient = smplx_params['global_orient']
-    jaw_pose = smplx_params['jaw_pose']
-    leye_pose = smplx_params['leye_pose']
-    reye_pose = smplx_params['reye_pose']
-    body = smplx_params['body']
-    left_hand_pose = smplx_params['left_hand_pose']
-    right_hand_pose = smplx_params['right_hand_pose']
-    betas = smplx_params['betas']
-    expression = smplx_params['expression']
-    translation = smplx_params['translation']
-    scale = smplx_params['scale']
+def load_smplx_params(smplx_params):
+    global_orient = np.array(smplx_params['global_orient'], np.float32)
+    jaw_pose = np.array(smplx_params['jaw_pose'], np.float32)
+    leye_pose = np.array(smplx_params['leye_pose'], np.float32)
+    reye_pose = np.array(smplx_params['reye_pose'], np.float32)
+    body = np.array(smplx_params['body'], np.float32)
+    left_hand_pose = np.array(smplx_params['left_hand_pose'], np.float32)
+    right_hand_pose = np.array(smplx_params['right_hand_pose'], np.float32)
+    betas = np.array(smplx_params['betas'], np.float32)
+    expression = np.array(smplx_params['expression'], np.float32)
+    translation = np.array(smplx_params['translation'], np.float32)
+    scale = np.array(smplx_params['scale'], np.float32)
 
     return global_orient, jaw_pose, leye_pose, reye_pose, body, \
         left_hand_pose, right_hand_pose, betas, expression, \
         translation, scale
 
 
-SUBJECT = 0
-EXPERIMENT = 'a1'
-OPTIMIZED = False
-
 if __name__ == '__main__':
+    args = _get_arguments()
+    configs = _load_configs(args.config)
+
+    print(f"Config loaded: {configs}")
+
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
     model = smplx.create(
-        PATH_MODEL, model_type='smplx',
-        gender='neutral', use_face_contour=False,
+        configs['models_root'], model_type='smplx',
+        gender=configs['gender'], use_face_contour=False,
         num_betas=10, use_pca=False,
         num_expression_coeffs=10,
         ext='npz').to(device)
+    
+    with open(configs['params_smplx'], 'rb') as handle:
+        params_smpl = yaml.safe_load(handle)
 
-    global_orient, jaw_pose, leye_pose, reye_pose, body, \
-        left_hand_pose, right_hand_pose, betas, expression, \
-        translation, scale = \
-            load_smplx(EXPERIMENT, SUBJECT)
+    for person in params_smpl:
+        global_orient, jaw_pose, leye_pose, reye_pose, body, \
+            left_hand_pose, right_hand_pose, betas, expression, \
+            translation, scale = \
+                load_smplx_params(person)
 
-    visualize_poses(
-        global_orient, jaw_pose, leye_pose,
-        reye_pose,body,left_hand_pose,
-        right_hand_pose, betas, expression,
-        translation, scale, model.faces)
+        visualize_poses(
+            global_orient, jaw_pose, leye_pose,
+            reye_pose,body,left_hand_pose,
+            right_hand_pose, betas, expression,
+            translation, scale, model.faces)
