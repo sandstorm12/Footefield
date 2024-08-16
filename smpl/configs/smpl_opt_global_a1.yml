@@ -5,9 +5,13 @@ gender: "neutral"
 models_root: "models"
 visualize: False
 visualize_mesh: True
-learning_rate: .002
-epochs: 2000
-output: "artifacts/smpl_opt_alpha_a1.yml"
+visualize_chamfer_projection: False
+weight_chamfer: 1.0e-7
+weight_distance: 1.0
+learning_rate: 2.0e-3
+scale_mask: 8
+epochs: 200
+output: "artifacts/smpl_opt_global_a1.yml"
 images_mask:
   cam2_4: "/home/hamid/Documents/phd/footefield/data/AzureKinectRecord_0729/a1/azure_kinect2_4/mask"
   cam3_4: "/home/hamid/Documents/phd/footefield/data/AzureKinectRecord_0729/a1/azure_kinect3_4/mask"
