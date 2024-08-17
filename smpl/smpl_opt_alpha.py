@@ -14,12 +14,10 @@ from utils import data_loader
 from smplpytorch.pytorch.smpl_layer import SMPL_Layer
 
 
-PARAM_LR = 2e-3
-
 SMPL_SKELETON_MAP = np.array([ # (SMPL, SKELETON)
-    [0, 19, 1.],
-    [1, 11, 1.],
-    [2, 12, 1.],
+    [0, 19, .25],
+    [1, 11, .25],
+    [2, 12, .25],
     [4, 13, 1.],
     [5, 14, 1.],
     [6, 26, .25],
@@ -27,9 +25,9 @@ SMPL_SKELETON_MAP = np.array([ # (SMPL, SKELETON)
     [8, 16, 1.],
     [10, 27, .25],
     [11, 28, .25],
-    [12, 18, 1.],
-    [16, 5, 1.],
-    [17, 6, 1.],
+    [12, 18, .25],
+    [16, 5, .25],
+    [17, 6, .25],
     [15, 0, .25],
     [18, 7, 1.],
     [19, 8, 1.],
@@ -64,7 +62,9 @@ def calc_distance(joints, skeleton, skeleton_weights):
     skeleton_selected = skeleton[:, SMPL_SKELETON_MAP[:, 1]]
     output_selected = joints[:, SMPL_SKELETON_MAP[:, 0]]
 
-    loss = F.smooth_l1_loss(output_selected, skeleton_selected, reduction='none')
+    loss = F.mse_loss(
+        output_selected, skeleton_selected,
+        reduction='none')
     
     # Just for test, optimize
     loss = torch.mean(loss, dim=(0, 2))
@@ -134,6 +134,9 @@ def optimize(smpl_layer, skeletons, configs):
         joints = joints * scale + translation
 
         loss = calc_distance(joints, skeletons_torch, skeleton_weights)
+        loss_scale = configs['weight_scale'] * scale
+
+        loss = loss + loss_scale
 
         optimizer.zero_grad()
         loss.backward()
@@ -148,7 +151,7 @@ def optimize(smpl_layer, skeletons, configs):
             )
         )
 
-    print('Loss went from {:.4f} to {:.4f}'.format(loss_init, loss))
+    print('Loss went from {:.4f} to {:.4f}'.format(loss_init, loss.detach().cpu().item()))
 
     return alphas.detach().cpu().numpy(), \
         betas.detach().cpu().numpy(), \

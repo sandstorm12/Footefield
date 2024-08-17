@@ -6,12 +6,12 @@ gender: "neutral"
 models_root: "models"
 visualize_skeleton: True
 visualize_joints: True
-visualize_mesh: True
+visualize_mesh: False
 fps: 5
 size:
   - 1920
   - 1080
-output: "videos/visualizer_smpl/a1/"
+output: "videos/visualizer_smpl_alpha/a1/"
 images:
   cam2_4: "/home/hamid/Documents/phd/footefield/data/AzureKinectRecord_0729/a1/azure_kinect2_4/color"
   cam3_4: "/home/hamid/Documents/phd/footefield/data/AzureKinectRecord_0729/a1/azure_kinect3_4/color"

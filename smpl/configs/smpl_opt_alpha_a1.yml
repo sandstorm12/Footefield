@@ -1,6 +1,7 @@
 skeletons: "/home/hamid/Documents/phd/footefield/footefield/pose_estimation/artifacts/3d_skeletons_a1_ba_norm.yml"
 gender: "neutral"
 models_root: "models"
+weight_scale: 1.0e-3
 visualize: False
 visualize_mesh: True
 learning_rate: .002
