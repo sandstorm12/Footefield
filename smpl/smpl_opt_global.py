@@ -228,7 +228,7 @@ def optimize(smpl_layer, masks, skeletons, alphas, betas, scale, translation, pa
 
     masks_torch, params_torch = masks_params_torch(masks, params)
 
-    lr = 2e-3
+    lr = configs['learning_rate']
     optim_params = [
         {'params': alphas, 'lr': lr},
         {'params': betas, 'lr': lr},
