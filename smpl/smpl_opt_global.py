@@ -87,7 +87,9 @@ def calc_distance(joints, skeleton, skeleton_weights):
     skeleton_selected = skeleton[:, SMPL_SKELETON_MAP[:, 1]]
     output_selected = joints[:, SMPL_SKELETON_MAP[:, 0]]
 
-    loss = F.smooth_l1_loss(output_selected, skeleton_selected, reduction='none')
+    loss = F.mse_loss(
+        output_selected, skeleton_selected,
+        reduction='none')
     
     # Just for test, optimize
     loss = torch.mean(loss, dim=(0, 2))
