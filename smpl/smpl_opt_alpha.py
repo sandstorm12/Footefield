@@ -89,7 +89,7 @@ def init_torch_params(skeletons, device):
             dtype=torch.float32
         ) * .03).to(device)
     betas = (torch.rand(1, 10, dtype=torch.float32) * .03).to(device)
-    translation = torch.zeros(3, dtype=torch.float32).to(device)
+    translation = torch.zeros((skeletons.shape[0], 3), dtype=torch.float32).to(device)
     scale = torch.ones(1, dtype=torch.float32).to(device)
 
     batch_tensor = torch.ones((skeletons.shape[0], 1)).to(device)
@@ -131,7 +131,8 @@ def optimize(smpl_layer, skeletons, configs):
         _, joints = model(
             alphas,
             th_betas=betas * batch_tensor)
-        joints = joints * scale + translation
+
+        joints = joints * scale + translation.unsqueeze(1)
 
         loss = calc_distance(joints, skeletons_torch, skeleton_weights)
         loss_scale = configs['weight_scale'] * scale

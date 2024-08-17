@@ -246,8 +246,8 @@ def optimize(smpl_layer, masks, skeletons, alphas, betas, scale, translation, pa
             alphas,
             th_betas=betas * batch_tensor)
 
-        verts = verts * scale + translation
-        joints = joints * scale + translation
+        verts = verts * scale + translation.unsqueeze(1)
+        joints = joints * scale + translation.unsqueeze(1)
 
         loss_distance = calc_distance(joints, skeletons_torch, skeleton_weights)
         
