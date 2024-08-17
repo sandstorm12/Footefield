@@ -273,12 +273,12 @@ def get_smplx_parameters(smplx_model, device):
 
         rotation_inverted = np.linalg.inv(rotation)
         
-        joints = joints - origin + translation_smplx
+        joints = joints - origin + np.expand_dims(translation_smplx, axis=1)
         joints = joints.dot(rotation_inverted.T)
         joints = joints * scale
         joints = joints + translation
 
-        verts = verts - origin + translation_smplx
+        verts = verts - origin + np.expand_dims(translation_smplx, axis=1)
         verts = verts.dot(rotation_inverted.T)
         verts = verts * scale
         verts = verts + translation

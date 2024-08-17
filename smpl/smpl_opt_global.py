@@ -87,7 +87,9 @@ def calc_distance(joints, skeleton, skeleton_weights):
     skeleton_selected = skeleton[:, SMPL_SKELETON_MAP[:, 1]]
     output_selected = joints[:, SMPL_SKELETON_MAP[:, 0]]
 
-    loss = F.smooth_l1_loss(output_selected, skeleton_selected, reduction='none')
+    loss = F.mse_loss(
+        output_selected, skeleton_selected,
+        reduction='none')
     
     # Just for test, optimize
     loss = torch.mean(loss, dim=(0, 2))
@@ -226,7 +228,7 @@ def optimize(smpl_layer, masks, skeletons, alphas, betas, scale, translation, pa
 
     masks_torch, params_torch = masks_params_torch(masks, params)
 
-    lr = 2e-3
+    lr = configs['learning_rate']
     optim_params = [
         {'params': alphas, 'lr': lr},
         {'params': betas, 'lr': lr},
@@ -244,8 +246,8 @@ def optimize(smpl_layer, masks, skeletons, alphas, betas, scale, translation, pa
             alphas,
             th_betas=betas * batch_tensor)
 
-        verts = verts * scale + translation
-        joints = joints * scale + translation
+        verts = verts * scale + translation.unsqueeze(1)
+        joints = joints * scale + translation.unsqueeze(1)
 
         loss_distance = calc_distance(joints, skeletons_torch, skeleton_weights)
         

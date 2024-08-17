@@ -137,7 +137,9 @@ def calc_distance(joints, skeleton, skeleton_weights):
     skeleton_selected = skeleton[:, SMPLX_SKELETON_MAP[:, 1]]
     output_selected = joints[:, SMPLX_SKELETON_MAP[:, 0]]
 
-    loss = F.smooth_l1_loss(output_selected, skeleton_selected, reduction='none')
+    loss = F.mse_loss(
+        output_selected, skeleton_selected,
+        reduction='none')
     
     # Just for test, optimize
     loss = torch.mean(loss, dim=(0, 2))
@@ -160,7 +162,7 @@ def optimize_beta(smpl_layer, skeletons, configs):
     right_hand_pose = (torch.rand([skeletons.shape[0], 15, 3], dtype=torch.float32) * .1).to(device)
     betas = (torch.zeros([1, 10], dtype=torch.float32)).to(device)
     expression = (torch.rand([skeletons.shape[0], 10], dtype=torch.float32) * .1).to(device)
-    translation = torch.zeros(3).to(device)
+    translation = torch.zeros((skeletons.shape[0], 3)).to(device)
     scale = torch.ones([1]).to(device)
 
     batch_tensor = torch.ones((skeletons.shape[0], 1)).to(device)
@@ -212,15 +214,13 @@ def optimize_beta(smpl_layer, skeletons, configs):
             return_verts=True)
 
         joints = output.joints
-        joints = joints - joints[0, 0] + translation
+        joints = joints - joints[0, 0] + translation.unsqueeze(1)
         joints = joints * scale
 
         loss_distance = calc_distance(joints, skeletons_torch, skeleton_weights)
+        loss_scale = configs['weight_scale'] * scale
 
-        # loss_smooth = torch.nn.functional.mse_loss(joints[1:], joints[:-1])
-        # loss = loss_distance + loss_smooth * PARAM_COEFF_POSE
-
-        loss = loss_distance
+        loss = loss_distance + loss_scale
 
         optimizer.zero_grad()
         loss.backward()
@@ -234,7 +234,6 @@ def optimize_beta(smpl_layer, skeletons, configs):
             "L: {:.5f} D: {:.5f} Si:{:.2f}".format(
                 loss,
                 loss_distance,
-                # loss_smooth * PARAM_COEFF_POSE,
                 scale.item(),
             )
         )
@@ -346,7 +345,7 @@ if __name__ == '__main__':
         num_expression_coeffs=10,
         ext='npz')
     
-    with open(configs['skeletons'], 'rb') as handle:
+    with open(configs['skeletons_norm'], 'rb') as handle:
         bundles = yaml.safe_load(handle)
 
     params_smplx = []

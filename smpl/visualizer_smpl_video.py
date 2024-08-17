@@ -201,12 +201,12 @@ def get_smpl_parameters(configs):
 
         rotation_inverted = np.linalg.inv(rotation)
 
-        joints = (joints + translation_smpl) * scale_smpl
+        joints = (joints + np.expand_dims(translation_smpl, axis=1)) * scale_smpl
         joints = joints.dot(rotation_inverted.T)
         joints = joints * scale
         joints = joints + translation
 
-        verts = (verts + translation_smpl) * scale_smpl
+        verts = (verts + np.expand_dims(translation_smpl, axis=1)) * scale_smpl
         verts = verts.dot(rotation_inverted.T)
         verts = verts * scale
         verts = verts + translation

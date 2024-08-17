@@ -140,7 +140,8 @@ def calc_distance(joints, skeleton, skeleton_weights):
     skeleton_selected = skeleton[:, SMPLX_SKELETON_MAP[:, 1]]
     output_selected = joints[:, SMPLX_SKELETON_MAP[:, 0]]
 
-    loss = F.smooth_l1_loss(output_selected, skeleton_selected, reduction='none')
+    loss = F.mse_loss(
+        output_selected, skeleton_selected, reduction='none')
     
     # Just for test, optimize
     loss = torch.mean(loss, dim=(0, 2))
@@ -317,12 +318,12 @@ def calc_chamfer(verts, masks, params):
                     pcd_proj.squeeze().detach().cpu().numpy())
             distances = chamfer_distance(
                 pcd_proj, mask_torch,
-                single_directional=False, norm=2,
+                single_directional=True, norm=2,
                 point_reduction=None, batch_reduction=None)[0]
             loss_verts = torch.mean(distances[0])
-            loss_mask = torch.mean(
-                distances[1][distances[1] < torch.max(distances[0])])
-            loss += loss_verts + loss_mask
+            # loss_mask = torch.mean(
+            #     distances[1][distances[1] < torch.max(distances[0])])
+            loss += loss_verts # + loss_mask
 
     return loss
 
@@ -380,9 +381,9 @@ def optimize_beta(model, poses, masks, subject, params, params_smpl, configs):
         joints = output.joints
         verts = output.vertices
         
-        verts = verts - joints[0, 0] + translation
+        verts = verts - joints[0, 0] + translation.unsqueeze(1)
         verts = verts * scale
-        joints = joints - joints[0, 0] + translation
+        joints = joints - joints[0, 0] + translation.unsqueeze(1)
         joints = joints * scale
 
         loss_distance = calc_distance(joints, skeletons_torch, skeleton_weights)
@@ -511,7 +512,7 @@ def get_mask(cam, idx, params, configs):
     
     img_mask = cv2.imread(img_mask, -1)
     kernel = np.ones((5, 5), np.uint8)
-    img_mask = cv2.erode(img_mask, kernel, iterations=6)
+    img_mask = cv2.erode(img_mask, kernel, iterations=3)
 
     mtx = np.array(params[cam]['mtx'], np.float32)
     dist = np.array(params[cam]['dist'], np.float32)

@@ -159,9 +159,9 @@ if __name__ == '__main__':
                                 th_betas=betas * batch_tensor)
 
         verts = verts.detach().cpu().numpy().astype(float)
-        verts = (verts + translation) * scale
+        verts = (verts + np.expand_dims(translation, axis=1)) * scale
         joints = joints.detach().cpu().numpy().astype(float)
-        joints = (joints + translation) * scale
+        joints = (joints + np.expand_dims(translation, axis=1)) * scale
         faces = smpl_layer.th_faces.detach().cpu().numpy()
 
         poses_person = (np.array(poses[idx_person]['pose_normalized']))
