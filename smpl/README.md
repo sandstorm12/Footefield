@@ -27,6 +27,7 @@ For SMPL fitting:
 1. ~~Feature: Combine individually registered pointclouds in a full scene view~~
 1. Refactor: Add the point cloud scripts into the pipeline.
 1. Refactor: Add the mask extractor to this repo.
+1. Refactor: Add rotation optimization to the fitter.
 
 
 ## Known issues
