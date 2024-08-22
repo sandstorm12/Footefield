@@ -8,10 +8,11 @@ sys.path.append('../')
 import cv2
 import yaml
 import argparse
-from utils import data_loader
 
 from tqdm import tqdm
 from threading import Thread
+
+from utils import data_loader
 
 
 criteria = (cv2.TERM_CRITERIA_MAX_ITER | cv2.TERM_CRITERIA_EPS, 30, 0.001)
@@ -24,7 +25,7 @@ def _get_arguments():
         '-c', '--config',
         help='Path to the config file',
         type=str,
-        default='configs/detect_chessboard_rgb.yml',
+        required=True,
     )
 
     args = parser.parse_args()
@@ -39,31 +40,38 @@ def _load_configs(path):
     return configs
 
 
-def extract_chessboardcorners(image_paths, images_info, camera_name, display=False):
+def extract_chessboardcorners(path_video, images_info, camera_name, search_depth, display=False):
+    cap = cv2.VideoCapture(path_video)
+
+    if not images_info.__contains__(camera_name):
+        images_info[camera_name] = []
+
+    frame_count = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
+    search_depth = min(frame_count, search_depth)
+
     success_count = 0
 
-    bar = tqdm(image_paths)
+    bar = tqdm(range(search_depth))
     bar.set_description(camera_name)
-    for image_path in bar:
-        image_name = data_loader.image_name_from_fullpath(image_path)
-        image_name = f"{camera_name}/{image_name}"
-        
-        image = cv2.imread(image_path)
+    for frame_idx in bar:
+        _, image = cap.read()
         gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
 
         ret, corners = cv2.findChessboardCorners(
             gray, (data_loader.CHESSBOARD_COLS, data_loader.CHESSBOARD_ROWS),
             cv2.CALIB_CB_ADAPTIVE_THRESH + cv2.CALIB_CB_NORMALIZE_IMAGE)
+        
         if ret:
             corners = cv2.cornerSubPix(gray, corners, (3, 3), (-1, -1), criteria)
+            print(corners.shape)
             corners = corners.tolist()
         else:
             corners = []
 
-        images_info[image_name] = {
-            "fullpath_rgb": image_path,
-            "findchessboardcorners_rgb": [ret, corners],
-        }
+        
+        images_info[camera_name].append(
+            [ret, corners]
+        )
 
         if display:
             if not _display(image, corners):
@@ -73,7 +81,7 @@ def extract_chessboardcorners(image_paths, images_info, camera_name, display=Fal
             success_count += 1
 
     print(f"Found {success_count} chessboards from " +
-        f"{len(image_paths)} image for {camera_name}")
+        f"{search_depth} image for {camera_name}")
     
 
 def _display(image, corners):
@@ -86,7 +94,7 @@ def _display(image, corners):
             thickness=-1, lineType=8) 
 
     cv2.imshow("image", image)
-    key = cv2.waitKey(0)
+    key = cv2.waitKey(1)
     if key == ord('q'):
         return False
     
@@ -96,8 +104,9 @@ def _display(image, corners):
 def calculate_total_success_dets(images_info):
     total_success_counter = 0
     for key in images_info.keys():
-        if images_info[key]['findchessboardcorners_rgb'][0]:
-            total_success_counter += 1
+        for item in images_info[key]:
+            if item[0]:
+                total_success_counter += 1
     print(f"Grand num of found chessboards: {total_success_counter}")
 
 
@@ -111,11 +120,11 @@ def detect_chessboards(configs):
 
     processes = []
     for calib_info in configs['calibration_folders']:
-        calibration_images = data_loader.list_calibration_images(calib_info['path'])
         process = Thread(
             target=extract_chessboardcorners,
-            args=(calibration_images['data'][data_loader.TYPE_RGB],
-                  images_info, calib_info['camera_name'], configs['display']))
+            args=(calib_info['path'], images_info,
+                  calib_info['camera_name'], configs['search_depth'],
+                  configs['display'],))
         process.start()
         processes.append(process)
 

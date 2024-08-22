@@ -11,11 +11,11 @@ from utils import data_loader
 
 
 ORDER_VALID = (
-    'cam1_5/cam1_4',
-    'cam1_4/cam3_4',
-    'cam3_4/cam3_5',
-    'cam3_5/cam2_4',
-    'cam2_4/cam1_5',
+    'cam0/cam1',
+    'cam1/cam2',
+    'cam2/cam3',
+    'cam3/cam4',
+    'cam4/cam5',
 )
 
 STEREO_CALIBRATION_CRITERIA = (
@@ -30,7 +30,7 @@ def _get_arguments():
         '-c', '--config',
         help='Path to the config file',
         type=str,
-        default='configs/calc_extrinsic_rgb.yml',
+        required=True,
     )
 
     args = parser.parse_args()
@@ -77,23 +77,14 @@ def load_image_points(images_info, images):
 
 
 def find_matching_images(images_info, cam_1, cam_2):
-    matching_pairs = {}
-    for image in images_info.keys():
-        img_name = image.split("/")[1]
-        cam_1_img = f"{cam_1}/{img_name}"
-        cam_2_img = f"{cam_2}/{img_name}"
-        if images_info.__contains__(cam_1_img) \
-            and images_info.__contains__(cam_2_img):
-            points_found_1, _ = \
-                images_info[cam_1_img]['findchessboardcorners_rgb']
-            points_found_2, _ = \
-                images_info[cam_2_img]['findchessboardcorners_rgb']
-            if points_found_1 and points_found_2:
-                matching_pairs[img_name] = {
-                    "cam_1_img": cam_1_img,
-                    "cam_2_img": cam_2_img,
-                }
-            
+    search_depth = min(len(images_info[cam_1]), len(images_info[cam_2]))
+
+    matching_pairs = []
+    for frame_idx in range(search_depth):
+        if images_info[cam_1][frame_idx][0] \
+                and images_info[cam_2][frame_idx][0]:
+            matching_pairs.append(frame_idx)
+        
     return matching_pairs
 
 
@@ -107,10 +98,12 @@ def calc_extrinsics(cam_1, cam_2, obj_points, extrinsics, configs):
 
     print(f"Matching pairs: {len(matching_pairs)}")
 
-    img_points_1 = load_image_points(
-        images_info, images=[item['cam_1_img'] for item in matching_pairs.values()])
-    img_points_2 = load_image_points(
-        images_info, images=[item['cam_2_img'] for item in matching_pairs.values()])
+    img_points_1 = np.array(
+        [images_info[cam_1][frame_idx][1] for frame_idx in matching_pairs],
+        np.float32)
+    img_points_2 = np.array(
+        [images_info[cam_2][frame_idx][1] for frame_idx in matching_pairs],
+        np.float32)
 
     _, mtx_1, dist_1, mtx_2, dist_2, R, T, _, _ = cv2.stereoCalibrate(
         np.tile(obj_points, (len(img_points_1), 1, 1)),
@@ -142,10 +135,12 @@ def calc_reprojection_error(cam_1, cam_2, obj_points, extrinsics, configs):
 
     print(f"Matching pairs: {len(matching_pairs)}")
 
-    img_points_1 = load_image_points(
-        images_info, images=[item['cam_1_img'] for item in matching_pairs.values()])
-    img_points_2 = load_image_points(
-        images_info, images=[item['cam_2_img'] for item in matching_pairs.values()])
+    img_points_1 = np.array(
+        [images_info[cam_1][frame_idx][1] for frame_idx in matching_pairs],
+        np.float32)
+    img_points_2 = np.array(
+        [images_info[cam_2][frame_idx][1] for frame_idx in matching_pairs],
+        np.float32)
     
     mtx_1 = np.array(extrinsics[cam_1]['mtx_l'], dtype=np.float32)
     dist_1 = np.array(extrinsics[cam_1]['dist_l'], dtype=np.float32)
@@ -181,14 +176,8 @@ def calc_extrinsic(configs):
 
     extrinsics = {}
 
-    cameras = configs['cameras']
-    for cam1_idx in range(len(cameras)):
-        for cam2_idx in range(len(cameras)):
-            cam_1 = cameras[cam1_idx]
-            cam_2 = cameras[cam2_idx]
-
-            if f"{cam_1}/{cam_2}" not in ORDER_VALID:
-                continue
+    for cam_pair in tqdm(ORDER_VALID):
+            cam_1, cam_2 = cam_pair.split('/')
                     
             calc_extrinsics(cam_1, cam_2, obj_points, extrinsics, configs)
             calc_reprojection_error(cam_1, cam_2, obj_points, extrinsics, configs)

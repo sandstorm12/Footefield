@@ -21,7 +21,7 @@ def _get_arguments():
         '-c', '--config',
         help='Path to the config file',
         type=str,
-        default='configs/calc_intrinsic_rgb.yml',
+        required=True,
     )
 
     args = parser.parse_args()
@@ -44,18 +44,15 @@ def load_image_points(configs):
         print("No images in images_info. Please run detect_chessboard first.")
 
     cameras = {}
-    for key in images_info.keys():
-        camera = key.split("/")[0]
+    for camera in images_info.keys():
+        cameras[camera] = {'img_points': []}
 
-        if not cameras.__contains__(camera):
-            cameras[camera] = {'img_points': []}
-        camera_points = cameras[camera]
-
-        ret, corners = images_info[key]['findchessboardcorners_rgb']
-        if not ret:
-            continue
+        for instance in images_info[camera]:
+            ret, corners = instance
+            if not ret:
+                continue
         
-        camera_points['img_points'].append(corners)
+            cameras[camera]['img_points'].append(corners)
 
     return cameras
 
@@ -72,6 +69,8 @@ def calculate_intrinsics(cameras_info, configs):
     for key in tqdm(cameras_info.keys()):
         img_points = np.array(cameras_info[key]['img_points'],
                               dtype=np.float32)
+        
+        print("Image points: {}".format(img_points.shape))
 
         width = data_loader.IMAGE_RGB_WIDTH
         height = data_loader.IMAGE_RGB_HEIGHT

@@ -1,2 +1,2 @@
-chessboards: "/home/hamid/Documents/phd/footefield/footefield/calibration/artifacts/chessboards_rgb.yml"
+chessboards: "/home/hamid/Documents/phd/footefield/footefield_feature_video/calibration/artifacts/chessboards_rgb.yml"
 output_dir: "artifacts/intrinsic_rgb.yml"
