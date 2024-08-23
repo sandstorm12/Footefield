@@ -3,15 +3,21 @@ display: False
 search_depth: 900
 output_dir: 'artifacts/chessboards_rgb.yml'
 calibration_folders:
-    - camera_name: "cam0"
+    cam0:
       path: "/home/hamid/Documents/phd/footefield/data/mocapaug21/cam_0.mp4"
-    - camera_name: "cam1"
+      offset: 0
+    cam1:
       path: "/home/hamid/Documents/phd/footefield/data/mocapaug21/cam_1.mp4"
-    - camera_name: "cam2"
+      offset: 1
+    cam2: 
       path: "/home/hamid/Documents/phd/footefield/data/mocapaug21/cam_2.mp4"
-    - camera_name: "cam3"
+      offset: 1
+    cam3: 
       path: "/home/hamid/Documents/phd/footefield/data/mocapaug21/cam_3.mp4"
-    - camera_name: "cam4"
+      offset: 1
+    cam4: 
       path: "/home/hamid/Documents/phd/footefield/data/mocapaug21/cam_4.mp4"
-    - camera_name: "cam5"
+      offset: 1
+    cam5: 
       path: "/home/hamid/Documents/phd/footefield/data/mocapaug21/cam_5.mp4"
+      offset: 1
