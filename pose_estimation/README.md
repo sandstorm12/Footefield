@@ -72,6 +72,9 @@ Now you can fit the SMPL-X parameters using the scripts in the `smplx` folder.
 1. Refactor: Merge wholebody scripts with the normal ones
 1. Refactor: Separate global param calculation from the triangulation script
 1. Bug: Make the config path mandatory when the default path is not given
+1. Feautre: Make the skeleton detection multi-thread
+1. Feature: Make extrinsic finder independent of the number of cameras
+1. Bug: We need separate translation and rotation for each timestep of skeleton normalizer and then propagate the change forward
 
 
 ## Known issues

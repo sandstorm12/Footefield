@@ -11,7 +11,7 @@ def _get_arguments():
         '-c', '--config',
         help='Path to the config file',
         type=str,
-        default='configs/skeleton_3d_normalizer.yml',
+        required=True,
     )
 
     args = parser.parse_args()

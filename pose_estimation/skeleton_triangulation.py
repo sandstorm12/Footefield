@@ -51,38 +51,41 @@ def _get_extrinsics(configs):
 
 
 def _calc_extrinsics(cam, extrinsics):
-    R = np.array(extrinsics["cam2_4"]['rotation'], np.float32)
-    T = np.array(extrinsics["cam2_4"]['transition'], np.float32)
-    R2 = np.array(extrinsics["cam1_5"]['rotation'], np.float32)
-    T2 = np.array(extrinsics["cam1_5"]['transition'], np.float32)
-    R3 = np.array(extrinsics["cam1_4"]['rotation'], np.float32)
-    T3 = np.array(extrinsics["cam1_4"]['transition'], np.float32)
-    R4 = np.array(extrinsics["cam3_4"]['rotation'], np.float32)
-    T4 = np.array(extrinsics["cam3_4"]['transition'], np.float32)
+    R = np.array(extrinsics["cam5"]['rotation'], np.float32)
+    T = np.array(extrinsics["cam5"]['transition'], np.float32)
+    R2 = np.array(extrinsics["cam4"]['rotation'], np.float32)
+    T2 = np.array(extrinsics["cam4"]['transition'], np.float32)
+    R3 = np.array(extrinsics["cam3"]['rotation'], np.float32)
+    T3 = np.array(extrinsics["cam3"]['transition'], np.float32)
+    R4 = np.array(extrinsics["cam2"]['rotation'], np.float32)
+    T4 = np.array(extrinsics["cam2"]['transition'], np.float32)
+    R5 = np.array(extrinsics["cam1"]['rotation'], np.float32)
+    T5 = np.array(extrinsics["cam1"]['transition'], np.float32)
 
-    if cam == "cam2_4":
+    # I don't like this
+    if cam == "cam5":
         r = np.array([[1, 0, 0],
                      [0, 1, 0],
                      [0, 0, 1]])
         t = np.array([0, 0, 0])
         R_global = r
         T_global = t.reshape(3)
-    elif cam == "cam1_5":
+    elif cam == "cam4":
         R_global = R
         T_global = T.reshape(3)
-    elif cam == "cam1_4":
+    elif cam == "cam3":
         R2_com = np.dot(R2, R)
         T2_com = (np.dot(R2, T).reshape(3, 1) + T2).reshape(3,)
         R_global = R2_com
         T_global = T2_com
-    elif cam == "cam3_4":
+    elif cam == "cam2":
         R2_com = np.dot(R2, R)
         T2_com = (np.dot(R2, T).reshape(3, 1) + T2).reshape(3,)
         R3_com = np.dot(R3, R2_com)
         T3_com = (np.dot(R3, T2_com).reshape(3, 1) + T3).reshape(3,)
         R_global = R3_com
         T_global = T3_com
-    elif cam == "cam3_5":
+    elif cam == "cam1":
         R2_com = np.dot(R2, R)
         T2_com = (np.dot(R2, T).reshape(3, 1) + T2).reshape(3,)
         R3_com = np.dot(R3, R2_com)
@@ -91,6 +94,17 @@ def _calc_extrinsics(cam, extrinsics):
         T4_com = (np.dot(R4, T3_com).reshape(3, 1) + T4).reshape(3,)
         R_global = R4_com
         T_global = T4_com
+    elif cam == "cam0":
+        R2_com = np.dot(R2, R)
+        T2_com = (np.dot(R2, T).reshape(3, 1) + T2).reshape(3,)
+        R3_com = np.dot(R3, R2_com)
+        T3_com = (np.dot(R3, T2_com).reshape(3, 1) + T3).reshape(3,)
+        R4_com = np.dot(R4, R3_com)
+        T4_com = (np.dot(R4, T3_com).reshape(3, 1) + T4).reshape(3,)
+        R5_com = np.dot(R5, R4_com)
+        T5_com = (np.dot(R5, T4_com).reshape(3, 1) + T5).reshape(3,)
+        R_global = R5_com
+        T_global = T5_com
 
     return R_global.tolist(), T_global.tolist()
 
@@ -131,10 +145,14 @@ def calc_3d_skeleton(poses, params, configs):
                         params[camera]['translation'], np.float32)
                     parameters.append(cam_mtx @ extrinsics)
 
-            points_2d = np.expand_dims(np.array(points_2d), 1)
-            parameters = np.array(parameters)
-            points_3d_single = pycalib.triangulate_Npts(
-                pt2d_CxPx2=points_2d, P_Cx3x4=parameters)
+            if len(points_2d) > 0:
+                points_2d = np.expand_dims(np.array(points_2d), 1)
+                
+                parameters = np.array(parameters)
+                points_3d_single = pycalib.triangulate_Npts(
+                    pt2d_CxPx2=points_2d, P_Cx3x4=parameters)
+            else:
+                points_3d_single = np.zeros((1, 3))
             
             points_3d_timestep.append(points_3d_single)
         points_3d.append(points_3d_timestep)

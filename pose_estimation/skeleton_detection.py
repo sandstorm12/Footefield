@@ -18,7 +18,7 @@ def _get_arguments():
         '-c', '--config',
         help='Path to the config file',
         type=str,
-        default='configs/skeleton_detection.yml',
+        required=True,
     )
 
     args = parser.parse_args()
@@ -33,7 +33,7 @@ def _load_configs(path):
     return configs
 
 
-def filter_sort(people_keypoints, num_select=2, invert=False):
+def filter_sort(people_keypoints, num_select=2):
     heights = []
     for person in people_keypoints:
         person = np.array(person['keypoints'])
@@ -53,36 +53,34 @@ def filter_sort(people_keypoints, num_select=2, invert=False):
         horizontal_position.append(person[0][0])
 
     indecies = np.argsort(horizontal_position)[::-1]
-    if invert:
-        indecies = indecies[::-1]
     people_keypoints = [people_keypoints[indecies[idx]]
                         for idx in range(num_select)]
 
     return people_keypoints
 
 
-def _get_skeleton(image, inferencer, max_people, invert, configs):
+def _get_skeleton(image, inferencer, max_people, configs):
     result_generator = inferencer(image)
     
     detected_keypoints = []
     detected_confidences = []
     for result in result_generator:
         poeple_keypoints = filter_sort(result['predictions'][0],
-                                       num_select=max_people,
-                                       invert=invert)
+                                       num_select=max_people)
         for predictions in poeple_keypoints:
             keypoints = predictions['keypoints']
             # Divided by 10 to normalize between 0 and 1
             # TODO: Clear the mess here
             confidences = (np.array(predictions['keypoint_scores']) \
                            / configs['confidence_coeff']).tolist()
+            
             detected_keypoints.append(keypoints)
             detected_confidences.append(confidences)
 
     return detected_keypoints, detected_confidences
 
 
-def extract_poses(dir, camera, model, intrinsics, max_people, invert,
+def extract_poses(dir, camera, model, intrinsics, max_people,
                   configs):
     mtx = np.array(intrinsics[camera]['mtx'], np.float32)
     dist = np.array(intrinsics[camera]['dist'], np.float32)
@@ -90,14 +88,22 @@ def extract_poses(dir, camera, model, intrinsics, max_people, invert,
     poses = []
     poses_confidence = []
 
-    img_rgb_paths = data_loader.list_rgb_images(dir)
-    for idx in tqdm(range(len(img_rgb_paths[:configs['experiment_length']]))):
-        img_rgb = cv2.imread(img_rgb_paths[idx])
+    cap = cv2.VideoCapture(dir)
+    for _ in range(configs['calibration_folders'][camera]['offset']):
+        cap.grab()
+
+    frame_count = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
+    search_depth = min(frame_count, configs['experiment_length'])
+
+    bar = tqdm(range(search_depth))
+    bar.set_description(camera)
+    for idx in bar:
+        _, img_rgb = cap.read()
 
         img_rgb = cv2.undistort(img_rgb, mtx, dist, None, None)
 
         people_keypoints, confidences = _get_skeleton(
-            img_rgb, model, max_people, invert, configs)
+            img_rgb, model, max_people, configs)
         if configs['visualize']:
             visualize_keypoints(img_rgb, people_keypoints, confidences)
 
@@ -135,13 +141,12 @@ def calc_2d_skeleton(cameras, model_2d, configs):
         intrinsics = yaml.safe_load(handler)
 
     keypoints = {}
-    for idx_cam, camera in enumerate(cameras):
-        dir = configs['calibration_folders'][idx_cam]['path']
+    for _, camera in enumerate(cameras):
+        dir = configs['calibration_folders'][camera]['path']
 
-        max_people = 1 if camera == "cam1_4" else 2
-        invert = True if camera == "cam3_4" or camera == "cam3_5" else False
+        max_people=1
         pose, pose_confidence = extract_poses(
-            dir, camera, model_2d, intrinsics, max_people, invert, configs)
+            dir, camera, model_2d, intrinsics, max_people, configs)
         
         keypoints[camera] = {
             'pose': pose,
@@ -158,7 +163,7 @@ if __name__ == "__main__":
     print(f"Config loaded: {configs}")
 
     model_2d = MMPoseInferencer(configs["model"])
-    cameras = [item['camera_name'] for item in configs["calibration_folders"]]
+    cameras = configs["calibration_folders"].keys()
         
     keypoints = calc_2d_skeleton(cameras, model_2d, configs)
     

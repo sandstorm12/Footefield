@@ -25,7 +25,6 @@ def _get_arguments():
         '-c', '--config',
         help='Path to the config file',
         type=str,
-        default='configs/visualizer_skeleton_triangulation_a1.yml',
     )
 
     args = parser.parse_args()
@@ -90,6 +89,7 @@ if __name__ == "__main__":
     with open(file_path) as handler:
         poses = yaml.safe_load(handler)
 
-    poses = np.array(poses, np.float32)
+    poses = np.array(poses, np.float32)[200:]
+    print(poses.shape)
 
     visualize_poses(poses.reshape(poses.shape[0], -1, 3))

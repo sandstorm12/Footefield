@@ -18,7 +18,6 @@ def _get_arguments():
         '-c', '--config',
         help='Path to the config file',
         type=str,
-        default='configs/visualizer_skeleton_2d_video.yml',
     )
 
     args = parser.parse_args()
@@ -48,9 +47,9 @@ def get_video_writer(camera, dir, fps, size):
     return writer
 
 
-def write_video(poses, camera, intrinsics, configs):
-    dir = configs['calibration_folders'][camera]
-    img_rgb_paths = data_loader.list_rgb_images(dir)
+def write_video(poses, camera, idx_cam, intrinsics, configs):
+    dir = configs['calibration_folders'][idx_cam]['path']
+    cap = cv2.VideoCapture(dir)
 
     if not os.path.exists(configs['output_dir']):
         os.makedirs(configs['output_dir'])
@@ -59,8 +58,8 @@ def write_video(poses, camera, intrinsics, configs):
     dist = np.array(intrinsics[camera]['dist'], np.float32)
 
     writer = get_video_writer(camera, configs['output_dir'], configs['fps'], configs['size'])
-    for idx, t in enumerate(poses.reshape(poses.shape[0], -1, 2)):
-        img_rgb = cv2.imread(img_rgb_paths[idx])
+    for _, t in enumerate(tqdm(poses.reshape(poses.shape[0], -1, 2))):
+        _, img_rgb = cap.read()
 
         img_rgb = cv2.undistort(img_rgb, mtx, dist, None, None)
         for point in t:
@@ -96,4 +95,5 @@ if __name__ == "__main__":
         
         poses_cam = np.array(poses[camera]['pose'])
 
-        write_video(poses_cam, camera, intrinsics, configs)
+        # Remove camname or camidx
+        write_video(poses_cam, camera, idx_cam, intrinsics, configs)

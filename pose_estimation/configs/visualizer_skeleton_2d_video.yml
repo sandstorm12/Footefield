@@ -1,13 +1,20 @@
 skeletons: "artifacts/detected_skeletons_a1.yml"
-intrinsics: "/home/hamid/Documents/phd/footefield/footefield/calibration/artifacts/intrinsic_rgb.yml"
+intrinsics: "../calibration/artifacts/intrinsic_rgb.yml"
 output_dir: "videos/visualizer_skeleton_2d/a1/"
 fps: 5
 size:
   - 1920
   - 1080
 calibration_folders:
-  cam2_4: "/home/hamid/Documents/phd/footefield/data/AzureKinectRecord_0729/a1/azure_kinect2_4/color"
-  cam3_4: "/home/hamid/Documents/phd/footefield/data/AzureKinectRecord_0729/a1/azure_kinect3_4/color"
-  cam3_5: "/home/hamid/Documents/phd/footefield/data/AzureKinectRecord_0729/a1/azure_kinect3_5/color"
-  cam1_4: "/home/hamid/Documents/phd/footefield/data/AzureKinectRecord_0729/a1/azure_kinect1_4/color"
-  cam1_5: "/home/hamid/Documents/phd/footefield/data/AzureKinectRecord_0729/a1/azure_kinect1_5/color"
+    - camera_name: "cam0"
+      path: "/home/hamid/Documents/phd/footefield/data/mocapaug21/cam_0.mp4"
+    - camera_name: "cam1"
+      path: "/home/hamid/Documents/phd/footefield/data/mocapaug21/cam_1.mp4"
+    - camera_name: "cam2"
+      path: "/home/hamid/Documents/phd/footefield/data/mocapaug21/cam_2.mp4"
+    - camera_name: "cam3"
+      path: "/home/hamid/Documents/phd/footefield/data/mocapaug21/cam_3.mp4"
+    - camera_name: "cam4"
+      path: "/home/hamid/Documents/phd/footefield/data/mocapaug21/cam_4.mp4"
+    - camera_name: "cam5"
+      path: "/home/hamid/Documents/phd/footefield/data/mocapaug21/cam_5.mp4"

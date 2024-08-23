@@ -232,9 +232,9 @@ def _format_points(poses_3d, poses_2d, params_org):
             
             for idx_cam, camera in enumerate(params_org.keys()):
                 points_2d_cam_time = np.array(
-                    poses_2d[camera]['pose'][timestep]).reshape(-1, 2)
+                    poses_2d[camera]['pose'][timestep+300]).reshape(-1, 2)
                 points_2d_cam_time_conf = np.array(
-                    poses_2d[camera]['pose_confidence'][timestep]).reshape(-1)
+                    poses_2d[camera]['pose_confidence'][timestep+300]).reshape(-1)
                 if point_idx_scene < len(points_2d_cam_time) \
                         and points_2d_cam_time_conf[point_idx_scene] \
                             > configs['conf_threshold']:
@@ -264,6 +264,10 @@ if __name__ == '__main__':
     print(f"Config loaded: {configs}")
 
     poses_2d, poses_3d, params_org = _load_inputs(configs)
+
+    poses_3d = poses_3d[300:600]
+    # poses_2d = poses_2d[300:600]
+    print(poses_3d.shape)
 
     n_cameras = len(list(params_org.keys()))
     n_points = poses_3d.reshape(-1, 3).shape[0]

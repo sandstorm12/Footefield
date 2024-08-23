@@ -1,17 +1,25 @@
 model: "rtmpose-x_8xb256-700e_body8-halpe26-384x288"
 output: "artifacts/detected_skeletons_a1.yml"
-intrinsics: "/home/hamid/Documents/phd/footefield/footefield/calibration/artifacts/intrinsic_rgb.yml"
+intrinsics: "/home/hamid/Documents/phd/footefield/footefield_feature_video/calibration/artifacts/intrinsic_rgb.yml"
 visualize: False
 confidence_coeff: 1
-experiment_length: 100
+experiment_length: 1000
 calibration_folders:
-    - camera_name: "cam2_4"
-      path: "/home/hamid/Documents/phd/footefield/data/AzureKinectRecord_0729/a1/azure_kinect2_4/color"
-    - camera_name: "cam3_4"
-      path: "/home/hamid/Documents/phd/footefield/data/AzureKinectRecord_0729/a1/azure_kinect3_4/color"
-    - camera_name: "cam3_5"
-      path: "/home/hamid/Documents/phd/footefield/data/AzureKinectRecord_0729/a1/azure_kinect3_5/color"
-    - camera_name: "cam1_4"
-      path: "/home/hamid/Documents/phd/footefield/data/AzureKinectRecord_0729/a1/azure_kinect1_4/color"
-    - camera_name: "cam1_5"
-      path: "/home/hamid/Documents/phd/footefield/data/AzureKinectRecord_0729/a1/azure_kinect1_5/color"
+    cam0:
+      path: "/home/hamid/Documents/phd/footefield/data/mocapaug21/cam_0.mp4"
+      offset: 0
+    cam1:
+      path: "/home/hamid/Documents/phd/footefield/data/mocapaug21/cam_1.mp4"
+      offset: 1
+    cam2: 
+      path: "/home/hamid/Documents/phd/footefield/data/mocapaug21/cam_2.mp4"
+      offset: 1
+    cam3: 
+      path: "/home/hamid/Documents/phd/footefield/data/mocapaug21/cam_3.mp4"
+      offset: 1
+    cam4: 
+      path: "/home/hamid/Documents/phd/footefield/data/mocapaug21/cam_4.mp4"
+      offset: 1
+    cam5: 
+      path: "/home/hamid/Documents/phd/footefield/data/mocapaug21/cam_5.mp4"
+      offset: 1

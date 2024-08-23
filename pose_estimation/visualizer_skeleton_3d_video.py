@@ -63,23 +63,25 @@ def get_video_writer(camera, configs):
 
 
 def write_video(poses_2d, camera, params, configs):
-    img_rgb_paths = data_loader.list_rgb_images(dir)
+    dir = configs['calibration_folders'][camera]['path']
+    cap = cv2.VideoCapture(dir)
+    offset = configs['calibration_folders'][camera]['offset']
+    for _ in range(offset):
+        cap.grab()
 
     mtx = np.array(params['mtx'], np.float32)
     dist = np.array(params['dist'], np.float32)
 
     writer = get_video_writer(camera, configs)
-    for idx, t in enumerate(poses_2d.reshape(poses_2d.shape[0], -1, 2)):
-        img_rgb = cv2.imread(img_rgb_paths[idx])
+    for _, t in enumerate(tqdm(poses_2d.reshape(poses_2d.shape[0], -1, 2))):
+        _, img_rgb = cap.read()
 
         img_rgb = cv2.undistort(img_rgb, mtx, dist, None, None)
         for point in t:
             cv2.circle(img_rgb, (int(point[0]), int(point[1])),
                        3, (0, 255, 0), -1)
 
-        connections = np.concatenate(
-            (np.array(data_loader.HALPE_EDGES),
-             np.array(data_loader.HALPE_EDGES) + 26))
+        connections = np.array(data_loader.HALPE_EDGES)
         for connection in connections:
             cv2.line(img_rgb,
                     (int(t[connection[0]][0]), int(t[connection[0]][1])),
@@ -121,6 +123,9 @@ if __name__ == "__main__":
         params = yaml.safe_load(handler)
 
     poses = np.array(poses)
+
+    print(poses.shape)
+
     cameras = list(configs['calibration_folders'].keys())
     for idx_cam, camera in enumerate(tqdm(cameras)):
         dir = configs['calibration_folders'][camera]

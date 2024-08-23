@@ -1,6 +1,6 @@
-skeletons: "artifacts/detected_skeletons_a1_smooth.yml"
-intrinsics: "/home/hamid/Documents/phd/footefield/footefield/calibration/artifacts/intrinsic_rgb.yml"
-extrinsics: "/home/hamid/Documents/phd/footefield/footefield/calibration/artifacts/extrinsic_rgb.yml"
-threshold: .6
+skeletons: "artifacts/detected_skeletons_a1.yml"
+intrinsics: "../calibration/artifacts/intrinsic_rgb.yml"
+extrinsics: "../calibration/artifacts/extrinsic_rgb.yml"
+threshold: .5
 output: "artifacts/3d_skeletons_a1.yml"
 output_params: "artifacts/params_global_a1.yml"
