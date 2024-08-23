@@ -11,11 +11,11 @@ from utils import data_loader
 
 
 ORDER_VALID = (
-    'cam0/cam1',
-    'cam1/cam2',
-    'cam2/cam3',
-    'cam3/cam4',
-    'cam4/cam5',
+    'cam5/cam4',
+    'cam4/cam3',
+    'cam3/cam2',
+    'cam2/cam1',
+    'cam1/cam0',
 )
 
 STEREO_CALIBRATION_CRITERIA = (
@@ -88,13 +88,13 @@ def find_matching_images(images_info, cam_1, cam_2):
     return matching_pairs
 
 
-def calc_extrinsics(cam_1, cam_2, obj_points, extrinsics, configs):
+def calc_extrinsics(cam_1, cam_2, obj_points, intrinsics, extrinsics, configs):
     print(f"Calibrating... {cam_1} vs {cam_2}")
 
     with open(configs['chessboards']) as handler:
         images_info = yaml.safe_load(handler)
 
-    matching_pairs = find_matching_images(images_info, cam_1, cam_2)
+    matching_pairs = find_matching_images(images_info, cam_1, cam_2)[:60]
 
     print(f"Matching pairs: {len(matching_pairs)}")
 
@@ -104,14 +104,19 @@ def calc_extrinsics(cam_1, cam_2, obj_points, extrinsics, configs):
     img_points_2 = np.array(
         [images_info[cam_2][frame_idx][1] for frame_idx in matching_pairs],
         np.float32)
+    
+    mtx_1 = np.array(intrinsics[cam_1]['mtx'], np.float32)
+    dist_1 = np.array(intrinsics[cam_1]['dist'], np.float32)
+    mtx_2 = np.array(intrinsics[cam_2]['mtx'], np.float32)
+    dist_2 = np.array(intrinsics[cam_2]['dist'], np.float32)
 
-    _, mtx_1, dist_1, mtx_2, dist_2, R, T, _, _ = cv2.stereoCalibrate(
+    _, _, _, _, _, R, T, _, _ = cv2.stereoCalibrate(
         np.tile(obj_points, (len(img_points_1), 1, 1)),
         img_points_1, img_points_2,
-        None, None, None, None,
+        mtx_1, dist_1, mtx_2, dist_2,
         (data_loader.IMAGE_RGB_WIDTH,
          data_loader.IMAGE_RGB_HEIGHT),
-        criteria=STEREO_CALIBRATION_CRITERIA, flags=0)
+        criteria=STEREO_CALIBRATION_CRITERIA, flags=cv2.CALIB_FIX_INTRINSIC)
 
     extrinsics[cam_1] = {
         'left_cam': cam_1,
@@ -131,7 +136,7 @@ def calc_reprojection_error(cam_1, cam_2, obj_points, extrinsics, configs):
     with open(configs['chessboards']) as handler:
         images_info = yaml.safe_load(handler)
 
-    matching_pairs = find_matching_images(images_info, cam_1, cam_2)
+    matching_pairs = find_matching_images(images_info, cam_1, cam_2)[:60]
 
     print(f"Matching pairs: {len(matching_pairs)}")
 
@@ -174,13 +179,16 @@ def calc_reprojection_error(cam_1, cam_2, obj_points, extrinsics, configs):
 def calc_extrinsic(configs):
     obj_points = get_obj_points()
 
+    with open(configs['intrinsics']) as handler:
+        intrinsics = yaml.safe_load(handler)
+
     extrinsics = {}
 
     for cam_pair in tqdm(ORDER_VALID):
-            cam_1, cam_2 = cam_pair.split('/')
-                    
-            calc_extrinsics(cam_1, cam_2, obj_points, extrinsics, configs)
-            calc_reprojection_error(cam_1, cam_2, obj_points, extrinsics, configs)
+        cam_1, cam_2 = cam_pair.split('/')
+                
+        calc_extrinsics(cam_1, cam_2, obj_points, intrinsics, extrinsics, configs)
+        calc_reprojection_error(cam_1, cam_2, obj_points, extrinsics, configs)
 
     _store_artifacts(extrinsics, configs)
 

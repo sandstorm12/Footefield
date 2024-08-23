@@ -1,5 +1,6 @@
-chessboards: "/home/hamid/Documents/phd/footefield/footefield_feature_video/calibration/artifacts/chessboards_rgb.yml"
-output_dir: "artifacts/extrinsic_rgb.yml"
+chessboards: "./artifacts/chessboards_rgb.yml"
+intrinsics: "./artifacts/intrinsic_rgb.yml"
+output_dir: "./artifacts/extrinsic_rgb.yml"
 cameras:
   - "cam0"
   - "cam1"
