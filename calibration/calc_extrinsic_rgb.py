@@ -94,7 +94,7 @@ def calc_extrinsics(cam_1, cam_2, obj_points, intrinsics, extrinsics, configs):
     with open(configs['chessboards']) as handler:
         images_info = yaml.safe_load(handler)
 
-    matching_pairs = find_matching_images(images_info, cam_1, cam_2)[:60]
+    matching_pairs = find_matching_images(images_info, cam_1, cam_2)
 
     print(f"Matching pairs: {len(matching_pairs)}")
 
@@ -136,7 +136,7 @@ def calc_reprojection_error(cam_1, cam_2, obj_points, extrinsics, configs):
     with open(configs['chessboards']) as handler:
         images_info = yaml.safe_load(handler)
 
-    matching_pairs = find_matching_images(images_info, cam_1, cam_2)[:60]
+    matching_pairs = find_matching_images(images_info, cam_1, cam_2)
 
     print(f"Matching pairs: {len(matching_pairs)}")
 

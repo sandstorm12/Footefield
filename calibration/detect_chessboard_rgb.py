@@ -40,17 +40,16 @@ def _load_configs(path):
     return configs
 
 
-def extract_chessboardcorners(path_video, images_info, camera_name, search_depth, offset,
-                              display=False):
+def extract_chessboardcorners(path_video, images_info, camera_name, configs):
     cap = cv2.VideoCapture(path_video)
-    for _ in range(offset):
+    for _ in range(configs['calibration_folders'][camera_name]['offset'] + configs['start_depth']):
         cap.grab()
 
     if not images_info.__contains__(camera_name):
         images_info[camera_name] = []
 
     frame_count = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
-    search_depth = min(frame_count, search_depth)
+    search_depth = min(frame_count - configs['start_depth'], configs['search_depth'])
 
     success_count = 0
 
@@ -75,7 +74,7 @@ def extract_chessboardcorners(path_video, images_info, camera_name, search_depth
             [ret, corners]
         )
 
-        if display:
+        if configs['display']:
             if not _display(image, corners):
                 break
 
@@ -125,8 +124,7 @@ def detect_chessboards(configs):
         process = Thread(
             target=extract_chessboardcorners,
             args=(configs['calibration_folders'][camera]['path'], images_info,
-                  camera, configs['search_depth'],
-                  configs['calibration_folders'][camera]['offset'], configs['display']))
+                  camera, configs))
         process.start()
         processes.append(process)
 
