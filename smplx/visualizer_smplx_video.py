@@ -144,13 +144,9 @@ def get_video_writer(camera, configs):
 # TODO: Make types constant
 def get_connections_by_type(type):
     if type == TYPE_ORG:
-        connections = np.concatenate(
-            (np.array(HALPE_LINES),
-             np.array(HALPE_LINES) + 133))
+        connections = np.array(HALPE_LINES)
     elif type == TYPE_JTR:
-        connections = np.concatenate(
-            (np.array(JOINTS_SMPLX),
-             np.array(JOINTS_SMPLX) + 127))
+        connections = np.array(JOINTS_SMPLX)
     elif type == TYPE_MESH:
         connections = None
     else:
@@ -272,16 +268,19 @@ def get_smplx_parameters(smplx_model, device):
         translation = params[idx_person]['translation']
 
         rotation_inverted = np.linalg.inv(rotation)
+        rotation_inverted = np.transpose(rotation_inverted, (0, 2, 1))
         
         joints = joints - origin + np.expand_dims(translation_smplx, axis=1)
-        joints = joints.dot(rotation_inverted.T)
+        joints = np.array([joints[idx_time].dot(rotation_inverted[idx_time])
+                           for idx_time in range(len(rotation_inverted))])
         joints = joints * scale
-        joints = joints + translation
+        joints = joints + np.expand_dims(translation, axis=1)
 
         verts = verts - origin + np.expand_dims(translation_smplx, axis=1)
-        verts = verts.dot(rotation_inverted.T)
+        verts = np.array([verts[idx_time].dot(rotation_inverted[idx_time])
+                          for idx_time in range(len(rotation_inverted))])
         verts = verts * scale
-        verts = verts + translation
+        verts = verts + np.expand_dims(translation, axis=1)
 
         poses_smpl_all.append(joints)
         verts_all.append(verts)
@@ -296,13 +295,6 @@ def get_smplx_parameters(smplx_model, device):
 
     return poses_smpl_all, verts_all, faces_all
 
-
-# TODO: Move the cameras somewhere else
-cam24 = 'azure_kinect2_4_calib_snap'
-cam15 = 'azure_kinect1_5_calib_snap'
-cam14 = 'azure_kinect1_4_calib_snap'
-cam34 = 'azure_kinect3_4_calib_snap'
-cam35 = 'azure_kinect3_5_calib_snap'
 
 # TODO: Too long
 if __name__ == "__main__":
@@ -328,10 +320,9 @@ if __name__ == "__main__":
     with open(configs['params'], 'rb') as handle:
         params = yaml.safe_load(handle)
 
-    cameras = configs['images'].keys()
+    cameras = configs['calibration_folders'].keys()
     for idx_cam, camera in enumerate(tqdm(cameras)):
-        dir = configs['images'][camera]
-        img_rgb_paths = data_loader.list_rgb_images(dir)
+        dir = configs['calibration_folders'][camera]['path']
         
         poses_2d = poses_3d_2_2d(
             poses,
@@ -343,9 +334,11 @@ if __name__ == "__main__":
             verts_all,
             params[camera]).reshape(poses.shape[0], -1, 2)
 
+        cap = cv2.VideoCapture(dir)
+        video_frame_count = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
         writer = get_video_writer(camera, configs)
         for idx, t in enumerate(poses_2d.reshape(poses_2d.shape[0], -1, 2)):
-            img_rgb = cv2.imread(img_rgb_paths[idx])
+            _, img_rgb = cap.read()
             mtx, dist = get_parameters(params[camera])
             img_rgb = cv2.undistort(img_rgb, mtx, dist, None, None)
             if configs['visualize_skeleton']:

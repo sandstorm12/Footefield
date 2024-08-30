@@ -19,7 +19,7 @@ from pytorch3d.loss import chamfer_distance
 
 COEFF_HGIH = 10
 COEFF_NORM = 1
-COEFF_MINI = .1
+COEFF_MINI = 1
 SMPLX_SKELETON_MAP = np.array([ # (SMPLX, HALPE)
     [16, 5, COEFF_NORM],
     [17, 6, COEFF_NORM],
@@ -140,7 +140,7 @@ def calc_distance(joints, skeleton, skeleton_weights):
     skeleton_selected = skeleton[:, SMPLX_SKELETON_MAP[:, 1]]
     output_selected = joints[:, SMPLX_SKELETON_MAP[:, 0]]
 
-    loss = F.mse_loss(
+    loss = F.smooth_l1_loss(
         output_selected, skeleton_selected, reduction='none')
     
     # Just for test, optimize
@@ -184,15 +184,15 @@ def load_smplx_params(smplx_params, device):
         np.array(smplx_params['scale'], np.float32)
     )
 
-    global_orient.requires_grad = True
-    jaw_pose.requires_grad = True
-    leye_pose.requires_grad = True
-    reye_pose.requires_grad = True
-    body.requires_grad = True
-    left_hand_pose.requires_grad = True
-    right_hand_pose.requires_grad = True
+    global_orient.requires_grad = False
+    jaw_pose.requires_grad = False
+    leye_pose.requires_grad = False
+    reye_pose.requires_grad = False
+    body.requires_grad = False
+    left_hand_pose.requires_grad = False
+    right_hand_pose.requires_grad = False
     betas.requires_grad = True
-    expression.requires_grad = True
+    expression.requires_grad = False
     translation.requires_grad = True
     scale.requires_grad = True
 
@@ -209,7 +209,7 @@ def load_denormalize_params(subject, device, configs):
     scale = np.array(params[subject]['scale'])
     translation = np.array(params[subject]['translation'])
 
-    rotation_inverted = np.linalg.inv(rotation).T
+    rotation_inverted = np.transpose(np.linalg.inv(rotation), (0, 2, 1))
 
     rotation_inverted = torch.from_numpy(rotation_inverted).float().to(device)
     scale = torch.from_numpy(scale).float().to(device)
@@ -221,9 +221,9 @@ def load_denormalize_params(subject, device, configs):
 def denormalize(verts, denormalize_params):
     rotation_inverted, scale, translation = denormalize_params
 
-    verts = torch.matmul(verts, rotation_inverted)
+    verts = torch.bmm(verts, rotation_inverted)
     verts = verts * scale
-    verts = verts + translation
+    verts += translation.unsqueeze(1)
 
     return verts
 
@@ -302,7 +302,7 @@ def visualize_chamfer(mask, vert):
 
 
 def calc_chamfer(verts, masks, params):
-    loss = 0
+    loss = []
     for cam in range(len(masks)):
         for idx_mask in range(len(masks[cam])):
             mask_torch = masks[cam][idx_mask]
@@ -323,7 +323,10 @@ def calc_chamfer(verts, masks, params):
             loss_verts = torch.mean(distances[0])
             # loss_mask = torch.mean(
             #     distances[1][distances[1] < torch.max(distances[0])])
-            loss += loss_verts # + loss_mask
+            loss.append(loss_verts) # + loss_mask
+
+    loss = torch.stack(loss) 
+    loss = torch.mean(loss)
 
     return loss
 
@@ -392,7 +395,8 @@ def optimize_beta(model, poses, masks, subject, params, params_smpl, configs):
         loss_chamfer = calc_chamfer(verts, masks_torch, params_torch)
 
         loss = loss_distance * configs['weight_distance'] \
-            + loss_chamfer * configs['weight_chamfer']
+            + loss_chamfer * configs['weight_chamfer'] \
+            + scale * configs['weight_scale']
 
         optimizer.zero_grad()
         loss.backward()
@@ -507,40 +511,37 @@ def visualize_poses(global_orient, jaw_pose, leye_pose,
             time.sleep(.01)
 
 
-def get_mask(cam, idx, params, configs):
-    img_mask = get_mask_image(cam, idx, configs)
-    
-    img_mask = cv2.imread(img_mask, -1)
-    kernel = np.ones((5, 5), np.uint8)
-    img_mask = cv2.erode(img_mask, kernel, iterations=3)
-
-    mtx = np.array(params[cam]['mtx'], np.float32)
-    dist = np.array(params[cam]['dist'], np.float32)
-    img_mask = cv2.undistort(img_mask, mtx, dist, None, None)
-
-    img_mask = cv2.resize(
-        img_mask,
-        (img_mask.shape[1] // configs['scale_mask'],
-         img_mask.shape[0] // configs['scale_mask']))
-
-    points = np.argwhere(img_mask > 0.7) * configs['scale_mask']
-    points = np.flip(points, axis=1).copy()
-
-    return points
-
-
 def get_masks(cameras, params, length, configs):
     masks = {camera: [] for camera in cameras}
 
+    kernel = np.ones((5, 5), np.uint8)
+
     print("Loading masks...")
-    for idx in tqdm(range(length)):
-        for camera in cameras:
-            mask = get_mask(camera, idx, params, configs)
+    for camera in tqdm(cameras):
+        mtx = np.array(params[camera]['mtx'], np.float32)
+        dist = np.array(params[camera]['dist'], np.float32)
+
+        dir = configs['videos_mask'][camera]
+        cap = cv2.VideoCapture(dir)
+        video_frame_count = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
+        for _ in range(video_frame_count):
+            _, img_mask = cap.read()
+            img_mask = cv2.cvtColor(img_mask, cv2.COLOR_BGR2GRAY)
+            img_mask = cv2.erode(img_mask, kernel, iterations=3)
+            img_mask = cv2.undistort(img_mask, mtx, dist, None, None)
+            img_mask = cv2.resize(
+                img_mask,
+                (img_mask.shape[1] // configs['scale_mask'],
+                img_mask.shape[0] // configs['scale_mask']))
+
+            mask = np.argwhere(img_mask > 0.7) * configs['scale_mask']
+            mask = np.flip(mask, axis=1).copy()
             masks[camera].append(
                 mask
             )
 
     return masks
+
 
 
 def _store_artifacts(artifact, output):

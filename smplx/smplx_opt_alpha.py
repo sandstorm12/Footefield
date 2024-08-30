@@ -16,7 +16,7 @@ from utils import data_loader
 
 COEFF_HGIH = 10
 COEFF_NORM = 1
-COEFF_MINI = .1
+COEFF_MINI = 1
 SMPLX_SKELETON_MAP = np.array([ # (SMPLX, HALPE)
     [16, 5, COEFF_NORM],
     [17, 6, COEFF_NORM],
@@ -137,7 +137,7 @@ def calc_distance(joints, skeleton, skeleton_weights):
     skeleton_selected = skeleton[:, SMPLX_SKELETON_MAP[:, 1]]
     output_selected = joints[:, SMPLX_SKELETON_MAP[:, 0]]
 
-    loss = F.mse_loss(
+    loss = F.smooth_l1_loss(
         output_selected, skeleton_selected,
         reduction='none')
     

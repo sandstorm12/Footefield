@@ -1,7 +1,7 @@
 params_smplx: "artifacts/smplx_opt_alpha_a1.yml"
-params: "/home/hamid/Documents/phd/footefield/footefield/pose_estimation/artifacts/params_global_a1_wb_ba.yml"
-skeletons: "/home/hamid/Documents/phd/footefield/footefield/pose_estimation/artifacts/3d_skeletons_a1_wb_ba.yml"
-skeletons_norm: "/home/hamid/Documents/phd/footefield/footefield/pose_estimation/artifacts/3d_skeletons_a1_wb_ba_norm.yml"
+params: "../pose_estimation/artifacts/params_global_a1_wb_ba.yml"
+skeletons: "../pose_estimation/artifacts/3d_skeletons_a1_wb_ba.yml"
+skeletons_norm: "../pose_estimation/artifacts/3d_skeletons_a1_wb_ba_norm.yml"
 gender: "neutral"
 models_root: "models"
 visualize_skeleton: True
@@ -12,9 +12,22 @@ size:
   - 1920
   - 1080
 output: "videos/visualizer_smplx_alpha/a1/"
-images:
-  cam2_4: "/home/hamid/Documents/phd/footefield/data/AzureKinectRecord_0729/a1/azure_kinect2_4/color"
-  cam3_4: "/home/hamid/Documents/phd/footefield/data/AzureKinectRecord_0729/a1/azure_kinect3_4/color"
-  cam3_5: "/home/hamid/Documents/phd/footefield/data/AzureKinectRecord_0729/a1/azure_kinect3_5/color"
-  cam1_4: "/home/hamid/Documents/phd/footefield/data/AzureKinectRecord_0729/a1/azure_kinect1_4/color"
-  cam1_5: "/home/hamid/Documents/phd/footefield/data/AzureKinectRecord_0729/a1/azure_kinect1_5/color"
+calibration_folders:
+    cam0:
+      path: "/home/hamid/Documents/phd/footefield/data/Aug 23 real/cam0_cut.mp4"
+      offset: 0
+    cam1:
+      path: "/home/hamid/Documents/phd/footefield/data/Aug 23 real/cam1_cut.mp4"
+      offset: 0
+    cam2: 
+      path: "/home/hamid/Documents/phd/footefield/data/Aug 23 real/cam2_cut.mp4"
+      offset: 0
+    cam3: 
+      path: "/home/hamid/Documents/phd/footefield/data/Aug 23 real/cam3_cut.mp4"
+      offset: 0
+    cam4: 
+      path: "/home/hamid/Documents/phd/footefield/data/Aug 23 real/cam4_cut.mp4"
+      offset: 0
+    cam5: 
+      path: "/home/hamid/Documents/phd/footefield/data/Aug 23 real/cam5_cut.mp4"
+      offset: 0
