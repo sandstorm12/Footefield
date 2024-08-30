@@ -98,14 +98,15 @@ def calc_distance(joints, skeleton, skeleton_weights):
     return loss
 
 
+# Optimization is possibly applicable
 def calc_chamfer(verts, masks, params, configs):
-    loss = 0
+    loss = []
     for cam in range(len(masks)):
+        mtx = params[cam]['mtx']
+        rotation = params[cam]['rotation']
+        translation = params[cam]['translation']
         for idx_mask in range(len(masks[cam])):
             mask_torch = masks[cam][idx_mask]
-            mtx = params[cam]['mtx']
-            rotation = params[cam]['rotation']
-            translation = params[cam]['translation']
             pcd_proj = project_points_to_camera_plane(
                 verts[idx_mask].unsqueeze(0), mtx,
                 rotation, translation,)
@@ -120,7 +121,10 @@ def calc_chamfer(verts, masks, params, configs):
             loss_verts = torch.mean(distances[0])
             # loss_mask = torch.mean(distances[1][distances[1] \
             #                                     < torch.max(distances[0])])
-            loss += loss_verts # + loss_mask
+            loss.append(loss_verts) # + loss_mask
+
+    loss = torch.stack(loss) 
+    loss = torch.mean(loss)
 
     return loss
 
@@ -147,9 +151,17 @@ def visualize_chamfer(mask, vert):
 def denormalize(verts, denormalize_params):
     rotation_inverted, scale, translation = denormalize_params
 
-    verts = torch.matmul(verts, rotation_inverted)
+    # PLEASE, use broadcasting
+    # for idx in range(verts.shape[0]):
+    #     verts[idx] = torch.matmul(verts[idx], rotation_inverted[idx])
+    verts = torch.bmm(verts, rotation_inverted)
+    
     verts = verts * scale
-    verts = verts + translation
+    
+    # PLEASE, use broadcasting
+    # for idx in range(verts.shape[0]):
+    #     verts[idx] = verts[idx] + translation[idx]
+    verts += translation.unsqueeze(1)
 
     return verts
 
@@ -162,7 +174,7 @@ def load_denormalize_params(subject, device, configs):
     scale = np.array(params[subject]['scale'])
     translation = np.array(params[subject]['translation'])
 
-    rotation_inverted = np.linalg.inv(rotation).T
+    rotation_inverted = np.transpose(np.linalg.inv(rotation), (0, 2, 1))
 
     rotation_inverted = torch.from_numpy(rotation_inverted).float().to(device)
     scale = torch.from_numpy(scale).float().to(device)
@@ -221,7 +233,7 @@ def optimize(smpl_layer, masks, skeletons, alphas, betas, scale, translation, pa
 
     batch_tensor = torch.ones((length, 1), dtype=torch.float32).to(device)
 
-    alphas.requires_grad = True
+    alphas.requires_grad = False
     betas.requires_grad = True
     scale.requires_grad = True
     translation.requires_grad = True
@@ -354,35 +366,33 @@ def get_mask_image(camera, idx, configs):
     return img_depth
 
 
-def get_mask(cam, idx, params, configs):
-    img_mask = get_mask_image(cam, idx, configs)
-    
-    img_mask = cv2.imread(img_mask, -1)
-    kernel = np.ones((5, 5), np.uint8)
-    img_mask = cv2.erode(img_mask, kernel, iterations=2)
-
-    mtx = np.array(params[cam]['mtx'], np.float32)
-    dist = np.array(params[cam]['dist'], np.float32)
-    img_mask = cv2.undistort(img_mask, mtx, dist, None, None)
-
-    img_mask = cv2.resize(
-        img_mask,
-        (img_mask.shape[1] // configs['scale_mask'],
-         img_mask.shape[0] // configs['scale_mask']))
-
-    points = np.argwhere(img_mask > 0.7) * configs['scale_mask']
-    points = np.flip(points, axis=1).copy()
-
-    return points
-
-
 def get_masks(cameras, params, length, configs):
     masks = {camera: [] for camera in cameras}
 
+    kernel = np.ones((5, 5), np.uint8)
+
     print("Loading masks...")
-    for idx in tqdm(range(length)):
-        for camera in cameras:
-            mask = get_mask(camera, idx, params, configs)
+    for camera in tqdm(cameras):
+        dir = configs['videos_mask'][camera]
+        cap = cv2.VideoCapture(dir)
+        video_frame_count = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
+        for _ in range(video_frame_count):
+            _, img_mask = cap.read()
+            img_mask = cv2.cvtColor(img_mask, cv2.COLOR_BGR2GRAY)
+        
+            img_mask = cv2.erode(img_mask, kernel, iterations=2)
+
+            mtx = np.array(params[camera]['mtx'], np.float32)
+            dist = np.array(params[camera]['dist'], np.float32)
+            img_mask = cv2.undistort(img_mask, mtx, dist, None, None)
+
+            img_mask = cv2.resize(
+                img_mask,
+                (img_mask.shape[1] // configs['scale_mask'],
+                img_mask.shape[0] // configs['scale_mask']))
+
+            mask = np.argwhere(img_mask > 0.7) * configs['scale_mask']
+            mask = np.flip(mask, axis=1).copy()
             masks[camera].append(
                 mask
             )

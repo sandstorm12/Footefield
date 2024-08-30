@@ -61,11 +61,11 @@ def get_video_writer(camera, configs):
     if not os.path.exists(configs['output']):
         os.makedirs(configs['output'])
 
-    fourcc = cv2.VideoWriter_fourcc(*'XVID')
+    fourcc = cv2.VideoWriter_fourcc(*'mp4v')
     writer = cv2.VideoWriter(
         os.path.join(
             configs['output'],
-            f'visualizer_skeleton_video_{camera}.avi'
+            f'visualizer_skeleton_video_{camera}.mp4'
         ),
         fourcc,
         configs['fps'],
@@ -78,13 +78,9 @@ def get_video_writer(camera, configs):
 # TODO: Make types constant
 def get_connections_by_type(type):
     if type == TYPE_ORG:
-        connections = np.concatenate(
-            (np.array(data_loader.HALPE_EDGES),
-             np.array(data_loader.HALPE_EDGES) + 26))
+        connections = np.array(data_loader.HALPE_EDGES)
     elif type == TYPE_JTR:
-        connections = np.concatenate(
-            (np.array(data_loader.SMPL_EDGES),
-             np.array(data_loader.SMPL_EDGES) + 24))
+        connections = np.array(data_loader.SMPL_EDGES)
     elif type == TYPE_MESH:
         connections = None
     else:
@@ -176,7 +172,8 @@ def get_smpl_parameters(configs):
     joints_all = []
     verts_all = []
     faces_all = []
-    for subject in [0, 1]:
+    # What the F?
+    for subject in [0]:
         alphas, betas, scale_smpl, translation_smpl = \
             load_smpl(subject, configs)
     
@@ -200,16 +197,20 @@ def get_smpl_parameters(configs):
         translation = params[subject]['translation']
 
         rotation_inverted = np.linalg.inv(rotation)
+        rotation_inverted = np.transpose(rotation_inverted, (0, 2, 1))
 
         joints = (joints + np.expand_dims(translation_smpl, axis=1)) * scale_smpl
-        joints = joints.dot(rotation_inverted.T)
+        # Make it more concise
+        joints = np.array([joints[idx_time].dot(rotation_inverted[idx_time])
+                           for idx_time in range(len(rotation_inverted))])
         joints = joints * scale
-        joints = joints + translation
+        joints = joints + np.expand_dims(translation, axis=1)
 
         verts = (verts + np.expand_dims(translation_smpl, axis=1)) * scale_smpl
-        verts = verts.dot(rotation_inverted.T)
+        verts = np.array([verts[idx_time].dot(rotation_inverted[idx_time])
+                          for idx_time in range(len(rotation_inverted))])
         verts = verts * scale
-        verts = verts + translation
+        verts = verts + np.expand_dims(translation, axis=1)
 
         joints_all.append(joints)
         verts_all.append(verts)
@@ -239,11 +240,11 @@ if __name__ == "__main__":
     with open(configs['params'], 'rb') as handle:
         params = yaml.safe_load(handle)
 
-    cameras = configs['images'].keys()
-    for idx_cam, camera in enumerate(tqdm(cameras)):
-        dir = configs['images'][camera]
+    print(params.keys())
 
-        img_rgb_paths = data_loader.list_rgb_images(dir)
+    cameras = configs['calibration_folders'].keys()
+    for idx_cam, camera in enumerate(tqdm(cameras)):
+        dir = configs['calibration_folders'][camera]['path']
         
         poses_2d = poses_3d_2_2d(
             poses,
@@ -255,9 +256,11 @@ if __name__ == "__main__":
             verts_all,
             params[camera]).reshape(verts_all.shape[0], -1, 2)
 
+        cap = cv2.VideoCapture(dir)
+        video_frame_count = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
         writer = get_video_writer(camera, configs)
-        for idx in range(joints_all.shape[0]):
-            img_rgb = cv2.imread(img_rgb_paths[idx])
+        for idx in range(video_frame_count):
+            _, img_rgb = cap.read()
             mtx, dist = get_parameters(params[camera])
             img_rgb = cv2.undistort(img_rgb, mtx, dist, None, None)
             if configs['visualize_skeleton']:
