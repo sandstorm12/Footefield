@@ -41,37 +41,37 @@ def rotation_matrix_from_axis_angle(axis, angle):
 def get_normalize_rotation_matrix(skeleton):
     skeleton = np.copy(skeleton)
 
-    # Rotation for torso plane
-    p1 = (skeleton[5] + skeleton[6]) / 2
-    p2 = skeleton[11]
-    p3 = skeleton[12]
-    facing_normal = np.cross(p2 - p1, p3 - p1)
-    facing_normal /= np.linalg.norm(facing_normal)
-    desired_normal = np.array([math.radians(0),
-                               math.radians(0),
-                               math.radians(-90)])
-    desired_normal = desired_normal / np.linalg.norm(desired_normal)
-    axis = np.cross(facing_normal, desired_normal)
-    cos_theta = np.dot(facing_normal, desired_normal)
-    theta = np.arccos(cos_theta)
-    R1 = rotation_matrix_from_axis_angle(axis, theta)
-    skeleton = skeleton.dot(R1.T)
-
     # Rotation for standing axis
-    p1 = skeleton[11]
-    p2 = skeleton[12]
+    p1 = (skeleton[11] + skeleton[12]) / 2
+    p2 = (skeleton[5] + skeleton[6]) / 2
     facing_normal2 = p1 - p2
     facing_normal2 /= np.linalg.norm(facing_normal2)
-    desired_normal2 = np.array([math.radians(90),
-                                math.radians(0),
+    desired_normal2 = np.array([math.radians(0),
+                                math.radians(-90),
                                 math.radians(0)])
     desired_normal2 = desired_normal2 / np.linalg.norm(desired_normal2)
     axis2 = np.cross(facing_normal2, desired_normal2)
     cos_theta2 = np.dot(facing_normal2, desired_normal2)
     theta2 = np.arccos(cos_theta2)
     R2 = rotation_matrix_from_axis_angle(axis2, theta2)
+    skeleton = skeleton.dot(R2.T)
 
-    R = R2 @ R1
+    # Rotation for torso plane
+    p1 = skeleton[11]
+    p2 = skeleton[12]
+    facing_normal = p1 - p2
+    facing_normal[1] = 0
+    facing_normal /= np.linalg.norm(facing_normal)
+    desired_normal = np.array([math.radians(90),
+                               math.radians(0),
+                               math.radians(0)])
+    desired_normal = desired_normal / np.linalg.norm(desired_normal)
+    axis = np.cross(facing_normal, desired_normal)
+    cos_theta = np.dot(facing_normal, desired_normal)
+    theta = np.arccos(cos_theta)
+    R1 = rotation_matrix_from_axis_angle(axis, theta)
+
+    R = R1 @ R2
 
     return R
 
@@ -112,12 +112,13 @@ def normalize_skeleton(path_input, path_output):
     for idx_person in range(poses.shape[1]):
         skeleton = poses[:, idx_person]
 
-        rotation = get_normalize_rotation_matrix(skeleton[0])
-        translation = np.copy((skeleton[0, 11] + skeleton[0, 12]) / 2)
+        rotation = np.array([get_normalize_rotation_matrix(skeleton[i])
+                             for i in range(len(skeleton))])
+        translation = np.copy((skeleton[:, 11] + skeleton[:, 12]) / 2)
         for i in range(len(skeleton)):
-            skeleton[i] = skeleton[i] - translation
+            skeleton[i] = skeleton[i] - translation[i]
 
-            skeleton[i] = rotate_skeleton(skeleton[i], rotation)
+            skeleton[i] = rotate_skeleton(skeleton[i], rotation[i])
 
         scale = np.max(abs(skeleton))
         for i in range(len(skeleton)):

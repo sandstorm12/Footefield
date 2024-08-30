@@ -57,7 +57,8 @@ def write_video(poses, camera, idx_cam, intrinsics, configs):
     mtx = np.array(intrinsics[camera]['mtx'], np.float32)
     dist = np.array(intrinsics[camera]['dist'], np.float32)
 
-    writer = get_video_writer(camera, configs['output_dir'], configs['fps'], configs['size'])
+    writer = get_video_writer(camera, configs['output_dir'],
+                              configs['fps'], configs['size'])
     for _, t in enumerate(tqdm(poses.reshape(poses.shape[0], -1, 2))):
         _, img_rgb = cap.read()
 
