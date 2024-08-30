@@ -113,6 +113,8 @@ def calc_3d_skeleton(poses, params, configs):
     cameras = poses.keys()
     length = len(poses[list(cameras)[0]]['pose'])
 
+    print(np.array(poses[list(cameras)[0]]['pose']).shape)
+
     num_people = 0
     num_points = 0
     for camera in cameras:
@@ -164,9 +166,7 @@ def calc_3d_skeleton(poses, params, configs):
 
 def _calc_params(configs):
     intrinsics = _get_intrinsics(configs)
-    print(intrinsics.keys())
     extrinsics = _get_extrinsics(configs)
-    print(extrinsics.keys())
 
     params_global = {}
     for camera in intrinsics.keys():

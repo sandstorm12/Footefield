@@ -98,17 +98,18 @@ def extract_poses(dir, camera, model, intrinsics, max_people,
     bar = tqdm(range(search_depth))
     bar.set_description(camera)
     for idx in bar:
-        _, img_rgb = cap.read()
+        ret, img_rgb = cap.read()
 
-        img_rgb = cv2.undistort(img_rgb, mtx, dist, None, None)
+        if ret:
+            img_rgb = cv2.undistort(img_rgb.copy(), mtx, dist, None, None)
 
-        people_keypoints, confidences = _get_skeleton(
-            img_rgb, model, max_people, configs)
-        if configs['visualize']:
-            visualize_keypoints(img_rgb, people_keypoints, confidences)
+            people_keypoints, confidences = _get_skeleton(
+                img_rgb, model, max_people, configs)
+            if configs['visualize']:
+                visualize_keypoints(img_rgb, people_keypoints, confidences)
 
-        poses.append(people_keypoints)
-        poses_confidence.append(confidences)
+            poses.append(people_keypoints)
+            poses_confidence.append(confidences)
 
     return poses, poses_confidence
 

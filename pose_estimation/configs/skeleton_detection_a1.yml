@@ -3,23 +3,23 @@ output: "artifacts/detected_skeletons_a1.yml"
 intrinsics: "/home/hamid/Documents/phd/footefield/footefield_feature_video/calibration/artifacts/intrinsic_rgb.yml"
 visualize: False
 confidence_coeff: 1
-experiment_length: 1000
+experiment_length: 1500
 calibration_folders:
     cam0:
-      path: "/home/hamid/Documents/phd/footefield/data/mocapaug21/cam_0.mp4"
+      path: "/home/hamid/Documents/phd/footefield/data/Aug 23 real/cam0_cut.mp4"
       offset: 0
     cam1:
-      path: "/home/hamid/Documents/phd/footefield/data/mocapaug21/cam_1.mp4"
-      offset: 1
+      path: "/home/hamid/Documents/phd/footefield/data/Aug 23 real/cam1_cut.mp4"
+      offset: 0
     cam2: 
-      path: "/home/hamid/Documents/phd/footefield/data/mocapaug21/cam_2.mp4"
-      offset: 1
+      path: "/home/hamid/Documents/phd/footefield/data/Aug 23 real/cam2_cut.mp4"
+      offset: 0
     cam3: 
-      path: "/home/hamid/Documents/phd/footefield/data/mocapaug21/cam_3.mp4"
-      offset: 1
+      path: "/home/hamid/Documents/phd/footefield/data/Aug 23 real/cam3_cut.mp4"
+      offset: 0
     cam4: 
-      path: "/home/hamid/Documents/phd/footefield/data/mocapaug21/cam_4.mp4"
-      offset: 1
+      path: "/home/hamid/Documents/phd/footefield/data/Aug 23 real/cam4_cut.mp4"
+      offset: 0
     cam5: 
-      path: "/home/hamid/Documents/phd/footefield/data/mocapaug21/cam_5.mp4"
-      offset: 1
+      path: "/home/hamid/Documents/phd/footefield/data/Aug 23 real/cam5_cut.mp4"
+      offset: 0
