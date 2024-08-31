@@ -47,7 +47,7 @@ def get_video_writer(camera, dir, fps, size):
     return writer
 
 
-def write_video(poses, camera, idx_cam, intrinsics, configs):
+def write_video(poses, poses_id, camera, idx_cam, intrinsics, configs):
     dir = configs['calibration_folders'][idx_cam]['path']
     cap = cv2.VideoCapture(dir)
 
@@ -59,23 +59,27 @@ def write_video(poses, camera, idx_cam, intrinsics, configs):
 
     writer = get_video_writer(camera, configs['output_dir'],
                               configs['fps'], configs['size'])
-    for _, t in enumerate(tqdm(poses.reshape(poses.shape[0], -1, 2))):
+    for idx_pose, t in enumerate(tqdm(poses)):
         _, img_rgb = cap.read()
 
         img_rgb = cv2.undistort(img_rgb, mtx, dist, None, None)
-        for point in t:
-            cv2.circle(img_rgb, (int(point[0]), int(point[1])),
-                       3, (0, 255, 0), -1)
 
-        connections = np.concatenate(
-            [np.array(data_loader.HALPE_EDGES) + i * 26
-             for i in range(poses.shape[1])]
-        )
-        for connection in connections:
-            cv2.line(img_rgb,
-                    (int(t[connection[0]][0]), int(t[connection[0]][1])),
-                    (int(t[connection[1]][0]), int(t[connection[1]][1])),
-                    (255, 255, 255), 1)
+        t = np.array(t)
+        for idx_person, person in enumerate(t):
+            for point in person:
+                cv2.circle(img_rgb, (int(point[0]), int(point[1])),
+                        3, (0, 255, 0), -1)
+                cv2.putText(img_rgb, str(poses_id[idx_pose][idx_person]),
+                    (int(point[0]), int(point[1])),
+                    cv2.FONT_HERSHEY_SIMPLEX,
+                    1, (255, 255, 255), 1, 2)
+
+            connections = np.array(data_loader.HALPE_EDGES)
+            for connection in connections:
+                cv2.line(img_rgb,
+                        (int(person[connection[0]][0]), int(person[connection[0]][1])),
+                        (int(person[connection[1]][0]), int(person[connection[1]][1])),
+                        (255, 255, 255), 1)
 
         writer.write(img_rgb)
 
@@ -94,7 +98,8 @@ if __name__ == "__main__":
         with open(configs['intrinsics']) as handler:
             intrinsics = yaml.safe_load(handler)
         
-        poses_cam = np.array(poses[camera]['pose'])
+        poses_cam = poses[camera]['pose']
+        poses_id = poses[camera]['ids']
 
         # Remove camname or camidx
-        write_video(poses_cam, camera, idx_cam, intrinsics, configs)
+        write_video(poses_cam, poses_id, camera, idx_cam, intrinsics, configs)

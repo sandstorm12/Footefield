@@ -137,7 +137,7 @@ def optimize(n_cameras, n_points, params_org,
 
     res = least_squares(
         fun, x0, jac_sparsity=jac_sparsity, verbose=2,
-        x_scale='jac', ftol=1e-8, xtol=1e-8, gtol=1e-8,
+        x_scale='jac', ftol=1e-9, xtol=1e-9, gtol=1e-9,
         method='trf', args=(n_cameras, n_points, params_org,
                             points_2d, points_2d_conf, points_indices,
                             points_cam_indices, configs))
@@ -218,6 +218,32 @@ def _contruct_optimization_params(params, poses_3d, configs):
     return x0
 
 
+def _filter_by_id(poses, ids):
+    poses_filtered = {}
+    for camera in poses.keys():
+        poses_cam_filtered = []
+        poses_conf_filtered = []
+        for timestep, pose_timestep in enumerate(poses[camera]['pose']):
+            poses_timestep = []
+            poses_conf_timestep = []
+            for idx_person, person in enumerate(pose_timestep):
+                id = poses[camera]['ids'][timestep][idx_person]
+                if id in ids:
+                    poses_timestep.append(person)
+                    poses_conf_timestep.append(
+                        poses[camera]['pose_confidence'][timestep][idx_person])
+
+            poses_cam_filtered.append(poses_timestep)
+            poses_conf_filtered.append(poses_conf_timestep)
+        
+        poses_filtered[camera] = {
+            'pose': poses_cam_filtered,
+            'pose_confidence': poses_conf_filtered,
+        }
+
+    return poses_filtered
+
+
 def _format_points(poses_3d, poses_2d, params_org):
     points_3d = []
     points_2d = []
@@ -264,10 +290,7 @@ if __name__ == '__main__':
     print(f"Config loaded: {configs}")
 
     poses_2d, poses_3d, params_org = _load_inputs(configs)
-
-    # poses_3d = poses_3d[650:1200]
-    # # poses_2d = poses_2d[300:600]
-    # print(poses_3d.shape)
+    poses_2d = _filter_by_id(poses_2d, [0])
 
     n_cameras = len(list(params_org.keys()))
     n_points = poses_3d.reshape(-1, 3).shape[0]
