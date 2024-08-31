@@ -1,7 +1,7 @@
 model: "rtmw-x_8xb320-270e_cocktail14-384x288"
 output: "artifacts/detected_skeletons_wb_a1.yml"
 intrinsics: "../calibration/artifacts/intrinsic_rgb.yml"
-visualize: False
+visualize: True
 confidence_coeff: 1
 experiment_length: 1500
 calibration_folders:

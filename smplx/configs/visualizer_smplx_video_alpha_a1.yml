@@ -4,9 +4,9 @@ skeletons: "../pose_estimation/artifacts/3d_skeletons_a1_wb_ba.yml"
 skeletons_norm: "../pose_estimation/artifacts/3d_skeletons_a1_wb_ba_norm.yml"
 gender: "neutral"
 models_root: "models"
-visualize_skeleton: True
+visualize_skeleton: False
 visualize_joints: True
-visualize_mesh: False
+visualize_mesh: True
 fps: 5
 size:
   - 1920

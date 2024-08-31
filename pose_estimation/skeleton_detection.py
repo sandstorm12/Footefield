@@ -3,12 +3,14 @@ sys.path.append('../')
 
 import cv2
 import yaml
+import torch
 import argparse
 import numpy as np
 
+from queue import Queue
 from tqdm import tqdm
-from utils import data_loader
 from mmpose.apis import MMPoseInferencer
+from transformers import ViTModel, ViTImageProcessor
 
 
 def _get_arguments():
@@ -33,40 +35,65 @@ def _load_configs(path):
     return configs
 
 
-def filter_sort(people_keypoints, num_select=2):
-    heights = []
-    for person in people_keypoints:
-        person = np.array(person['keypoints'])
-        heights.append(
-            (np.max(person[:, 1]) - np.min(person[:, 1])) *
-            (np.max(person[:, 0]) - np.min(person[:, 0])) *
-            (700 -  np.linalg.norm(np.mean(person[:], axis=0) - (1920 / 2, 1080 / 2)))
-        )
+def filter_sort(image, people_keypoints, feature_store):
+    people_keypoints = [person
+                        for person in people_keypoints
+                        if person['bbox_score'] > .4 and \
+                            person['bbox'][0][3] - person['bbox'][0][1] > 500]
+    
+    match_indices = []
+    for idx_person, person in enumerate(people_keypoints):
+        bbox = person['bbox'][0]
+        x0, y0, x1, y1 = map(int, bbox)
+        image_person = image[y0:y1, x0:x1]
 
-    indecies = np.argsort(heights)[::-1]
-    people_keypoints = [people_keypoints[indecies[idx]]
-                        for idx in range(num_select)]
+        inputs = processor(images=image_person, return_tensors="pt")
+        outputs = model(**inputs)
+        last_hidden_states = outputs.last_hidden_state[0]
+        feature_current = last_hidden_states[0].cpu().detach().numpy()
 
-    horizontal_position = []
-    for person in people_keypoints:
-        person = person['keypoints']
-        horizontal_position.append(person[0][0])
+        similarities = []
+        for features_queue in feature_store:
+            features = list(features_queue.queue)
+            
+            scores = []
+            for feature in features:
+                dot_product = np.dot(feature_current, feature)
+                cosine_similarity = dot_product / \
+                    (np.linalg.norm(feature_current) * np.linalg.norm(feature))
+                scores.append(cosine_similarity)
 
-    indecies = np.argsort(horizontal_position)[::-1]
-    people_keypoints = [people_keypoints[indecies[idx]]
-                        for idx in range(num_select)]
+            scores = np.array(scores)
+            print(scores)
+            similarities.append(np.max(scores) + (len(features) / 5 * .1))
 
-    return people_keypoints
+        if len(similarities) > 0 and \
+                similarities[np.argmax(similarities)] > .6 and \
+                np.argmax(similarities) not in match_indices:
+            match_index = np.argmax(similarities).item()
+            feature_store[match_index].put(feature_current)
+            if feature_store[match_index].qsize() > 5:
+                feature_store[match_index].get()
+        else:
+            feature_store.append(Queue())
+            feature_store[-1].put(feature_current)
+            match_index = len(feature_store) - 1
+
+        match_indices.append(match_index)
+
+        print(idx_person, "-->", match_index)
+
+    return people_keypoints, match_indices
 
 
-def _get_skeleton(image, inferencer, max_people, configs):
+def _get_skeleton(image, inferencer, feature_store, configs):
     result_generator = inferencer(image)
     
     detected_keypoints = []
     detected_confidences = []
     for result in result_generator:
-        poeple_keypoints = filter_sort(result['predictions'][0],
-                                       num_select=max_people)
+        poeple_keypoints, match_indcies = filter_sort(
+            image, result['predictions'][0], feature_store)
         for predictions in poeple_keypoints:
             keypoints = predictions['keypoints']
             # Divided by 10 to normalize between 0 and 1
@@ -77,16 +104,19 @@ def _get_skeleton(image, inferencer, max_people, configs):
             detected_keypoints.append(keypoints)
             detected_confidences.append(confidences)
 
-    return detected_keypoints, detected_confidences
+    return detected_keypoints, detected_confidences, match_indcies
 
 
-def extract_poses(dir, camera, model, intrinsics, max_people,
+def extract_poses(dir, camera, model_2d, intrinsics,
                   configs):
     mtx = np.array(intrinsics[camera]['mtx'], np.float32)
     dist = np.array(intrinsics[camera]['dist'], np.float32)
 
     poses = []
     poses_confidence = []
+    poses_ids = []
+
+    feature_store = []
 
     cap = cv2.VideoCapture(dir)
     for _ in range(configs['calibration_folders'][camera]['offset']):
@@ -103,23 +133,24 @@ def extract_poses(dir, camera, model, intrinsics, max_people,
         if ret:
             img_rgb = cv2.undistort(img_rgb.copy(), mtx, dist, None, None)
 
-            people_keypoints, confidences = _get_skeleton(
-                img_rgb, model, max_people, configs)
+            people_keypoints, confidences, detected_ids = _get_skeleton(
+                img_rgb, model_2d, feature_store, configs)
             if configs['visualize']:
-                visualize_keypoints(img_rgb, people_keypoints, confidences)
+                visualize_keypoints(img_rgb, people_keypoints, confidences, detected_ids)
 
             poses.append(people_keypoints)
             poses_confidence.append(confidences)
+            poses_ids.append(detected_ids)
 
-    return poses, poses_confidence
+    return poses, poses_confidence, poses_ids
 
 
-def visualize_keypoints(image, keypoints, confidences):
+def visualize_keypoints(image, keypoints, confidences, detected_ids):
     for idx_person, person in enumerate(keypoints):
         for idx_point, point in enumerate(person):
             cv2.circle(image, (int(point[0]), int(point[1])),
                     5, (0, 255, 0), -1)
-            cv2.putText(image, str(idx_person),
+            cv2.putText(image, str(detected_ids[idx_person]),
                 (int(point[0]), int(point[1])),
                 cv2.FONT_HERSHEY_SIMPLEX,
                 1, (255, 255, 255), 1, 2)
@@ -145,13 +176,13 @@ def calc_2d_skeleton(cameras, model_2d, configs):
     for _, camera in enumerate(cameras):
         dir = configs['calibration_folders'][camera]['path']
 
-        max_people=1
-        pose, pose_confidence = extract_poses(
-            dir, camera, model_2d, intrinsics, max_people, configs)
+        pose, pose_confidence, ids = extract_poses(
+            dir, camera, model_2d, intrinsics, configs)
         
         keypoints[camera] = {
             'pose': pose,
-            'pose_confidence': pose_confidence
+            'pose_confidence': pose_confidence,
+            'ids': ids,
         }
 
     return keypoints
@@ -163,7 +194,10 @@ if __name__ == "__main__":
 
     print(f"Config loaded: {configs}")
 
-    model_2d = MMPoseInferencer(configs["model"])
+    processor = ViTImageProcessor.from_pretrained('google/vit-large-patch32-384')
+    model = ViTModel.from_pretrained('google/vit-large-patch32-384')
+
+    model_2d = MMPoseInferencer(configs["model"], device='cpu')
     cameras = configs["calibration_folders"].keys()
         
     keypoints = calc_2d_skeleton(cameras, model_2d, configs)

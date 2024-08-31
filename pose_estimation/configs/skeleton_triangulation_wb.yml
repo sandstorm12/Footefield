@@ -2,5 +2,7 @@ skeletons: "artifacts/detected_skeletons_wb_a1.yml"
 intrinsics: "../calibration/artifacts/intrinsic_rgb.yml"
 extrinsics: "../calibration/artifacts/extrinsic_rgb.yml"
 threshold: .6
+num_people: 1
+num_points: 133
 output: "artifacts/3d_skeletons_a1_wb.yml"
 output_params: "artifacts/params_global_a1_wb.yml"

@@ -6,7 +6,7 @@ models_root: "models"
 visualize: False
 visualize_mesh: True
 visualize_chamfer_projection: False
-weight_chamfer: 1.0e-8
+weight_chamfer: 1.0e-6
 weight_distance: 1.0
 weight_scale: 1.0e-10
 learning_rate: 2.0e-3

@@ -215,7 +215,8 @@ def masks_params_torch(masks, params):
     return masks_torch, params_torch
 
 
-def optimize(smpl_layer, masks, skeletons, alphas, betas, scale, translation, params, subject, configs):
+def optimize(smpl_layer, masks, skeletons, alphas, betas, scale,
+             translation, params, subject, configs):
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
     smpl_layer.to(device)
 
@@ -233,7 +234,7 @@ def optimize(smpl_layer, masks, skeletons, alphas, betas, scale, translation, pa
 
     batch_tensor = torch.ones((length, 1), dtype=torch.float32).to(device)
 
-    alphas.requires_grad = False
+    alphas.requires_grad = True
     betas.requires_grad = True
     scale.requires_grad = True
     translation.requires_grad = True

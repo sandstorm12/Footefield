@@ -184,15 +184,15 @@ def load_smplx_params(smplx_params, device):
         np.array(smplx_params['scale'], np.float32)
     )
 
-    global_orient.requires_grad = False
-    jaw_pose.requires_grad = False
-    leye_pose.requires_grad = False
-    reye_pose.requires_grad = False
-    body.requires_grad = False
-    left_hand_pose.requires_grad = False
-    right_hand_pose.requires_grad = False
+    global_orient.requires_grad = True
+    jaw_pose.requires_grad = True
+    leye_pose.requires_grad = True
+    reye_pose.requires_grad = True
+    body.requires_grad = True
+    left_hand_pose.requires_grad = True
+    right_hand_pose.requires_grad = True
     betas.requires_grad = True
-    expression.requires_grad = False
+    expression.requires_grad = True
     translation.requires_grad = True
     scale.requires_grad = True
 

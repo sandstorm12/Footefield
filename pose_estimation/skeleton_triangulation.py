@@ -113,15 +113,8 @@ def calc_3d_skeleton(poses, params, configs):
     cameras = poses.keys()
     length = len(poses[list(cameras)[0]]['pose'])
 
-    print(np.array(poses[list(cameras)[0]]['pose']).shape)
-
-    num_people = 0
-    num_points = 0
-    for camera in cameras:
-        points = np.array(poses[camera]['pose']).shape[1:3]
-        num_points = points[1]
-        if num_people < points[0]:
-            num_people = points[0]
+    num_people = configs['num_people']
+    num_points = configs['num_points']
     points_per_timestep = num_people * num_points
 
     points_3d = []
@@ -154,6 +147,7 @@ def calc_3d_skeleton(poses, params, configs):
                 points_3d_single = pycalib.triangulate_Npts(
                     pt2d_CxPx2=points_2d, P_Cx3x4=parameters)
             else:
+                print(f"points_2d is empty in {timestep}")
                 points_3d_single = np.zeros((1, 3))
             
             points_3d_timestep.append(points_3d_single)
@@ -182,6 +176,32 @@ def _calc_params(configs):
     return params_global
 
 
+def _filter_by_id(poses, ids):
+    poses_filtered = {}
+    for camera in poses.keys():
+        poses_cam_filtered = []
+        poses_conf_filtered = []
+        for timestep, pose_timestep in enumerate(poses[camera]['pose']):
+            poses_timestep = []
+            poses_conf_timestep = []
+            for idx_person, person in enumerate(pose_timestep):
+                id = poses[camera]['ids'][timestep][idx_person]
+                if id in ids:
+                    poses_timestep.append(person)
+                    poses_conf_timestep.append(
+                        poses[camera]['pose_confidence'][timestep][idx_person])
+
+            poses_cam_filtered.append(poses_timestep)
+            poses_conf_filtered.append(poses_conf_timestep)
+        
+        poses_filtered[camera] = {
+            'pose': poses_cam_filtered,
+            'pose_confidence': poses_conf_filtered,
+        }
+
+    return poses_filtered
+
+
 def _store_artifacts(artifact, output):
     with open(output, 'w') as handle:
         yaml.dump(artifact, handle)
@@ -195,6 +215,8 @@ if __name__ == "__main__":
 
     with open(configs['skeletons']) as handler:
         poses = yaml.safe_load(handler)
+
+    poses = _filter_by_id(poses, [0])
         
     params = _calc_params(configs)
     poses_3d = calc_3d_skeleton(poses, params, configs)

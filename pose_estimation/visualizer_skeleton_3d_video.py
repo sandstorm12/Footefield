@@ -124,8 +124,6 @@ if __name__ == "__main__":
 
     poses = np.array(poses)
 
-    print(poses.shape)
-
     cameras = list(configs['calibration_folders'].keys())
     for idx_cam, camera in enumerate(tqdm(cameras)):
         dir = configs['calibration_folders'][camera]
