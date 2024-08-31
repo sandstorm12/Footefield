@@ -3,10 +3,10 @@ import cv2
 from tqdm import tqdm
 
 
-video_path = "/home/hamid/Documents/phd/footefield/data/Aug 23 real/cam5.mp4"
-video_path_output = "/home/hamid/Documents/phd/footefield/data/Aug 23 real/cam5_cut.mp4"
+video_path = "/home/hamid/Documents/phd/footefield/data/Aug 23 real/cam0.mp4"
+video_path_output = "/home/hamid/Documents/phd/footefield/data/Aug 23 real/cam0_cut.mp4"
 start_frame = 702
-end_frame = 702 + 500
+end_frame = 702 + 50
 
 if __name__ == "__main__":
     cap = cv2.VideoCapture(video_path)
