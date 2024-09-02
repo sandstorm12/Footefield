@@ -9,7 +9,15 @@ import argparse
 import numpy as np
 
 from tqdm import tqdm
-from utils import data_loader
+
+
+HALPE_EDGES = [
+    (0, 1), (0, 2), (1, 3), (2, 4),  # Head
+    (5, 18), (6, 18), (5, 7), (7, 9), (6, 8), (8, 10), # Body
+    (17, 18), (18, 19), (19, 11), (19, 12),
+    (11, 13), (12, 14), (13, 15), (14, 16),
+    (20, 24), (21, 25), (23, 25), (22, 24), (15, 24), (16, 25), # Feet
+]
 
 
 def _get_arguments():
@@ -19,7 +27,7 @@ def _get_arguments():
         '-c', '--config',
         help='Path to the config file',
         type=str,
-        default='configs/visualizer_skeleton_3d_video.yml',
+        required=True,
     )
 
     args = parser.parse_args()
@@ -63,11 +71,8 @@ def get_video_writer(camera, configs):
 
 
 def write_video(poses_2d, camera, params, configs):
-    dir = configs['calibration_folders'][camera]['path']
+    dir = configs['videos'][camera]['path']
     cap = cv2.VideoCapture(dir)
-    offset = configs['calibration_folders'][camera]['offset']
-    for _ in range(offset):
-        cap.grab()
 
     mtx = np.array(params['mtx'], np.float32)
     dist = np.array(params['dist'], np.float32)
@@ -81,7 +86,7 @@ def write_video(poses_2d, camera, params, configs):
             cv2.circle(img_rgb, (int(point[0]), int(point[1])),
                        3, (0, 255, 0), -1)
 
-        connections = np.array(data_loader.HALPE_EDGES)
+        connections = np.array(HALPE_EDGES)
         for connection in connections:
             cv2.line(img_rgb,
                     (int(t[connection[0]][0]), int(t[connection[0]][1])),
@@ -124,9 +129,9 @@ if __name__ == "__main__":
 
     poses = np.array(poses)
 
-    cameras = list(configs['calibration_folders'].keys())
+    cameras = list(configs['videos'].keys())
     for idx_cam, camera in enumerate(tqdm(cameras)):
-        dir = configs['calibration_folders'][camera]
+        dir = configs['videos'][camera]
 
         poses_2d = poses_3d_2_2d(
             poses,

@@ -13,9 +13,9 @@ scale_mask: 8
 epochs: 200
 output: "artifacts/smpl_opt_global_a1.yml"
 videos_mask:
-  cam0: "/home/hamid/Documents/phd/footefield/data/Aug 23 real/cam0_cut_mask.mp4"
-  cam1: "/home/hamid/Documents/phd/footefield/data/Aug 23 real/cam1_cut_mask.mp4" 
-  cam2: "/home/hamid/Documents/phd/footefield/data/Aug 23 real/cam2_cut_mask.mp4"
-  cam3: "/home/hamid/Documents/phd/footefield/data/Aug 23 real/cam3_cut_mask.mp4"
-  cam4: "/home/hamid/Documents/phd/footefield/data/Aug 23 real/cam4_cut_mask.mp4"
-  cam5: "/home/hamid/Documents/phd/footefield/data/Aug 23 real/cam5_cut_mask.mp4"
+  cam0: "../adjust/adjusted/aug23_e1_1/cam0/0_mask.mp4"
+  cam1: "../adjust/adjusted/aug23_e1_1/cam1/0_mask.mp4"
+  cam2: "../adjust/adjusted/aug23_e1_1/cam2/0_mask.mp4"
+  cam3: "../adjust/adjusted/aug23_e1_1/cam3/0_mask.mp4"
+  cam4: "../adjust/adjusted/aug23_e1_1/cam4/0_mask.mp4"
+  cam5: "../adjust/adjusted/aug23_e1_1/cam5/0_mask.mp4"

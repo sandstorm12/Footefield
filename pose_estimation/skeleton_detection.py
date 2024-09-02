@@ -35,11 +35,13 @@ def _load_configs(path):
     return configs
 
 
-def filter_sort(image, people_keypoints, feature_store):
+def filter_sort(image, people_keypoints, feature_store, configs):
     people_keypoints = [person
                         for person in people_keypoints
-                        if person['bbox_score'] > .4 and \
-                            person['bbox'][0][3] - person['bbox'][0][1] > 500]
+                        if person['bbox_score'] > configs['detect_threshold'] and \
+                            person['bbox'][0][3] - person['bbox'][0][1] > configs['detect_min_height'] and \
+                            person['bbox'][0][0] > configs['detect_min_x'] and \
+                            person['bbox'][0][2] < configs['detect_max_x']]
     
     match_indices = []
     for idx_person, person in enumerate(people_keypoints):
@@ -68,7 +70,7 @@ def filter_sort(image, people_keypoints, feature_store):
             similarities.append(np.max(scores) + (len(features) / 5 * .1))
 
         if len(similarities) > 0 and \
-                similarities[np.argmax(similarities)] > .6 and \
+                similarities[np.argmax(similarities)] > configs['track_threshold'] and \
                 np.argmax(similarities) not in match_indices:
             match_index = np.argmax(similarities).item()
             feature_store[match_index].put(feature_current)
@@ -93,7 +95,7 @@ def _get_skeleton(image, inferencer, feature_store, configs):
     detected_confidences = []
     for result in result_generator:
         poeple_keypoints, match_indcies = filter_sort(
-            image, result['predictions'][0], feature_store)
+            image, result['predictions'][0], feature_store, configs)
         for predictions in poeple_keypoints:
             keypoints = predictions['keypoints']
             # Divided by 10 to normalize between 0 and 1
@@ -119,13 +121,10 @@ def extract_poses(dir, camera, model_2d, intrinsics,
     feature_store = []
 
     cap = cv2.VideoCapture(dir)
-    for _ in range(configs['calibration_folders'][camera]['offset']):
-        cap.grab()
 
     frame_count = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
-    search_depth = min(frame_count, configs['experiment_length'])
 
-    bar = tqdm(range(search_depth))
+    bar = tqdm(range(frame_count))
     bar.set_description(camera)
     for idx in bar:
         ret, img_rgb = cap.read()
@@ -174,7 +173,7 @@ def calc_2d_skeleton(cameras, model_2d, configs):
 
     keypoints = {}
     for _, camera in enumerate(cameras):
-        dir = configs['calibration_folders'][camera]['path']
+        dir = configs['videos'][camera]['path']
 
         pose, pose_confidence, ids = extract_poses(
             dir, camera, model_2d, intrinsics, configs)
@@ -198,7 +197,7 @@ if __name__ == "__main__":
     model = ViTModel.from_pretrained('google/vit-large-patch32-384')
 
     model_2d = MMPoseInferencer(configs["model"], device='cpu')
-    cameras = configs["calibration_folders"].keys()
+    cameras = configs["videos"].keys()
         
     keypoints = calc_2d_skeleton(cameras, model_2d, configs)
     
