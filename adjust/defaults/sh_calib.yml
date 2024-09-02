@@ -1,0 +1,4 @@
+detect_chessboard_rgb: "/home/hamid/Documents/phd/footefield/footefield_feature_video/calibration/detect_chessboard_rgb.py"
+calc_intrinsic_rgb: "/home/hamid/Documents/phd/footefield/footefield_feature_video/calibration/calc_intrinsic_rgb.py"
+calc_extrinsic_rgb: "/home/hamid/Documents/phd/footefield/footefield_feature_video/calibration/calc_extrinsic_rgb.py"
+pattern: "python3 \"{}\" -c \"{}\"\npython3 \"{}\" -c \"{}\"\npython3 \"{}\" -c \"{}\""

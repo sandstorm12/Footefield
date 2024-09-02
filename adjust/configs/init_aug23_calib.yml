@@ -1,5 +1,7 @@
-segment_size: 50
-output_dir: "adjusted/aug23_calib/"
+segment_size: 500
+calibration: True
+calib_data_dir: None
+output_dir: "/home/hamid/Documents/phd/footefield/data/dataset_mocap24/aug_23/aug23_calib"
 videos:
   - name: "cam0"
     path: "/home/hamid/Documents/phd/footefield/data/Aug 23 real/cam0.mp4"
@@ -25,3 +27,8 @@ videos:
     path: "/home/hamid/Documents/phd/footefield/data/Aug 23 real/cam5.mp4"
     start: 702
     length: 500
+defaults:
+  detect_chessboard_rgb: "defaults/detect_chessboard_rgb.yml"
+  calc_intrinsic_rgb: "defaults/calc_intrinsic_rgb.yml"
+  calc_extrinsic_rgb: "defaults/calc_extrinsic_rgb.yml"
+  sh: "defaults/sh_calib.yml"
