@@ -42,6 +42,10 @@ def filter_sort(image, people_keypoints, feature_store, configs):
                             person['bbox'][0][3] - person['bbox'][0][1] > configs['detect_min_height'] and \
                             person['bbox'][0][0] > configs['detect_min_x'] and \
                             person['bbox'][0][2] < configs['detect_max_x']]
+    people_keypoints = sorted(
+        people_keypoints,
+        key=lambda x: abs(((x['bbox'][0][0] + x['bbox'][0][2]) / 2) - 960),
+        reverse=False)
     
     match_indices = []
     for idx_person, person in enumerate(people_keypoints):
