@@ -56,6 +56,7 @@ def _make_dirs(configs):
 def _copy_original_videos(dir_videos_org, configs):
     for video in configs['videos']:
         file_name = os.path.split(video['path'])[1]
+        file_name = video['name'] + '_' + file_name
         
         src = video['path']
         dst = os.path.join(dir_videos_org, file_name)
@@ -206,9 +207,9 @@ if __name__ == "__main__":
     dir_videos_org, dir_segments, dir_artifacts, dir_configs, dir_sh = \
         _make_dirs(configs)
 
-    # _copy_original_videos(dir_videos_org, configs)
+    _copy_original_videos(dir_videos_org, configs)
 
-    # _segment_videos(dir_segments, configs)
+    _segment_videos(dir_segments, configs)
 
     _generate_configs(dir_segments, dir_artifacts, dir_configs, configs)
 

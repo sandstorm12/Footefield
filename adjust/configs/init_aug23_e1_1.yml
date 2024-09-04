@@ -1,5 +1,6 @@
 segment_size: 50
-output_dir: "adjusted/aug23_e1_1/"
+calib_data_dir: "/home/hamid/Documents/phd/footefield/data/dataset_mocap24/aug_23/aug23_calib/artifacts"
+output_dir: "/home/hamid/Documents/phd/footefield/data/dataset_mocap24/aug_23/aug23_e1_1/"
 videos:
   - name: "cam0"
     path: "/home/hamid/Documents/phd/footefield/data/Aug 23 real/cam0.mp4"
@@ -25,3 +26,10 @@ videos:
     path: "/home/hamid/Documents/phd/footefield/data/Aug 23 real/cam5.mp4"
     start: 1702
     length: 300
+defaults:
+  skeleton_detection: "defaults_pose/skeleton_detection.yml"
+  skeleton_triangulation: "defaults_pose/skeleton_triangulation.yml"
+  skeleton_bundle_adjustment: "defaults_pose/skeleton_bundle_adjustment.yml"
+  skeleton_3d_normalizer: "defaults_pose/skeleton_3d_normalizer.yml"
+  visualizer_skeleton_3d_video_ba: "defaults_pose/visualizer_skeleton_3d_video_ba.yml"
+  sh: "defaults_pose/sh.yml"
