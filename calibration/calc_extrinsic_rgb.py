@@ -91,12 +91,30 @@ def find_matching_images(images_info, cam_1, cam_2):
 def calc_extrinsics(cam_1, cam_2, obj_points, intrinsics, extrinsics, configs):
     print(f"Calibrating... {cam_1} vs {cam_2}")
 
+    mtx_1 = np.array(intrinsics[cam_1]['mtx'], np.float32)
+    dist_1 = np.array(intrinsics[cam_1]['dist'], np.float32)
+    mtx_2 = np.array(intrinsics[cam_2]['mtx'], np.float32)
+    dist_2 = np.array(intrinsics[cam_2]['dist'], np.float32)
+
     with open(configs['chessboards']) as handler:
         images_info = yaml.safe_load(handler)
 
     matching_pairs = find_matching_images(images_info, cam_1, cam_2)
 
     print(f"Matching pairs: {len(matching_pairs)}")
+    # Technical Debt
+    if len(matching_pairs) == 0:
+        extrinsics[cam_1] = {
+            'left_cam': cam_1,
+            'right_cam': cam_2,
+            'mtx_l': mtx_1.tolist(),
+            'dist_l': dist_1.tolist(),
+            'mtx_r': mtx_2.tolist(),
+            'dist_r': dist_2.tolist(),
+            'rotation': None,
+            'transition': None,
+        }
+        return
 
     img_points_1 = np.array(
         [images_info[cam_1][frame_idx][1] for frame_idx in matching_pairs],
@@ -104,11 +122,6 @@ def calc_extrinsics(cam_1, cam_2, obj_points, intrinsics, extrinsics, configs):
     img_points_2 = np.array(
         [images_info[cam_2][frame_idx][1] for frame_idx in matching_pairs],
         np.float32)
-    
-    mtx_1 = np.array(intrinsics[cam_1]['mtx'], np.float32)
-    dist_1 = np.array(intrinsics[cam_1]['dist'], np.float32)
-    mtx_2 = np.array(intrinsics[cam_2]['mtx'], np.float32)
-    dist_2 = np.array(intrinsics[cam_2]['dist'], np.float32)
 
     _, _, _, _, _, R, T, _, _ = cv2.stereoCalibrate(
         np.tile(obj_points, (len(img_points_1), 1, 1)),
@@ -139,6 +152,9 @@ def calc_reprojection_error(cam_1, cam_2, obj_points, extrinsics, configs):
     matching_pairs = find_matching_images(images_info, cam_1, cam_2)
 
     print(f"Matching pairs: {len(matching_pairs)}")
+    # Technical Debt
+    if len(matching_pairs) == 0:
+        return
 
     img_points_1 = np.array(
         [images_info[cam_1][frame_idx][1] for frame_idx in matching_pairs],
