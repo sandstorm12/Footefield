@@ -137,7 +137,7 @@ def optimize(n_cameras, n_points, params_org,
 
     res = least_squares(
         fun, x0, jac_sparsity=jac_sparsity, verbose=2,
-        x_scale='jac', ftol=1e-9, xtol=1e-9, gtol=1e-9,
+        x_scale='jac', ftol=1e-8, xtol=1e-8, gtol=1e-8,
         method='trf', args=(n_cameras, n_points, params_org,
                             points_2d, points_2d_conf, points_indices,
                             points_cam_indices, configs))
@@ -300,16 +300,18 @@ if __name__ == '__main__':
 
     x0 = _contruct_optimization_params(params_org, points_3d, configs)
 
-    visualize_error(x0, n_cameras, n_points,
-                    params_org, points_2d, points_2d_conf, points_indices,
-                    points_cam_indices, configs)
+    if configs['visualize']:
+        visualize_error(x0, n_cameras, n_points,
+                        params_org, points_2d, points_2d_conf, points_indices,
+                        points_cam_indices, configs)
 
     results = optimize(n_cameras, n_points,
                        params_org, points_2d, points_2d_conf, points_indices,
                        points_cam_indices, configs)
 
-    visualize_error(results['x'], n_cameras, n_points,
-                    params_org, points_2d, points_2d_conf, points_indices,
-                    points_cam_indices, configs)
+    if configs['visualize']:
+        visualize_error(results['x'], n_cameras, n_points,
+                        params_org, points_2d, points_2d_conf, points_indices,
+                        points_cam_indices, configs)
 
     store_results(results, poses_2d, poses_3d, params_org, configs)

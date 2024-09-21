@@ -1,0 +1,35 @@
+segment_size: 50
+calib_data_dir: "/home/hamid/Documents/phd/footefield/data/dataset_mocap24/aug_24/aug24_calib_0/artifacts"
+output_dir: "/home/hamid/Documents/phd/footefield/data/dataset_mocap24/aug_24/aug24_e1_0"
+videos:
+  - name: "cam0"
+    path: "/home/hamid/Documents/phd/footefield/data/real aug 24/0/output_1 (1).mp4"
+    start: 200
+    length: 1555
+  - name: "cam1"
+    path: "/home/hamid/Documents/phd/footefield/data/real aug 24/0/output_0 (1).mp4"
+    start: 202
+    length: 1555
+  - name: "cam2"
+    path: "/home/hamid/Documents/phd/footefield/data/real aug 24/1/output_1 (1).mp4"
+    start: 202
+    length: 1555
+  - name: "cam3"
+    path: "/home/hamid/Documents/phd/footefield/data/real aug 24/1/output_0 (1).mp4"
+    start: 202
+    length: 1555
+  - name: "cam4"
+    path: "/home/hamid/Documents/phd/footefield/data/real aug 24/2/output_0 (1).mp4"
+    start: 202
+    length: 1555
+  - name: "cam5"
+    path: "/home/hamid/Documents/phd/footefield/data/real aug 24/2/output_1 (1).mp4"
+    start: 202
+    length: 1555
+defaults:
+  skeleton_detection: "defaults_pose/skeleton_detection.yml"
+  skeleton_triangulation: "defaults_pose/skeleton_triangulation.yml"
+  skeleton_bundle_adjustment: "defaults_pose/skeleton_bundle_adjustment.yml"
+  skeleton_3d_normalizer: "defaults_pose/skeleton_3d_normalizer.yml"
+  visualizer_skeleton_3d_video_ba: "defaults_pose/visualizer_skeleton_3d_video_ba.yml"
+  sh: "defaults_pose/sh.yml"

@@ -1,7 +1,7 @@
-skeletons: "../pose_estimation/artifacts/3d_skeletons_a1_ba_norm.yml"
+skeletons: "/home/hamid/Documents/phd/footefield/data/dataset_mocap24/aug_24/aug24_e2_0/artifacts/0/3d_skeletons_ba_norm.yml"
 gender: "neutral"
 models_root: "models"
-weight_scale: 1.0e-4
+weight_scale: 1.0e-3
 visualize: False
 visualize_mesh: True
 learning_rate: .002

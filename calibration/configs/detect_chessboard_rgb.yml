@@ -1,7 +1,5 @@
 parallel: True
 display: False
-start_depth: 650
-search_depth: 550
 output_dir: 'artifacts/chessboards_rgb.yml'
 calibration_folders:
     cam0:

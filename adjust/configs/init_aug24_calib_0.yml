@@ -1,0 +1,32 @@
+segment_size: 1140
+output_dir: "/home/hamid/Documents/phd/footefield/data/dataset_mocap24/aug_24/aug24_calib_0"
+videos:
+  - name: "cam0"
+    path: "/home/hamid/Documents/phd/footefield/data/real aug 24/0/output_1.mp4"
+    start: 130
+    length: 1140
+  - name: "cam1"
+    path: "/home/hamid/Documents/phd/footefield/data/real aug 24/0/output_0.mp4"
+    start: 132
+    length: 1140
+  - name: "cam2"
+    path: "/home/hamid/Documents/phd/footefield/data/real aug 24/1/output_1.mp4"
+    start: 132
+    length: 1140
+  - name: "cam3"
+    path: "/home/hamid/Documents/phd/footefield/data/real aug 24/1/output_0.mp4"
+    start: 132
+    length: 1140
+  - name: "cam4"
+    path: "/home/hamid/Documents/phd/footefield/data/real aug 24/2/output_0.mp4"
+    start: 132
+    length: 1140
+  - name: "cam5"
+    path: "/home/hamid/Documents/phd/footefield/data/real aug 24/2/output_1.mp4"
+    start: 132
+    length: 1140
+defaults:
+  detect_chessboard_rgb: "defaults_calib/detect_chessboard_rgb.yml"
+  calc_intrinsic_rgb: "defaults_calib/calc_intrinsic_rgb.yml"
+  calc_extrinsic_rgb: "defaults_calib/calc_extrinsic_rgb.yml"
+  sh: "defaults_calib/sh_calib.yml"

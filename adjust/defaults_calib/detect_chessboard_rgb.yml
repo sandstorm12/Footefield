@@ -1,0 +1,6 @@
+parallel: True
+display: False
+output_dir: "chessboards_rgb.yml"
+calibration_videos:
+    cam_name:
+      path: "video/path"
