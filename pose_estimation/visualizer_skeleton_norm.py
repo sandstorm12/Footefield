@@ -67,7 +67,7 @@ def visualize_poses(poses):
             vis.update_geometry(geometry)
             vis.update_geometry(lines)
             
-        delay_ms = 50
+        delay_ms = 100
         for _ in range(delay_ms // 10):
             vis.poll_events()
             vis.update_renderer()
