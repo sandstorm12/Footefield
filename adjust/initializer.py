@@ -41,6 +41,9 @@ def _make_dirs(configs):
     dir_segments = os.path.join(configs['output_dir'], "segments")
     _make_check_exists(dir_segments)
 
+    dir_segments_360 = os.path.join(configs['output_dir'], "segments_360")
+    _make_check_exists(dir_segments)
+
     dir_videos_test = os.path.join(configs['output_dir'], "videos_test")
     _make_check_exists(dir_videos_test)
 
@@ -53,7 +56,7 @@ def _make_dirs(configs):
     dir_sh = os.path.join(configs['output_dir'], "sh")
     _make_check_exists(dir_sh)
 
-    return dir_videos_org, dir_segments, dir_videos_test, \
+    return dir_videos_org, dir_segments, dir_segments_360, dir_videos_test, \
         dir_artifacts, dir_configs, dir_sh
 
 
@@ -96,6 +99,56 @@ def _segment_videos(dir_segments, configs):
                             video['name'], segment
                         ))
 
+                writer.write(frame)
+
+    return sum(num_segments) // len(num_segments)
+
+
+def _segment_videos_360(dir_segments_360, configs):
+    num_segments_kinect = configs['videos'][0]['length'] / configs['segment_size']
+
+    num_segments = []
+    for video in tqdm(configs['videos_360']):
+        cap = cv2.VideoCapture(video['path'])
+
+        segment_size_360 = video['length'] / num_segments_kinect
+        
+        path_segments_cam = os.path.join(dir_segments_360, video['name'])
+        _make_check_exists(path_segments_cam)
+        
+        cap.set(cv2.CAP_PROP_POS_FRAMES, video['start'])
+        length = video['length']
+        num_segments.append(int(num_segments_kinect))
+        position = 0
+
+        bar = tqdm(range(int(num_segments_kinect)))
+        for segment in bar:
+            segment_path = os.path.join(path_segments_cam, f"{segment}.mp4")
+
+            start = position
+            position += segment_size_360
+            end = start + segment_size_360
+            current_segment_size = int(round(end)) - int(round(start))
+            bar.set_description(f"cs: {current_segment_size}")
+
+            fps = current_segment_size / configs['segment_size'] * 5
+            print("fps", fps)
+            writer = cv2.VideoWriter(
+                segment_path,
+                cv2.VideoWriter_fourcc(*'mp4v'),
+                fps,
+                (1920, 1080))
+
+            for _ in range(current_segment_size):
+                ret, frame = cap.read()
+
+                if not ret:
+                    raise Exception(
+                        "Failed to read frame in cam {} at segment {}".format(
+                            video['name'], segment
+                        ))
+
+                frame = cv2.resize(frame, (1920, 1080))
                 writer.write(frame)
 
     return sum(num_segments) // len(num_segments)
@@ -322,15 +375,16 @@ if __name__ == "__main__":
 
     print(f"Config loaded: {configs}")
 
-    dir_videos_org, dir_segments, dir_videos_test, \
+    dir_videos_org, dir_segments, dir_segments_360, dir_videos_test, \
         dir_artifacts, dir_configs, dir_sh = \
         _make_dirs(configs)
 
-    print("Copying original videos...")
-    _copy_original_videos(dir_videos_org, configs)
+    # # print("Copying original videos...")
+    # _copy_original_videos(dir_videos_org, configs)
 
     print("Segmenting videos...")
     num_segments = _segment_videos(dir_segments, configs)
+    num_segments_360 = _segment_videos_360(dir_segments_360, configs)
 
     sh_segment_list = []
     for segment in range(num_segments):

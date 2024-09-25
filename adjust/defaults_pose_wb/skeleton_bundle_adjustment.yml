@@ -1,9 +1,0 @@
-skeletons_2d: "detected_skeletons.yml"
-skeletons_3d: "3d_skeletons.yml"
-params: "params_global.yml"
-visualize: False
-calib_param_size: 12
-conf_threshold: .5
-conf_power: 1
-output_skeleton_3d: "3d_skeletons_ba.yml"
-output_params: "params_global_ba.yml"

@@ -1,6 +1,0 @@
-skeleton_detection: "/home/hamid/Documents/phd/footefield/footefield_feature_video/pose_estimation/skeleton_detection.py"
-skeleton_triangulation: "/home/hamid/Documents/phd/footefield/footefield_feature_video/pose_estimation/skeleton_triangulation.py"
-skeleton_bundle_adjustment: "/home/hamid/Documents/phd/footefield/footefield_feature_video/pose_estimation/skeleton_bundle_adjustment.py"
-skeleton_3d_normalizer: "/home/hamid/Documents/phd/footefield/footefield_feature_video/pose_estimation/skeleton_3d_normalizer.py"
-visualizer_skeleton_3d_video_ba: "/home/hamid/Documents/phd/footefield/footefield_feature_video/pose_estimation/visualizer_skeleton_3d_video.py"
-pattern: "python3 \"{}\" -c \"{}\"\npython3 \"{}\" -c \"{}\"\npython3 \"{}\" -c \"{}\"\npython3 \"{}\" -c \"{}\"\npython3 \"{}\" -c \"{}\""
