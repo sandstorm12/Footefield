@@ -137,7 +137,7 @@ def optimize(n_cameras, n_points, params_org,
 
     res = least_squares(
         fun, x0, jac_sparsity=jac_sparsity, verbose=2,
-        x_scale='jac', ftol=1e-8, xtol=1e-8, gtol=1e-8,
+        x_scale='jac', ftol=1e-8, xtol=1e-8, gtol=1e-8, max_nfev=20,
         method='trf', args=(n_cameras, n_points, params_org,
                             points_2d, points_2d_conf, points_indices,
                             points_cam_indices, configs))
