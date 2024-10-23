@@ -7,8 +7,8 @@ import torch
 import argparse
 import numpy as np
 
-from queue import Queue
 from tqdm import tqdm
+from queue import Queue
 from mmpose.apis import MMPoseInferencer
 from transformers import ViTModel, ViTImageProcessor
 
@@ -44,7 +44,7 @@ def filter_sort(image, people_keypoints, feature_store, configs):
                             person['bbox'][0][2] < configs['detect_max_x']]
     people_keypoints = sorted(
         people_keypoints,
-        key=lambda x: abs(((x['bbox'][0][0] + x['bbox'][0][2]) / 2) - 960),
+        key=lambda x: abs(((x['bbox'][0][0] + x['bbox'][0][2]) / 2) - 960) + (1080 - x['bbox'][0][3]),
         reverse=False)
     
     match_indices = []
@@ -53,7 +53,8 @@ def filter_sort(image, people_keypoints, feature_store, configs):
         x0, y0, x1, y1 = map(int, bbox)
         image_person = image[y0:y1, x0:x1]
 
-        inputs = processor(images=image_person, return_tensors="pt")
+        # TODO: Use the model from input arguments
+        inputs = processor(images=image_person, return_tensors="pt").to(device)
         outputs = model(**inputs)
         last_hidden_states = outputs.last_hidden_state[0]
         feature_current = last_hidden_states[0].cpu().detach().numpy()
@@ -70,7 +71,6 @@ def filter_sort(image, people_keypoints, feature_store, configs):
                 scores.append(cosine_similarity)
 
             scores = np.array(scores)
-            print(scores)
             similarities.append(np.max(scores) + (len(features) / 5 * .1))
 
         if len(similarities) > 0 and \
@@ -86,8 +86,6 @@ def filter_sort(image, people_keypoints, feature_store, configs):
             match_index = len(feature_store) - 1
 
         match_indices.append(match_index)
-
-        print(idx_person, "-->", match_index)
 
     return people_keypoints, match_indices
 
@@ -194,13 +192,15 @@ def calc_2d_skeleton(cameras, model_2d, configs):
 if __name__ == "__main__":
     args = _get_arguments()
     configs = _load_configs(args.config)
-
     print(f"Config loaded: {configs}")
+
+    device = 'cuda' if torch.cuda.is_available() else 'cpu'
 
     processor = ViTImageProcessor.from_pretrained('google/vit-large-patch32-384')
     model = ViTModel.from_pretrained('google/vit-large-patch32-384')
+    model.to(device)
 
-    model_2d = MMPoseInferencer(configs["model"], device='cpu')
+    model_2d = MMPoseInferencer(configs["model"], device=device)
     cameras = configs["videos"].keys()
         
     keypoints = calc_2d_skeleton(cameras, model_2d, configs)
