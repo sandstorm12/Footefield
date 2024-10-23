@@ -44,7 +44,7 @@ def visualize_poses(poses):
     vis.get_render_option().show_coordinate_frame = True
     vis.get_render_option().background_color = data_loader.COLOR_SPACE_GRAY
     
-    origin = o3d.geometry.TriangleMesh().create_coordinate_frame(.10)
+    origin = o3d.geometry.TriangleMesh().create_coordinate_frame(np.max(poses) // 10)
     geometry = o3d.geometry.PointCloud()
     lines = o3d.geometry.LineSet()
     for idx in range(len(poses)):
