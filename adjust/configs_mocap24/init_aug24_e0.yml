@@ -31,6 +31,10 @@ videos_360:
     path: "/media/hamid/2874687674684920/Anything/Research/Insta360/aug24/output_1.mp4"
     start: 141
     length: 19413
+  - name: "360_1"
+    path: "/media/hamid/2874687674684920/Anything/Research/Insta360/aug24/output_0.mp4"
+    start: 448
+    length: 19413
 defaults:
   skeleton_detection: "defaults_pose/skeleton_detection.yml"
   skeleton_triangulation: "defaults_pose/skeleton_triangulation.yml"

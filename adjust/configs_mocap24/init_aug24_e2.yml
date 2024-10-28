@@ -1,0 +1,44 @@
+segment_size: 50
+calib_data_dir: "/home/hamid/Documents/phd/footefield/data/dataset_mocap24/aug_24/aug24_calib_0/artifacts"
+output_dir: "/home/hamid/Documents/phd/footefield/data/dataset_mocap24/aug_24/aug24_e2"
+videos:
+  - name: "cam0"
+    path: "/media/hamid/2874687674684920/Anything/Research/Kinect/aug24/captures/output_0_03.mp4"
+    start: 334
+    length: 1670
+  - name: "cam1"
+    path: "/media/hamid/2874687674684920/Anything/Research/Kinect/aug24/captures/output_1_03.mp4"
+    start: 335
+    length: 1670
+  - name: "cam2"
+    path: "/media/hamid/2874687674684920/Anything/Research/Kinect/aug24/captures/output_2_03.mp4"
+    start: 336
+    length: 1670
+  - name: "cam3"
+    path: "/media/hamid/2874687674684920/Anything/Research/Kinect/aug24/captures/output_3_03.mp4"
+    start: 336
+    length: 1670
+  - name: "cam4"
+    path: "/media/hamid/2874687674684920/Anything/Research/Kinect/aug24/captures/output_4_03.mp4"
+    start: 336
+    length: 1670
+  - name: "cam5"
+    path: "/media/hamid/2874687674684920/Anything/Research/Kinect/aug24/captures/output_5_03.mp4"
+    start: 336
+    length: 1670
+videos_360:
+  - name: "360_0"
+    path: "/media/hamid/2874687674684920/Anything/Research/Insta360/aug24/output_0.mp4"
+    start: 42106
+    length: 10014
+  - name: "360_1"
+    path: "/media/hamid/2874687674684920/Anything/Research/Insta360/aug24/output_1.mp4"
+    start: 41799
+    length: 10014
+defaults:
+  skeleton_detection: "defaults_pose/skeleton_detection.yml"
+  skeleton_triangulation: "defaults_pose/skeleton_triangulation.yml"
+  skeleton_bundle_adjustment: "defaults_pose/skeleton_bundle_adjustment.yml"
+  skeleton_3d_normalizer: "defaults_pose/skeleton_3d_normalizer.yml"
+  visualizer_skeleton_3d_video_ba: "defaults_pose/visualizer_skeleton_3d_video_ba.yml"
+  sh: "defaults_pose/sh.yml"
