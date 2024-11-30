@@ -68,7 +68,7 @@ def calculate_intrinsics(cameras_info, configs):
     intrinsics = {}
     for key in tqdm(cameras_info.keys()):
         img_points = np.array(cameras_info[key]['img_points'],
-                              dtype=np.float32)
+                              dtype=np.float32)[:configs['max_boards']]
         
         print("Image points: {}".format(img_points.shape))
 

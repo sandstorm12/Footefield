@@ -1,22 +1,22 @@
 parallel: True
 display: False
-output_dir: 'artifacts/chessboards_rgb.yml'
-calibration_folders:
+output_dir: './artifacts/chessboards_rgb.yml'
+calibration_videos:
     cam0:
-      path: "/home/hamid/Documents/phd/footefield/data/Aug 23 real/cam0.mp4"
+      path: "../captures/cam_1.mp4"
       offset: 0
     cam1:
-      path: "/home/hamid/Documents/phd/footefield/data/Aug 23 real/cam1.mp4"
-      offset: 1
+      path: "../captures/cam_2.mp4"
+      offset: 2
     cam2: 
-      path: "/home/hamid/Documents/phd/footefield/data/Aug 23 real/cam2.mp4"
+      path: "../captures/cam_3.mp4"
       offset: 1
     cam3: 
-      path: "/home/hamid/Documents/phd/footefield/data/Aug 23 real/cam3.mp4"
-      offset: 1
+      path: "../captures/cam_4.mp4"
+      offset: 2
     cam4: 
-      path: "/home/hamid/Documents/phd/footefield/data/Aug 23 real/cam4.mp4"
-      offset: 1
+      path: "../captures/cam_5.mp4"
+      offset: 2
     cam5: 
-      path: "/home/hamid/Documents/phd/footefield/data/Aug 23 real/cam5.mp4"
-      offset: 1
+      path: "../captures/cam_6.mp4"
+      offset: 2
