@@ -1,0 +1,22 @@
+see_through: False
+output_dir: "./videos/"
+exp_length: 150
+views:
+  cam_0:
+    path_in: "../captures/cam_1.mp4"
+    offset: 850
+  cam_1:
+    path_in: "../captures/cam_2.mp4"
+    offset: 852
+  cam_2:
+    path_in: "../captures/cam_3.mp4"
+    offset: 851
+  cam_3:
+    path_in: "../captures/cam_4.mp4"
+    offset: 852
+  cam_4:
+    path_in: "../captures/cam_5.mp4"
+    offset: 852
+  cam_5:
+    path_in: "../captures/cam_6.mp4"
+    offset: 852
