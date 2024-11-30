@@ -80,14 +80,10 @@ def _segment_video(model, preprocess, configs):
             output = model(input_batch)['out'][0]
         output_predictions = output.argmax(0)
 
-        print(torch.unique(output_predictions))
-        print(output_predictions.shape, output_predictions.min(), output_predictions.max())
-
         output_predictions[output_predictions == 15] = 255
         output_predictions[output_predictions != 255] = 0
 
         mask = output_predictions.detach().cpu().numpy().astype(np.uint8)
-        print(mask.shape, mask.min(), mask.max())
         mask = cv2.cvtColor(mask, cv2.COLOR_GRAY2BGR)
 
         if configs['see_through']:

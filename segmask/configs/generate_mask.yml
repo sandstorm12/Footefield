@@ -1,5 +1,3 @@
-visualize: True
-see_through: True
-batch_size: 4
+see_through: False
 path_in: "/home/hamid/Documents/phd/footefield/data/dataset_mocap24/aug_24/aug24_e0/segments/cam0/0.mp4"
 path_out: "./videos/0.mp4"
