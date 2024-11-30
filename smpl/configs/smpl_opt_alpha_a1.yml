@@ -1,9 +1,0 @@
-skeletons: "/home/hamid/Documents/phd/footefield/data/dataset_mocap24/aug_24/aug24_e2_0/artifacts/0/3d_skeletons_ba_norm.yml"
-gender: "neutral"
-models_root: "models"
-weight_scale: 1.0e-3
-visualize: False
-visualize_mesh: True
-learning_rate: .002
-epochs: 2000
-output: "artifacts/smpl_opt_alpha_a1.yml"

@@ -1,5 +1,0 @@
-chessboards: "chessboards_rgb.yml"
-intrinsics: "intrinsic_rgb.yml"
-output_dir: "extrinsic_rgb.yml"
-cameras:
-  - "cam_name"

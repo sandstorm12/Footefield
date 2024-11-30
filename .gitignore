@@ -35,6 +35,7 @@ smpl/models/
 # Videos
 *.avi
 *.mp4
+captures/
 
 # Mediapipe
 *.task
