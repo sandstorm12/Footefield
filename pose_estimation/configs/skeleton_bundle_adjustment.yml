@@ -1,8 +1,0 @@
-skeletons_2d: "./artifacts/detected_skeletons_a1.yml"
-skeletons_3d: "./artifacts/3d_skeletons_a1.yml"
-params: "./artifacts/params_global_a1.yml"
-calib_param_size: 12
-conf_threshold: .5
-conf_power: 1
-output_skeleton_3d: "artifacts/3d_skeletons_a1_ba.yml"
-output_params: "artifacts/params_global_a1_ba.yml"

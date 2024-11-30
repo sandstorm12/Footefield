@@ -1,26 +1,26 @@
-skeletons: "artifacts/3d_skeletons_a1_wb_ba.yml"
-params: "artifacts/params_global_a1_wb_ba.yml"
-output_dir: "videos/visualizer_skeleton_3d_wb_ba/a1/"
+skeletons: "./artifacts/3d_skeletons_a1_wb_ba.yml"
+params: "./artifacts/params_global_a1_wb_ba.yml"
+output_dir: "./videos/visualizer_skeleton_3d_ba/a1/"
 fps: 5
 size:
   - 1920
   - 1080
 calibration_folders:
     cam0:
-      path: "../adjust/adjusted/aug23_e1_1/cam0/0.mp4"
-      offset: 0
+      path: "../captures/cam_1.mp4"
+      offset: 850
     cam1:
-      path: "../adjust/adjusted/aug23_e1_1/cam1/0.mp4"
-      offset: 0
+      path: "../captures/cam_2.mp4"
+      offset: 852
     cam2: 
-      path: "../adjust/adjusted/aug23_e1_1/cam2/0.mp4"
-      offset: 0
+      path: "../captures/cam_3.mp4"
+      offset: 851
     cam3: 
-      path: "../adjust/adjusted/aug23_e1_1/cam3/0.mp4"
-      offset: 0
+      path: "../captures/cam_4.mp4"
+      offset: 852
     cam4: 
-      path: "../adjust/adjusted/aug23_e1_1/cam4/0.mp4"
-      offset: 0
+      path: "../captures/cam_5.mp4"
+      offset: 852
     cam5: 
-      path: "../adjust/adjusted/aug23_e1_1/cam5/0.mp4"
-      offset: 0
+      path: "../captures/cam_6.mp4"
+      offset: 852

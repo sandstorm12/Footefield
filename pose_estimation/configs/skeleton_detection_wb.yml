@@ -1,11 +1,15 @@
-skeletons: "./artifacts/3d_skeletons_a1_wb.yml"
-params: "./artifacts/params_global_a1_wb.yml"
-output_dir: "./videos/visualizer_skeleton_3d/a1/"
-fps: 5
-size:
-  - 1920
-  - 1080
-calibration_folders:
+model: "rtmw-x_8xb320-270e_cocktail14-384x288"
+output: "artifacts/detected_skeletons_wb_a1.yml"
+intrinsics: "../calibration/artifacts/intrinsic_rgb.yml"
+detect_threshold: .2
+track_threshold: .5
+detect_min_height: 100
+detect_min_x: 0
+detect_max_x: 1920
+visualize: True
+confidence_coeff: 10
+experiment_length: 150
+videos:
     cam0:
       path: "../captures/cam_1.mp4"
       offset: 850

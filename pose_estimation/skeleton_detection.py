@@ -123,8 +123,12 @@ def extract_poses(dir, camera, model_2d, intrinsics,
     feature_store = []
 
     cap = cv2.VideoCapture(dir)
+    offset = configs['videos'][camera]['offset']
+    for _ in range(offset):
+        cap.grab()
 
-    frame_count = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
+    frame_count = int(cap.get(cv2.CAP_PROP_FRAME_COUNT)) - offset
+    frame_count = min(frame_count, configs['experiment_length'])
 
     bar = tqdm(range(frame_count))
     bar.set_description(camera)
