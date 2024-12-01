@@ -1,26 +1,26 @@
-skeletons: "artifacts/detected_skeletons_wb_a1.yml"
+skeletons: "./artifacts/detected_skeletons_wb_a1.yml"
 intrinsics: "../calibration/artifacts/intrinsic_rgb.yml"
-output_dir: "videos/visualizer_skeleton_2d_wb/a1/"
+output_dir: "./videos/visualizer_skeleton_2d_wb/a1/"
 fps: 5
 size:
   - 1920
   - 1080
 calibration_folders:
     cam0:
-      path: "/home/hamid/Documents/phd/footefield/data/Aug 23 real/cam0_cut.mp4"
-      offset: 0
+      path: "../captures/cam_1.mp4"
+      offset: 850
     cam1:
-      path: "/home/hamid/Documents/phd/footefield/data/Aug 23 real/cam1_cut.mp4"
-      offset: 0
+      path: "../captures/cam_2.mp4"
+      offset: 852
     cam2: 
-      path: "/home/hamid/Documents/phd/footefield/data/Aug 23 real/cam2_cut.mp4"
-      offset: 0
+      path: "../captures/cam_3.mp4"
+      offset: 851
     cam3: 
-      path: "/home/hamid/Documents/phd/footefield/data/Aug 23 real/cam3_cut.mp4"
-      offset: 0
+      path: "../captures/cam_4.mp4"
+      offset: 852
     cam4: 
-      path: "/home/hamid/Documents/phd/footefield/data/Aug 23 real/cam4_cut.mp4"
-      offset: 0
+      path: "../captures/cam_5.mp4"
+      offset: 852
     cam5: 
-      path: "/home/hamid/Documents/phd/footefield/data/Aug 23 real/cam5_cut.mp4"
-      offset: 0
+      path: "../captures/cam_6.mp4"
+      offset: 852

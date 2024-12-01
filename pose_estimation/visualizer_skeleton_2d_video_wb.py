@@ -85,9 +85,12 @@ def get_video_writer(camera, dir, fps, size):
     return writer
 
 
-def write_video(poses, camera, intrinsics, configs):
+def write_video(poses, confs, camera, intrinsics, configs):
     dir = configs['calibration_folders'][camera]['path']
+    offset = configs['calibration_folders'][camera]['offset']
     cap = cv2.VideoCapture(dir)
+    for _ in range(offset):
+        cap.grab()
 
     if not os.path.exists(configs['output_dir']):
         os.makedirs(configs['output_dir'])
@@ -97,23 +100,24 @@ def write_video(poses, camera, intrinsics, configs):
 
     writer = get_video_writer(camera, configs['output_dir'],
                               configs['fps'], configs['size'])
-    for idx, t in enumerate(poses.reshape(poses.shape[0], -1, 2)):
+    for pose, conf in zip(poses, confs):
         _, img_rgb = cap.read()
 
         img_rgb = cv2.undistort(img_rgb, mtx, dist, None, None)
-        for point in t:
-            cv2.circle(img_rgb, (int(point[0]), int(point[1])),
-                       3, (0, 255, 0), -1)
-
-        connections = np.concatenate(
-            [np.array(HALPE_LINES) + i * 133
-             for i in range(poses.shape[1])]
-        )
-        for connection in connections:
-            cv2.line(img_rgb,
-                    (int(t[connection[0]][0]), int(t[connection[0]][1])),
-                    (int(t[connection[1]][0]), int(t[connection[1]][1])),
-                    (255, 255, 255), 1)
+        for person, person_conf in zip(pose, conf):
+            connections = np.array(HALPE_LINES)
+            for connection in connections:
+                cv2.line(img_rgb,
+                        (int(person[connection[0]][0]),
+                         int(person[connection[0]][1])),
+                        (int(person[connection[1]][0]),
+                         int(person[connection[1]][1])),
+                        (255, 255, 255), 1)
+                
+                for point, point_conf in zip(person, person_conf):
+                    color = (0, 255, 0) if point_conf > 0.6 else (0, 0, 255)
+                    cv2.circle(img_rgb, (int(point[0]), int(point[1])),
+                            5, color, -1)
 
         writer.write(img_rgb)
 
@@ -132,7 +136,8 @@ if __name__ == "__main__":
     for idx_cam, camera in enumerate(tqdm(cameras)):
         with open(configs['intrinsics']) as handler:
             intrinsics = yaml.safe_load(handler)
-        
-        poses_cam = np.array(poses[camera]['pose'])
 
-        write_video(poses_cam, camera, intrinsics, configs)
+        poses_cam = np.array(poses[camera]['pose'])
+        confs_cam = np.array(poses[camera]['pose_confidence'])
+
+        write_video(poses_cam, confs_cam, camera, intrinsics, configs)

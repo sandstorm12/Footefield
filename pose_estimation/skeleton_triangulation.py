@@ -140,7 +140,7 @@ def calc_3d_skeleton(poses, params, configs):
                         params[camera]['translation'], np.float32)
                     parameters.append(cam_mtx @ extrinsics)
 
-            if len(points_2d) > 0:
+            if len(points_2d) > 1:
                 points_2d = np.expand_dims(np.array(points_2d), 1)
                 
                 parameters = np.array(parameters)
@@ -202,6 +202,23 @@ def _filter_by_id(poses, ids):
     return poses_filtered
 
 
+def _fill_zero_points(poses_3d):
+    for timestep in range(len(poses_3d)):
+        for keypoint in range(len(poses_3d[timestep][0])):
+            if np.all(poses_3d[timestep][0][keypoint] == 0):
+                if timestep != 0:
+                    fill = poses_3d[timestep - 1][0][keypoint]
+                    print("Replaced {} -> {} with {}".format(
+                        keypoint, timestep, timestep - 1
+                    ))
+                else:
+                    fill = poses_3d[timestep + 1][0][keypoint]
+                    print("Replaced {} -> {} with {}".format(
+                        keypoint, timestep, timestep + 1
+                    ))
+                poses_3d[timestep][0][keypoint] = fill
+
+
 def _store_artifacts(artifact, output):
     with open(output, 'w') as handle:
         yaml.dump(artifact, handle)
@@ -220,6 +237,8 @@ if __name__ == "__main__":
         
     params = _calc_params(configs)
     poses_3d = calc_3d_skeleton(poses, params, configs)
+
+    _fill_zero_points(poses_3d)
 
     _store_artifacts(params, configs['output_params'])
     _store_artifacts(poses_3d.tolist(), configs['output'])
