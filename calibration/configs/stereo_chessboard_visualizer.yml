@@ -1,7 +1,20 @@
-chessboards_rgb: "/home/hamid/Documents/phd/footefield/footefield/calibration/artifacts/chessboards_rgb.yml"
+chessboards_rgb: "./artifacts/chessboards_rgb.yml"
 cameras:
-  - "cam1_5"
-  - "cam1_4"
-  - "cam3_4"
-  - "cam3_5"
-  - "cam2_4"
+    cam0:
+      path: "../captures/cam_1.mp4"
+      offset: 0
+    cam1:
+      path: "../captures/cam_2.mp4"
+      offset: 2
+    cam2: 
+      path: "../captures/cam_3.mp4"
+      offset: 1
+    cam3: 
+      path: "../captures/cam_4.mp4"
+      offset: 2
+    cam4: 
+      path: "../captures/cam_5.mp4"
+      offset: 2
+    cam5: 
+      path: "../captures/cam_6.mp4"
+      offset: 2

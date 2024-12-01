@@ -1,4 +1,3 @@
-chessboards: "/home/hamid/Documents/phd/footefield/footefield_ref_740a01/calibration/artifacts/chessboards_rgb.yml"
+chessboards: "./artifacts/chessboards_rgb.yml"
 output_dir: "./artifacts/intrinsic_rgb.yml"
-max_boards: 100
-
+max_boards: 150

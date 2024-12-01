@@ -8,9 +8,12 @@ sys.path.append('../')
 import cv2
 import yaml
 import argparse
+import numpy as np
 
 from tqdm import tqdm
 from threading import Thread
+
+from scipy.spatial import ConvexHull
 
 from utils import data_loader
 
@@ -43,10 +46,14 @@ def _load_configs(path):
 def extract_chessboardcorners(path_video, images_info, camera_name, configs):
     cap = cv2.VideoCapture(path_video)
 
+    offset = configs['calibration_videos'][camera_name]['offset']
+    for _ in range(offset):
+        cap.read()
+
     if not images_info.__contains__(camera_name):
         images_info[camera_name] = []
 
-    frame_count = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
+    frame_count = int(cap.get(cv2.CAP_PROP_FRAME_COUNT)) - offset
 
     success_count = 0
 
@@ -61,7 +68,11 @@ def extract_chessboardcorners(path_video, images_info, camera_name, configs):
             cv2.CALIB_CB_ADAPTIVE_THRESH + cv2.CALIB_CB_NORMALIZE_IMAGE)
         
         if ret:
-            corners = cv2.cornerSubPix(gray, corners, (6, 6), (-1, -1), criteria)
+            corners = cv2.cornerSubPix(gray, corners, (3, 3), (-1, -1), criteria)
+            corners = corners.reshape(data_loader.CHESSBOARD_ROWS, data_loader.CHESSBOARD_COLS, 2)
+            if corners[0, 0, 1] > corners[-1, -1, 1]:  # Compare y-coordinates
+                corners = corners[::-1, ::-1] 
+            corners = corners.reshape(-1, 1, 2).astype(np.float32)
             corners = corners.tolist()
         else:
             corners = []
@@ -83,16 +94,20 @@ def extract_chessboardcorners(path_video, images_info, camera_name, configs):
     
 
 def _display(image, corners):
-    for point in corners:
+    for idx_point, point in enumerate(corners):
         x = int(point[0][0])
         y = int(point[0][1])
 
         cv2.circle(
             image, (x, y), 5, (123, 105, 34),
-            thickness=-1, lineType=8) 
+            thickness=-1, lineType=8)
+        
+        cv2.putText(
+            image, str(idx_point), (x, y),
+            cv2.FONT_HERSHEY_SIMPLEX, .5, (255, 255, 255), thickness=2)
 
     cv2.imshow("image", image)
-    key = cv2.waitKey(1)
+    key = cv2.waitKey(0)
     if key == ord('q'):
         return False
     

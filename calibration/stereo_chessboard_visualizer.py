@@ -11,11 +11,11 @@ from utils import data_loader
 
 
 ORDER_VALID = (
-    'cam1_5/cam1_4',
-    'cam1_4/cam3_4',
-    'cam3_4/cam3_5',
-    'cam3_5/cam2_4',
-    'cam2_4/cam1_5',
+    'cam5/cam4',
+    'cam4/cam3',
+    'cam3/cam2',
+    'cam2/cam1',
+    'cam1/cam0',
 )
 
 def _get_arguments():
@@ -74,21 +74,14 @@ def load_image_points(images_info, images):
 
 
 def find_matching_images(images_info, cam_1, cam_2):
-    matching_pairs = {}
-    for image in images_info.keys():
-        img_name = image.split("/")[1]
-        cam_1_img = f"{cam_1}/{img_name}"
-        cam_2_img = f"{cam_2}/{img_name}"
-        if images_info.__contains__(cam_1_img) \
-            and images_info.__contains__(cam_2_img):
-            points_found_1, _ = images_info[cam_1_img]['findchessboardcorners_rgb']
-            points_found_2, _ = images_info[cam_2_img]['findchessboardcorners_rgb']
-            if points_found_1 and points_found_2:
-                matching_pairs[img_name] = {
-                    "cam_1_img": cam_1_img,
-                    "cam_2_img": cam_2_img,
-                }
-            
+    search_depth = min(len(images_info[cam_1]), len(images_info[cam_2]))
+
+    matching_pairs = []
+    for frame_idx in range(search_depth):
+        if images_info[cam_1][frame_idx][0] \
+                and images_info[cam_2][frame_idx][0]:
+            matching_pairs.append(frame_idx)
+        
     return matching_pairs
 
 
@@ -104,16 +97,13 @@ if __name__ == "__main__":
         images_info = yaml.safe_load(handler)
 
     cameras = configs['cameras']
-    for cam1_idx in range(len(cameras)):
-        for cam2_idx in range(len(cameras)):
-            cam_1 = cameras[cam1_idx]
-            cam_2 = cameras[cam2_idx]
-
+    for cam_1 in cameras:
+        for cam_2 in cameras:
             if f"{cam_1}/{cam_2}" not in ORDER_VALID:
                 continue
             
-            print(f"Calibrating... {cameras[cam1_idx]}"
-                  f" vs {cameras[cam2_idx]}")
+            print(f"Calibrating... {cam_1}"
+                  f" vs {cam_2}")
 
             matching_pairs = find_matching_images(images_info, cam_1, cam_2)
 
@@ -121,26 +111,27 @@ if __name__ == "__main__":
             if len(matching_pairs) == 0:
                 continue
             
-            img_points_1 = load_image_points(
-                images_info, images=[item['cam_1_img'] for item in matching_pairs.values()])
-            img_points_2 = load_image_points(
-                images_info, images=[item['cam_2_img'] for item in matching_pairs.values()])
+            img_points_1 = np.array(
+                [images_info[cam_1][frame_idx][1] for frame_idx in matching_pairs],
+                np.float32)
+            img_points_2 = np.array(
+                [images_info[cam_2][frame_idx][1] for frame_idx in matching_pairs],
+                np.float32)
 
-            for idx, key in enumerate(matching_pairs.keys()):
-                image_1_addr = images_info[matching_pairs[key]['cam_1_img']]['fullpath_rgb']
-                image_1 = cv2.imread(image_1_addr)
-                image_2_addr = images_info[matching_pairs[key]['cam_2_img']]['fullpath_rgb']
-                image_2 = cv2.imread(image_2_addr)
+            cap1 = cv2.VideoCapture(configs['cameras'][cam_1]['path'])
+            for _ in range(configs['cameras'][cam_1]['offset']):
+                cap1.grab()
+            cap2 = cv2.VideoCapture(configs['cameras'][cam_2]['path'])
+            for _ in range(configs['cameras'][cam_2]['offset']):
+                cap2.grab()
 
-                image_1 = data_loader.downsample_keep_aspect_ratio(
-                    image_1,
-                    (data_loader.IMAGE_INFRARED_WIDTH,
-                     data_loader.IMAGE_INFRARED_HEIGHT))
-                
-                image_2 = data_loader.downsample_keep_aspect_ratio(
-                    image_2,
-                    (data_loader.IMAGE_INFRARED_WIDTH,
-                     data_loader.IMAGE_INFRARED_HEIGHT))
+            idx_frame = -1
+            for idx, matched_frame_idx in enumerate(matching_pairs):
+                print(idx, idx_frame, matched_frame_idx)
+                while idx_frame < matched_frame_idx:
+                    _, image_1 = cap1.read()
+                    _, image_2 = cap2.read()
+                    idx_frame += 1
 
                 for idx_point, point in enumerate(img_points_1[idx]):
                     x = int(point[0][0])

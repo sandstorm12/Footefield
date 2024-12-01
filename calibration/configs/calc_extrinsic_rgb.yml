@@ -1,6 +1,7 @@
 chessboards: "./artifacts/chessboards_rgb.yml"
 intrinsics: "./artifacts/intrinsic_rgb.yml"
 output_dir: "./artifacts/extrinsic_rgb.yml"
+max_length: 150
 cameras:
   - "cam0"
   - "cam1"

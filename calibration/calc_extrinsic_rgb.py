@@ -100,6 +100,8 @@ def calc_extrinsics(cam_1, cam_2, obj_points, intrinsics, extrinsics, configs):
         images_info = yaml.safe_load(handler)
 
     matching_pairs = find_matching_images(images_info, cam_1, cam_2)
+    matching_pairs = matching_pairs[:min(len(matching_pairs),
+                                         configs['max_length'])]
 
     print(f"Matching pairs: {len(matching_pairs)}")
     # Technical Debt
