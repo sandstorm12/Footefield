@@ -1,9 +1,9 @@
 skeletons_norm: "../pose_estimation/artifacts/3d_skeletons_a1_wb_ba_norm.yml"
 gender: "neutral"
 models_root: "models"
-visualize: False
+visualize: True
 visualize_mesh: True
 learning_rate: .02
-weight_scale: 1.0e-10
+weight_scale: 1.0e-3
 epochs: 1000
-output: "artifacts/smplx_opt_alpha_a1.yml"
+output: "./artifacts/smplx_opt_alpha_a1.yml"

@@ -323,6 +323,7 @@ if __name__ == "__main__":
     cameras = configs['calibration_folders'].keys()
     for idx_cam, camera in enumerate(tqdm(cameras)):
         dir = configs['calibration_folders'][camera]['path']
+        offset = configs['calibration_folders'][camera]['offset']
         
         poses_2d = poses_3d_2_2d(
             poses,
@@ -335,7 +336,10 @@ if __name__ == "__main__":
             params[camera]).reshape(poses.shape[0], -1, 2)
 
         cap = cv2.VideoCapture(dir)
-        video_frame_count = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
+        for _ in range(offset):
+            cap.grab()
+
+        video_frame_count = int(cap.get(cv2.CAP_PROP_FRAME_COUNT)) - offset
         writer = get_video_writer(camera, configs)
         for idx, t in enumerate(poses_2d.reshape(poses_2d.shape[0], -1, 2)):
             _, img_rgb = cap.read()

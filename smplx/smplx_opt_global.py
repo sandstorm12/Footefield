@@ -184,17 +184,17 @@ def load_smplx_params(smplx_params, device):
         np.array(smplx_params['scale'], np.float32)
     )
 
-    global_orient.requires_grad = True
-    jaw_pose.requires_grad = True
-    leye_pose.requires_grad = True
-    reye_pose.requires_grad = True
-    body.requires_grad = True
-    left_hand_pose.requires_grad = True
-    right_hand_pose.requires_grad = True
+    global_orient.requires_grad = False
+    jaw_pose.requires_grad = False
+    leye_pose.requires_grad = False
+    reye_pose.requires_grad = False
+    body.requires_grad = False
+    left_hand_pose.requires_grad = False
+    right_hand_pose.requires_grad = False
     betas.requires_grad = True
-    expression.requires_grad = True
-    translation.requires_grad = True
-    scale.requires_grad = True
+    expression.requires_grad = False
+    translation.requires_grad = False
+    scale.requires_grad = False
 
     return global_orient, jaw_pose, leye_pose, reye_pose, body, \
         left_hand_pose, right_hand_pose, betas, expression, \
@@ -312,18 +312,18 @@ def calc_chamfer(verts, masks, params):
             pcd_proj = project_points_to_camera_plane(
                 verts[idx_mask].unsqueeze(0), mtx,
                 rotation, translation,)
-            if configs['visualize_chamfer_projection'] and cam == 0:
+            if configs['visualize_chamfer_projection']:
                 visualize_chamfer(
                     mask_torch.squeeze().detach().cpu().numpy(),
                     pcd_proj.squeeze().detach().cpu().numpy())
             distances = chamfer_distance(
                 pcd_proj, mask_torch,
-                single_directional=True, norm=2,
+                single_directional=False, norm=2,
                 point_reduction=None, batch_reduction=None)[0]
             loss_verts = torch.mean(distances[0])
-            # loss_mask = torch.mean(
-            #     distances[1][distances[1] < torch.max(distances[0])])
-            loss.append(loss_verts) # + loss_mask
+            loss_mask = torch.mean(
+                distances[1][distances[1] < torch.max(distances[0])])
+            loss.append(loss_verts + loss_mask)
 
     loss = torch.stack(loss) 
     loss = torch.mean(loss)
@@ -521,13 +521,16 @@ def get_masks(cameras, params, length, configs):
         mtx = np.array(params[camera]['mtx'], np.float32)
         dist = np.array(params[camera]['dist'], np.float32)
 
-        dir = configs['videos_mask'][camera]
+        dir = configs['videos_mask'][camera]['path']
+        offset = configs['videos_mask'][camera]['offset']
         cap = cv2.VideoCapture(dir)
-        video_frame_count = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
+        for _ in range(offset):
+            cap.grab()
+        video_frame_count = int(cap.get(cv2.CAP_PROP_FRAME_COUNT)) - offset
         for _ in range(video_frame_count):
             _, img_mask = cap.read()
             img_mask = cv2.cvtColor(img_mask, cv2.COLOR_BGR2GRAY)
-            img_mask = cv2.erode(img_mask, kernel, iterations=3)
+            # img_mask = cv2.erode(img_mask, kernel, iterations=3)
             img_mask = cv2.undistort(img_mask, mtx, dist, None, None)
             img_mask = cv2.resize(
                 img_mask,

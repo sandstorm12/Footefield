@@ -14,9 +14,21 @@ scale_mask: 8
 epochs: 200
 output: "artifacts/smplx_opt_global_a1.yml"
 videos_mask:
-  cam0: "../adjust/adjusted/aug23_e1_1/cam0/0_mask.mp4"
-  cam1: "../adjust/adjusted/aug23_e1_1/cam1/0_mask.mp4"
-  cam2: "../adjust/adjusted/aug23_e1_1/cam2/0_mask.mp4"
-  cam3: "../adjust/adjusted/aug23_e1_1/cam3/0_mask.mp4"
-  cam4: "../adjust/adjusted/aug23_e1_1/cam4/0_mask.mp4"
-  cam5: "../adjust/adjusted/aug23_e1_1/cam5/0_mask.mp4"
+  cam0:
+    path: "../segmask/videos/cam_1.mp4"
+    offset: 0
+  cam1:
+    path: "../segmask/videos/cam_2.mp4"
+    offset: 0
+  cam2:
+    path: "../segmask/videos/cam_3.mp4"
+    offset: 0
+  cam3:
+    path: "../segmask/videos/cam_4.mp4"
+    offset: 0
+  cam4:
+    path: "../segmask/videos/cam_5.mp4"
+    offset: 0
+  cam5:
+    path: "../segmask/videos/cam_6.mp4"
+    offset: 0

@@ -1,0 +1,33 @@
+params_smplx: "./artifacts/smplx_opt_global_a1.yml"
+params: "../pose_estimation/artifacts/params_global_a1_wb_ba.yml"
+skeletons: "../pose_estimation/artifacts/3d_skeletons_a1_wb_ba.yml"
+skeletons_norm: "../pose_estimation/artifacts/3d_skeletons_a1_wb_ba_norm.yml"
+gender: "neutral"
+models_root: "models"
+visualize_skeleton: False
+visualize_joints: False
+visualize_mesh: True
+fps: 5
+size:
+  - 1920
+  - 1080
+output: "./videos/visualizer_smplx_global/a1/"
+calibration_folders:
+    cam0:
+      path: "../captures/cam_1.mp4"
+      offset: 850
+    cam1:
+      path: "../captures/cam_2.mp4"
+      offset: 852
+    cam2: 
+      path: "../captures/cam_3.mp4"
+      offset: 851
+    cam3: 
+      path: "../captures/cam_4.mp4"
+      offset: 852
+    cam4: 
+      path: "../captures/cam_5.mp4"
+      offset: 852
+    cam5: 
+      path: "../captures/cam_6.mp4"
+      offset: 852

@@ -291,7 +291,7 @@ def visualize_poses(global_orient, jaw_pose, leye_pose,
     verts = output.vertices.detach().cpu().numpy().squeeze()
     joints = output.joints.detach().cpu().numpy().squeeze()
 
-    verts = verts - joints[0, 0] + translation
+    verts = verts - joints[0, 0] + np.expand_dims(translation, axis=1)
     verts = verts * scale
     verts = verts.squeeze()
 

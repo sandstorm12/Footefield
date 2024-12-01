@@ -2,6 +2,6 @@ skeletons_norm: "../pose_estimation/artifacts/3d_skeletons_a1_wb_ba_norm.yml"
 visualize_poses: True
 visualize_joints: True
 visualize_mesh: False
-params_smplx: "artifacts/smplx_opt_alpha_a1.yml"
+params_smplx: "./artifacts/smplx_opt_alpha_a1.yml"
 gender: "neutral"
 models_root: "models"
