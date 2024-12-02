@@ -1,25 +1,25 @@
 chessboards: "./artifacts/chessboards_rgb.yml"
-output_dir: videos/chessboard/a1/
+output_dir: ./videos/chessboard/a1/
 fps: 5
 size:
   - 1920
   - 1080
 calibration_folders:
     cam0:
-      path: "/home/hamid/Documents/phd/footefield/data/mocapaug21/cam_0.mp4"
+      path: "../captures/cam_1.mp4"
       offset: 0
     cam1:
-      path: "/home/hamid/Documents/phd/footefield/data/mocapaug21/cam_1.mp4"
-      offset: 1
+      path: "../captures/cam_2.mp4"
+      offset: 2
     cam2: 
-      path: "/home/hamid/Documents/phd/footefield/data/mocapaug21/cam_2.mp4"
+      path: "../captures/cam_3.mp4"
       offset: 1
     cam3: 
-      path: "/home/hamid/Documents/phd/footefield/data/mocapaug21/cam_3.mp4"
-      offset: 1
+      path: "../captures/cam_4.mp4"
+      offset: 2
     cam4: 
-      path: "/home/hamid/Documents/phd/footefield/data/mocapaug21/cam_4.mp4"
-      offset: 1
+      path: "../captures/cam_5.mp4"
+      offset: 2
     cam5: 
-      path: "/home/hamid/Documents/phd/footefield/data/mocapaug21/cam_5.mp4"
-      offset: 1
+      path: "../captures/cam_6.mp4"
+      offset: 2

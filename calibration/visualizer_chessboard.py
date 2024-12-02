@@ -61,9 +61,14 @@ def write_video(chessboards, camera, configs):
         _, img_rgb = cap.read()
 
         if ret:
-            for point in points:
-                cv2.circle(img_rgb, (int(point[0][0]), int(point[0][1])),
-                        3, (0, 255, 0), -1)
+            for idx_point, point in enumerate(points):
+                x = int(point[0][0])
+                y = int(point[0][1])
+                cv2.circle(img_rgb, (x, y),
+                    8, (0, 255, 0), -1)
+                cv2.putText(
+                    img_rgb, str(idx_point), (x, y),
+                    cv2.FONT_HERSHEY_SIMPLEX, .5, (255, 255, 255), thickness=2)
 
         writer.write(img_rgb)
 
