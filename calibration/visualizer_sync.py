@@ -1,3 +1,4 @@
+import os
 import cv2
 import yaml
 import argparse
@@ -27,6 +28,19 @@ def _load_configs(path):
 
 
 def _play_sync(configs):
+    if not os.path.exists(configs['output_dir']):
+        os.makedirs(configs['output_dir'])
+
+    writer = cv2.VideoWriter(
+        os.path.join(
+            configs['output_dir'],
+            'visualizer_sync.mp4'
+        ),
+        cv2.VideoWriter_fourcc(*'mp4v'),
+        configs['fps'],
+        (1280*2, 720*3),
+    )
+
     caps = []
     for video in configs['videos']:
         path = configs['videos'][video]['path']
@@ -38,9 +52,9 @@ def _play_sync(configs):
 
         caps.append(cap)
 
-    frame_agg = np.zeros((720, 1280, 3), dtype=np.uint8)
-    width = 1280 // 3
-    height = 720 // 2
+    frame_agg = np.zeros((720*3, 1280*2, 3), dtype=np.uint8)
+    width = 1280
+    height = 720
     while True:
         readouts = [cap.read() for cap in caps]
         if not np.alltrue([readouts[i][0] for i in range(len(readouts))]):
@@ -48,13 +62,14 @@ def _play_sync(configs):
 
         frame_agg[0:height, 0:width] = cv2.resize(readouts[0][1], (width, height))
         frame_agg[0:height, width:width*2] = cv2.resize(readouts[1][1], (width, height))
-        frame_agg[0:height, width*2:width*3] = cv2.resize(readouts[2][1], (width, height))
-        frame_agg[height:height*2, 0:width] = cv2.resize(readouts[3][1], (width, height))
-        frame_agg[height:height*2, width:width*2] = cv2.resize(readouts[4][1], (width, height))
-        frame_agg[height:height*2, width*2:width*3] = cv2.resize(readouts[5][1], (width, height))
+        frame_agg[height:height*2, 0:width] = cv2.resize(readouts[2][1], (width, height))
+        frame_agg[height:height*2, width:width*2] = cv2.resize(readouts[3][1], (width, height))
+        frame_agg[height*2:height*3, 0:width] = cv2.resize(readouts[4][1], (width, height))
+        frame_agg[height*2:height*3, width:width*2] = cv2.resize(readouts[5][1], (width, height))
 
         cv2.imshow("sync", frame_agg)
-        if cv2.waitKey(0) == ord('q'):
+        writer.write(frame_agg)
+        if cv2.waitKey(1) == ord('q'):
             break
 
 
