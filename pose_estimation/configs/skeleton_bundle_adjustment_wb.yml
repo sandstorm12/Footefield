@@ -1,8 +1,9 @@
-skeletons_2d: "artifacts/detected_skeletons_wb_a1.yml"
-skeletons_3d: "artifacts/3d_skeletons_a1_wb.yml"
-params: "artifacts/params_global_a1_wb.yml"
+skeletons_2d: "/home/hamid/Documents/phd/footefield/data/dataset_mocap24/aug_24/aug24_e0/artifacts/0/detected_skeletons_wb.yml"
+skeletons_3d: "/home/hamid/Documents/phd/footefield/data/dataset_mocap24/aug_24/aug24_e0/artifacts/0/3d_skeletons_wb.yml"
+params: "/home/hamid/Documents/phd/footefield/data/dataset_mocap24/aug_24/aug24_e0/artifacts/0/params_global_wb.yml"
 calib_param_size: 12
 conf_threshold: .5
 conf_power: 1
-output_skeleton_3d: "artifacts/3d_skeletons_a1_wb_ba.yml"
-output_params: "artifacts/params_global_a1_wb_ba.yml"
+output_skeleton_3d: "/home/hamid/Documents/phd/footefield/data/dataset_mocap24/aug_24/aug24_e0/artifacts/0/3d_skeletons_ba_wb.yml"
+output_params: "/home/hamid/Documents/phd/footefield/data/dataset_mocap24/aug_24/aug24_e0/artifacts/0/params_global_ba_wb.yml"
+visualize: false

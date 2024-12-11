@@ -1,0 +1,23 @@
+model: "rtmw-x_8xb320-270e_cocktail14-384x288"
+confidence_coeff: 1
+detect_max_x: 1620
+detect_min_height: 300
+detect_min_x: 300
+detect_threshold: 0.5
+intrinsics: /home/hamid/Documents/phd/footefield/data/dataset_mocap24/aug_24/aug24_calib_0/artifacts/intrinsic_rgb.yml
+output: /home/hamid/Documents/phd/footefield/data/dataset_mocap24/aug_24/aug24_e0/artifacts/0/detected_skeletons_wb.yml
+track_threshold: 0.6
+videos:
+  cam0:
+    path: /home/hamid/Documents/phd/footefield/data/dataset_mocap24/aug_24/aug24_e0/segments/cam0/0.mp4
+  cam1:
+    path: /home/hamid/Documents/phd/footefield/data/dataset_mocap24/aug_24/aug24_e0/segments/cam1/0.mp4
+  cam2:
+    path: /home/hamid/Documents/phd/footefield/data/dataset_mocap24/aug_24/aug24_e0/segments/cam2/0.mp4
+  cam3:
+    path: /home/hamid/Documents/phd/footefield/data/dataset_mocap24/aug_24/aug24_e0/segments/cam3/0.mp4
+  cam4:
+    path: /home/hamid/Documents/phd/footefield/data/dataset_mocap24/aug_24/aug24_e0/segments/cam4/0.mp4
+  cam5:
+    path: /home/hamid/Documents/phd/footefield/data/dataset_mocap24/aug_24/aug24_e0/segments/cam5/0.mp4
+visualize: true
