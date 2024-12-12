@@ -1,8 +1,8 @@
-skeletons: "/home/hamid/Documents/phd/footefield/data/dataset_mocap24/aug_24/aug24_e0/artifacts/0/detected_skeletons_wb.yml"
+skeletons: "/home/hamid/Documents/phd/footefield/data/dataset_mocap24/aug_24/aug24_e1/artifacts/37/detected_skeletons_wb.yml"
 intrinsics: "/home/hamid/Documents/phd/footefield/data/dataset_mocap24/aug_24/aug24_calib_0/artifacts/intrinsic_rgb.yml"
 extrinsics: "/home/hamid/Documents/phd/footefield/data/dataset_mocap24/aug_24/aug24_calib_0/artifacts/extrinsic_rgb.yml"
 threshold: .5
 num_people: 1
 num_points: 133
-output: "/home/hamid/Documents/phd/footefield/data/dataset_mocap24/aug_24/aug24_e0/artifacts/0/3d_skeletons_wb.yml"
-output_params: "/home/hamid/Documents/phd/footefield/data/dataset_mocap24/aug_24/aug24_e0/artifacts/0/params_global_wb.yml"
+output: "/home/hamid/Documents/phd/footefield/data/dataset_mocap24/aug_24/aug24_e1/artifacts/37/3d_skeletons_wb.yml"
+output_params: "/home/hamid/Documents/phd/footefield/data/dataset_mocap24/aug_24/aug24_e1/artifacts/37/params_global_wb.yml"
