@@ -1,0 +1,33 @@
+params_smplx: "/home/hamid/Documents/phd/footefield/data/dataset_mocap24/aug_24/aug24_e0/artifacts/26/smplx_opt_global.yml"
+params: "/home/hamid/Documents/phd/footefield/data/dataset_mocap24/aug_24/aug24_e0/artifacts/26/params_global_ba_wb.yml"
+skeletons: "/home/hamid/Documents/phd/footefield/data/dataset_mocap24/aug_24/aug24_e0/artifacts/26/3d_skeletons_ba_wb.yml"
+skeletons_norm: "/home/hamid/Documents/phd/footefield/data/dataset_mocap24/aug_24/aug24_e0/artifacts/26/3d_skeletons_ba_wb_norm.yml"
+gender: "neutral"
+models_root: "models"
+visualize_skeleton: False
+visualize_joints: True
+visualize_mesh: True
+fps: 5
+size:
+  - 1920
+  - 1080
+output: "./videos/visualizer_smplx_global/"
+calibration_folders:
+    cam0:
+      path: "/home/hamid/Documents/phd/footefield/data/dataset_mocap24/aug_24/aug24_e0/segments/cam0/26.mp4"
+      offset: 0
+    cam1:
+      path: "/home/hamid/Documents/phd/footefield/data/dataset_mocap24/aug_24/aug24_e0/segments/cam1/26.mp4"
+      offset: 0
+    cam2: 
+      path: "/home/hamid/Documents/phd/footefield/data/dataset_mocap24/aug_24/aug24_e0/segments/cam2/26.mp4"
+      offset: 0
+    cam3: 
+      path: "/home/hamid/Documents/phd/footefield/data/dataset_mocap24/aug_24/aug24_e0/segments/cam3/26.mp4"
+      offset: 0
+    cam4: 
+      path: "/home/hamid/Documents/phd/footefield/data/dataset_mocap24/aug_24/aug24_e0/segments/cam4/26.mp4"
+      offset: 0
+    cam5: 
+      path: "/home/hamid/Documents/phd/footefield/data/dataset_mocap24/aug_24/aug24_e0/segments/cam5/26.mp4"
+      offset: 0
