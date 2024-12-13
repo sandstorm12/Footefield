@@ -1,22 +1,28 @@
-see_through: True
-output_dir: "./videos/"
+see_through: False
+output_dir: "/home/hamid/Documents/phd/footefield/data/dataset_mocap24/aug_24/aug24_e0/segments_mask/26"
 exp_length: 150
 views:
   cam_0:
-    path_in: "/home/hamid/Documents/phd/footefield/data/dataset_mocap24/aug_24/aug24_e1/segments/cam0/0.mp4"
+    path_in: "/home/hamid/Documents/phd/footefield/data/dataset_mocap24/aug_24/aug24_e0/segments/cam0/26.mp4"
     offset: 0
+    name_out: cam0.mp4
   cam_1:
-    path_in: "/home/hamid/Documents/phd/footefield/data/dataset_mocap24/aug_24/aug24_e1/segments/cam1/0.mp4"
+    path_in: "/home/hamid/Documents/phd/footefield/data/dataset_mocap24/aug_24/aug24_e0/segments/cam1/26.mp4"
     offset: 0
+    name_out: cam1.mp4
   cam_2:
-    path_in: "/home/hamid/Documents/phd/footefield/data/dataset_mocap24/aug_24/aug24_e1/segments/cam2/0.mp4"
+    path_in: "/home/hamid/Documents/phd/footefield/data/dataset_mocap24/aug_24/aug24_e0/segments/cam2/26.mp4"
     offset: 0
+    name_out: cam2.mp4
   cam_3:
-    path_in: "/home/hamid/Documents/phd/footefield/data/dataset_mocap24/aug_24/aug24_e1/segments/cam3/0.mp4"
+    path_in: "/home/hamid/Documents/phd/footefield/data/dataset_mocap24/aug_24/aug24_e0/segments/cam3/26.mp4"
     offset: 0
+    name_out: cam3.mp4
   cam_4:
-    path_in: "/home/hamid/Documents/phd/footefield/data/dataset_mocap24/aug_24/aug24_e1/segments/cam4/0.mp4"
+    path_in: "/home/hamid/Documents/phd/footefield/data/dataset_mocap24/aug_24/aug24_e0/segments/cam4/26.mp4"
     offset: 0
+    name_out: cam4.mp4
   cam_5:
-    path_in: "/home/hamid/Documents/phd/footefield/data/dataset_mocap24/aug_24/aug24_e1/segments/cam5/0.mp4"
+    path_in: "/home/hamid/Documents/phd/footefield/data/dataset_mocap24/aug_24/aug24_e0/segments/cam5/26.mp4"
     offset: 0
+    name_out: cam5.mp4

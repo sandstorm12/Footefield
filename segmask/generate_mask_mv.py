@@ -1,5 +1,6 @@
 import os
 import cv2
+import time
 import yaml
 import torch
 import argparse
@@ -34,7 +35,7 @@ def _load_configs(path):
 
 def _load_model(device):
     model = torch.hub.load(
-        'pytorch/vision:v0.10.0',
+        'pytorch/vision:v0.20.0',
         # 'deeplabv3_resnet50',
         'deeplabv3_resnet101',
         # 'deeplabv3_mobilenet_v3_large',
@@ -49,7 +50,7 @@ def _load_model(device):
     return model, preprocess
 
 
-def _segment_video(model, preprocess, path_in, path_out, offset, configs):
+def _segment_video(model, preprocess, path_in, path_out, offset, device, configs):
     cap = cv2.VideoCapture(path_in)
     length = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
     fps = int(cap.get(cv2.CAP_PROP_FPS))
@@ -68,31 +69,38 @@ def _segment_video(model, preprocess, path_in, path_out, offset, configs):
     for i in range(offset):
         cap.grab()
 
+    frames = [cap.read()[1] for _ in range(length)]
+
+    batch_size = 1
     # TODO: Add batching. Update: didn't work as expected
-    for idx_frame in tqdm(range(length)):
-        ret, frame = cap.read()
-        if not ret:
-            break
-
-        frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-
-        input_tensor = preprocess(frame_rgb)
-        input_batch = input_tensor.unsqueeze(0).to(device)
+    for idx_frame in tqdm(range(length // batch_size)):
+        batch = torch.stack([
+            preprocess(cv2.resize(cv2.cvtColor(
+                frame, cv2.COLOR_BGR2RGB), (width, height)))
+            for frame in frames[idx_frame * batch_size: (idx_frame + 1) * batch_size]])
+        batch = batch.to(device)
 
         with torch.no_grad():
-            output = model(input_batch)['out'][0]
-        output_predictions = output.argmax(0)
+            output = model(batch)['out']
 
-        output_predictions[output_predictions == 15] = 255
-        output_predictions[output_predictions != 255] = 0
+        for idx in range(batch_size):
+            output_predictions = output[idx].argmax(0)
 
-        mask = output_predictions.detach().cpu().numpy().astype(np.uint8)
-        mask = cv2.cvtColor(mask, cv2.COLOR_GRAY2BGR)
+            output_predictions[output_predictions == 15] = 255
+            output_predictions[output_predictions != 255] = 0
 
-        if configs['see_through']:
-            mask[mask == 255] = frame[mask == 255]
+            mask = output_predictions.detach().cpu().numpy().astype(np.uint8)
+            mask = cv2.cvtColor(mask, cv2.COLOR_GRAY2BGR)
+            mask = cv2.resize(mask, (width, height))
 
-        writer.write(mask)
+            # cv2.imshow("mask", mask)
+            # if cv2.waitKey(0) == ord('q'):
+            #     break
+
+            if configs['see_through']:
+                mask[mask == 255] = frames[idx_frame * batch_size + idx][mask == 255]
+
+            writer.write(mask)
 
 
 if __name__ == "__main__":
@@ -102,12 +110,16 @@ if __name__ == "__main__":
     print(f"Config loaded: {configs}")
 
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+    # device = 'cpu'
 
-    model, preprocess = _load_model('cuda')
+    print("Device", device)
+
+    model, preprocess = _load_model(device)
 
     for video in configs['views']:
         path_in = configs['views'][video]['path_in']
         offset = configs['views'][video]['offset']
         path_out = os.path.join(configs['output_dir'],
-                                os.path.basename(path_in))
-        _segment_video(model, preprocess, path_in, path_out, offset, configs)
+                                configs['views'][video]['name_out'])
+        _segment_video(model, preprocess, path_in, path_out, offset,
+                       device, configs)
